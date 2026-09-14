@@ -1,0 +1,29 @@
+.browser {
+  display: flex;
+}
+
+.browser select {
+  width: 285px;
+  border: 1px solid #35463f;
+  background: #111b18;
+  color: #fff;
+  padding: 13px;
+}
+
+.browser button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+.browser .refresh {
+  border-left: 1px solid #173b30;
+  background: #245747;
+  color: #dff8ee;
+}
+
+@media(max-width: 800px) {
+  .browser,
+  .browser select {
+    width: 100%;
+  }
+}

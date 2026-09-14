@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDecideRelease, canRequestRelease, mutationHeaders, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -39,6 +39,11 @@ test("release catalog only offers active and validated choices", () => {
   ];
   assert.deepEqual(selectableCatalogItems(items).map((item) => item.id), ["1"]);
   assert.deepEqual(selectableCatalogItems(items, ["ACTIVE", "ACTIVE_WITH_WARNINGS"]).map((item) => item.id), ["1", "2"]);
+});
+
+test("recent release choices have a stable compact label", () => {
+  assert.equal(releaseOptionLabel({ id: "1", version: "v2.1.0", status: "PENDING_APPROVAL", createdAt: "2026-09-15T00:00:00Z" }), "v2.1.0 · PENDING_APPROVAL · 2026-09-15");
+  assert.equal(releaseOptionLabel({ id: "2", version: "v1", status: "FAILED", createdAt: "invalid" }), "v1 · FAILED · 날짜 미상");
 });
 
 test("release draft validation fails closed before mutation", () => {

@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
+import browserStyles from "./release-browser.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { canDecideRelease, canRequestRelease, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -65,6 +66,8 @@ const emptyReleaseDraft: ReleaseDraft = { serviceId: "", environmentId: "", vers
 
 export default function Home() {
   const [releaseId, setReleaseId] = useState("");
+  const [recentReleases, setRecentReleases] = useState<ReleaseSummary[]>([]);
+  const [releaseListBusy, setReleaseListBusy] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [release, setRelease] = useState<Release | null>(null);
   const [live, setLive] = useState<LiveState>({ releaseStatus: "ANALYZING", steps: demoSteps });
@@ -89,6 +92,21 @@ export default function Home() {
   const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
 
+  const refreshReleases = useCallback(async () => {
+    setReleaseListBusy(true);
+    try {
+      const response = await fetch("/control-api/releases?limit=20", { credentials: "include" });
+      if (!response.ok) throw new Error();
+      const page = await response.json() as { items: ReleaseSummary[] };
+      setRecentReleases(page.items);
+      setReleaseId((current) => current || page.items[0]?.id || "");
+    } catch {
+      setError("최근 릴리스를 불러올 수 없습니다.");
+    } finally {
+      setReleaseListBusy(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetch("/control-api/session/providers")
       .then((response) => response.ok ? response.json() : Promise.reject())
@@ -99,10 +117,11 @@ export default function Home() {
       .then((current) => {
         setSessionUser(current.user);
         setCanOperate(current.user.roles.includes("OPERATOR"));
+        void refreshReleases();
         if (!current.user.demo) void refreshSessions().catch(() => setSessionNotice("활성 세션을 불러올 수 없습니다."));
       })
       .catch(() => undefined);
-  }, []);
+  }, [refreshReleases]);
 
   useEffect(() => {
     if (!canRequestRelease(sessionUser?.roles ?? [])) return;
@@ -141,6 +160,7 @@ export default function Home() {
     setActiveSessions([]);
     setCanOperate(session.user.roles.includes("OPERATOR"));
     setConnection("DEMO · VIEW ONLY");
+    await refreshReleases();
   }
 
   async function csrfToken() {
@@ -212,6 +232,7 @@ export default function Home() {
     setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
     setAnalyses(await analysesResponse.json());
     setActiveId(id);
+    setRecentReleases((current) => current.map((item) => item.id === id ? { ...item, status: loadedRelease.status } : item));
   }
 
   useEffect(() => {
@@ -279,6 +300,7 @@ export default function Home() {
       const created = await response.json() as { id: string };
       setReleaseId(created.id);
       setRequestNotice(`릴리스 ${created.id} 요청이 생성되었습니다.`);
+      await refreshReleases();
       await load(created.id);
     } catch (failure) {
       setError((failure as Error).message);
@@ -361,7 +383,7 @@ export default function Home() {
       <section className={styles.shell}>
         <header className={styles.topline}>
           <div><p>RELEASE OPERATIONS</p><h1>Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
-          <form onSubmit={submit}><input aria-label="Release ID" placeholder="Release UUID" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} /><button>불러오기</button></form>
+          <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy}>불러오기</button><button type="button" className={browserStyles.refresh} onClick={() => void refreshReleases()} disabled={!sessionUser || releaseListBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
         </header>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {canRequestRelease(sessionUser?.roles ?? []) && <details className={sessionStyles.releaseRequest}>

@@ -1,9 +1,16 @@
 export type CsrfToken = { headerName: string; token: string };
 
 export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
+export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
+}
+
+export function releaseOptionLabel(release: ReleaseSummary) {
+  const created = new Date(release.createdAt);
+  const date = Number.isNaN(created.getTime()) ? "날짜 미상" : created.toISOString().slice(0, 10);
+  return `${release.version} · ${release.status} · ${date}`;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
