@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
+import { CsrfToken, mutationHeaders } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -66,6 +67,9 @@ export default function Home() {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState("");
+  const [operationBusy, setOperationBusy] = useState(false);
+  const [operationNotice, setOperationNotice] = useState("");
+  const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
 
   useEffect(() => {
@@ -94,11 +98,10 @@ export default function Home() {
     setConnection("DEMO · VIEW ONLY");
   }
 
-  async function csrfHeaders() {
+  async function csrfToken() {
     const response = await fetch("/control-api/session/csrf", { credentials: "include" });
     if (!response.ok) throw new Error("보안 토큰을 갱신할 수 없습니다.");
-    const csrf = await response.json() as { headerName: string; token: string };
-    return { [csrf.headerName]: csrf.token };
+    return response.json() as Promise<CsrfToken>;
   }
 
   async function refreshSessions() {
@@ -114,7 +117,7 @@ export default function Home() {
     setSessionNotice("");
     try {
       const response = await fetch(`/control-api/session/active/${session.reference}`, {
-        method: "DELETE", credentials: "include", headers: await csrfHeaders(),
+        method: "DELETE", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       if (!response.ok) throw new Error("세션 종료 요청이 거부되었습니다.");
       if (session.current) {
@@ -139,7 +142,7 @@ export default function Home() {
     setSessionNotice("");
     try {
       const response = await fetch("/control-api/session/revoke-others", {
-        method: "POST", credentials: "include", headers: await csrfHeaders(),
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       if (!response.ok) throw new Error("다른 세션 종료 요청이 거부되었습니다.");
       const result = await response.json() as { revoked: number };
@@ -187,14 +190,33 @@ export default function Home() {
     try { await load(releaseId.trim()); } catch (failure) { setError((failure as Error).message); }
   }
 
-  async function operate(action: "promote" | "pause" | "abort") {
-    if (!activeId) return;
-    const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() + crypto.randomUUID() },
-      body: JSON.stringify({ reason: `Operator ${action} from release console` }),
-    });
-    if (!response.ok) setError(`${action} 요청이 거부되었습니다.`);
+  async function operate(action: "promote" | "pause" | "resume" | "abort") {
+    if (!activeId || operationInFlight.current) return;
+    const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
+    if (reason === undefined) return;
+    if (reason.length === 0 || reason.length > 1000) {
+      setError("조작 사유는 1자 이상 1000자 이하여야 합니다.");
+      return;
+    }
+    operationInFlight.current = true;
+    setOperationBusy(true);
+    setOperationNotice("");
+    setError("");
+    try {
+      const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
+      const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
+        method: "POST", credentials: "include",
+        headers: mutationHeaders(await csrfToken(), { idempotencyKey, json: true }),
+        body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) throw new Error(`${action} 요청이 거부되었습니다.`);
+      setOperationNotice(`${action} 요청이 접수되었습니다.`);
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      operationInFlight.current = false;
+      setOperationBusy(false);
+    }
   }
 
   return (
@@ -214,7 +236,8 @@ export default function Home() {
             <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
             <div className={styles.stages}>{live.steps.map((step) => <div className={styles.stage} data-status={step.status} key={step.index}><i /><span>{step.weight}%</span><small>{step.status}</small></div>)}</div>
-            <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate}>Pause</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
+            <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
+            {operationNotice && <p className={sessionStyles.operationNotice} role="status">{operationNotice}</p>}
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>

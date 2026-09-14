@@ -12,6 +12,7 @@
 .sessionList article button { color: #ffacb0; border-color: #5c3437; }
 .sessionEmpty, .sessionNotice { padding: 20px 26px; color: #8fa39b; }
 .sessionNotice { border-top: 1px solid #293730; color: #c9e8dc; }
+.operationNotice { margin: 0; padding: 12px 26px; border-top: 1px solid #293730; color: #c9e8dc; }
 @media(max-width: 600px) {
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test --experimental-strip-types src/app/session-management.test.mts",
+    "test": "node --test --experimental-strip-types src/app/session-management.test.mts src/app/control-api.test.mts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
