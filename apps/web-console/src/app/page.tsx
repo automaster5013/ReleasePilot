@@ -118,7 +118,7 @@ export default function Home() {
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>
-          <div><p>RELEASE OPERATIONS</p><h1>Canary control room</h1><span>판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
+          <div><p>RELEASE OPERATIONS</p><h1>Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
           <form onSubmit={submit}><input aria-label="Release ID" placeholder="Release UUID" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} /><button>불러오기</button></form>
         </header>
         {error && <p className={styles.error} role="alert">{error}</p>}
