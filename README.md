@@ -71,6 +71,8 @@ external-dns, cert-manager, Argo CD와 digest 기반 GitOps 정의는 `infra/aws
 
 - 실행 엔진은 Argo Rollouts에 맡기고 ReleasePilot은 승인, 정책 판정, 실행 명령과 감사 증거를 소유합니다.
 - Canary 트래픽은 10→30→60→100 단계로 진행하며 FAIL은 abort, 불확실한 관측은 자동 승격하지 않습니다.
+- Blue/Green은 격리된 preview를 분석한 뒤에만 active Service를 전환하며, Environment와 정책 전략의
+  불일치를 실행 전에 차단합니다.
 - 애플리케이션 이미지는 Git 태그에서 빌드하고 digest를 Git에 기록해 Argo CD가 동일 산출물을 재현합니다.
 - 초기 데모는 비용과 운영 복잡도를 낮추기 위해 EKS 내부 단일 MySQL을 사용합니다. 프로덕션 전환 시 RDS와
   전용 secret manager, WAF, 인증된 관측성 엔드포인트가 필요합니다.

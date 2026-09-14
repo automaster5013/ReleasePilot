@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: checkout-blue-green
+spec:
+  replicas: 2
+  strategy:
+    blueGreen:
+      activeService: checkout-active
+      previewService: checkout-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
+      activeMetadata:
+        labels: { release_track: stable }
+      previewMetadata:
+        labels: { release_track: canary }
+  selector:
+    matchLabels:
+      app: checkout-blue-green
+  template:
+    metadata:
+      labels:
+        app: checkout-blue-green
+    spec:
+      containers:
+        - name: checkout
+          image: ghcr.io/example/checkout@sha256:replace-me
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-active
+spec:
+  selector: { app: checkout-blue-green }
+  ports: [{ port: 80, targetPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-preview
+spec:
+  selector: { app: checkout-blue-green }
+  ports: [{ port: 80, targetPort: 8080 }]

@@ -17,7 +17,7 @@ class EnvironmentApiTests {
   var prom=prometheus.save(PrometheusConnection.create("env-prometheus","http://prometheus:9090",null,15,now));
   String response=mvc.perform(post("/api/v1/services/{id}/environments",app.getId()).with(authentication(operator())).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
    {"name":"production","clusterId":"%s","namespace":"releasepilot-demo","rolloutName":"checkout","containerName":"checkout","stableServiceName":"checkout-stable","canaryServiceName":"checkout-canary","prometheusConnectionId":"%s","workloadLabelSelector":{"service_namespace":"releasepilot-demo","service_name":"checkout"},"defaultPolicyVersionId":"%s"}
-   """.formatted(cluster.getId(),prom.getId(),UUID.randomUUID()))).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.containerName").value("checkout")).andReturn().getResponse().getContentAsString();
+   """.formatted(cluster.getId(),prom.getId(),UUID.randomUUID()))).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.strategy").value("CANARY")).andExpect(jsonPath("$.containerName").value("checkout")).andReturn().getResponse().getContentAsString();
   String id=response.substring(response.indexOf("\"id\":\"")+6,response.indexOf("\"",response.indexOf("\"id\":\"")+6));
   mvc.perform(post("/api/v1/environments/{id}/validate",id).with(authentication(operator())).with(csrf()))
    .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("INVALID")).andExpect(jsonPath("$.checks.length()").value(11)).andExpect(jsonPath("$.checks[6].code").value("ROLLOUT_RBAC"));

@@ -78,6 +78,14 @@ staging은 개발 속도를 위해 별도의 짧은 정책을 사용할 수 있�
 
 각 단계에서 ReleasePilot은 안정 버전과 Canary 버전을 동일한 시간 창으로 비교한다.
 
+### Blue/Green 실행 계획
+
+Blue/Green Environment는 Argo Rollouts의 `activeService`, `previewService`와
+`autoPromotionEnabled: false`를 사용한다. 새 이미지는 preview ReplicaSet에 배포되고 단일 100% preview
+분석 단계가 PASS한 뒤 ReleasePilot의 promote 명령으로 active Service가 전환된다. FAIL이면 abort하여
+active Service를 기존 stable ReplicaSet에 유지하고, INCONCLUSIVE이면 자동 전환하지 않고 일시정지한다.
+Environment와 정책의 전략이 다르면 릴리스 요청 단계에서 거부한다.
+
 MVP 필수 지표는 다음 세 가지다.
 
 | 지표 | 목적 | production 기본 조건 초안 |

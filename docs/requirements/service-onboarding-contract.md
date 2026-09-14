@@ -47,8 +47,9 @@ Project
 | namespace | 예 | Rollout이 존재하는 namespace |
 | rolloutName | 예 | Argo Rollouts Rollout 이름 |
 | containerName | 예 | 이미지 digest를 교체할 Rollout Pod template의 컨테이너 이름 |
-| stableServiceName | 예 | stable 트래픽 대상 Kubernetes Service |
-| canaryServiceName | 예 | canary 트래픽 대상 Kubernetes Service |
+| strategy | 아니오 | `CANARY`(기본값) 또는 `BLUE_GREEN` |
+| stableServiceName | 예 | Canary stable 또는 Blue/Green active Kubernetes Service |
+| canaryServiceName | 예 | Canary candidate 또는 Blue/Green preview Kubernetes Service |
 | prometheusConnectionId | 예 | 사전에 등록된 PrometheusConnection |
 | workloadLabelSelector | 예 | 대상 시계열을 제한하는 label 집합 |
 | defaultPolicyVersionId | 예 | ACTIVE 상태 정책 버전 |
@@ -82,14 +83,14 @@ Environment는 다음 검사를 모두 통과해야 ACTIVE가 된다.
 1. Kubernetes API에 연결할 수 있다.
 2. 지정 namespace가 허용 목록 안에 있다.
 3. Rollout이 존재하고 `argoproj.io/v1alpha1` Rollout이다.
-4. Rollout의 strategy가 Canary다.
-5. stableService와 canaryService 참조가 등록 입력과 일치한다.
+4. Rollout의 strategy가 Environment의 `CANARY` 또는 `BLUE_GREEN`과 일치한다.
+5. stable/canary 또는 active/preview Service 참조가 등록 입력과 일치한다.
 6. 두 Kubernetes Service가 존재한다.
 7. Control Plane ServiceAccount가 Rollout get/watch/patch 권한을 가진다.
 8. Prometheus의 ready endpoint와 query endpoint에 접근할 수 있다.
 9. label selector로 최근 시계열을 조회할 수 있다.
 10. stable과 canary를 구분하는 `release_track` label이 존재한다.
-11. 기본 정책이 ACTIVE이며 의미 검증을 통과한다.
+11. 기본 정책이 ACTIVE이고 의미 검증을 통과하며 Environment와 같은 전략을 사용한다.
 
 검사 결과는 항목별 PASS, FAIL, WARNING으로 저장하고 사용자에게 보여준다. FAIL이 있으면 Environment는 `INVALID`, WARNING만 있으면 `ACTIVE_WITH_WARNINGS`가 될 수 있다.
 
@@ -144,7 +145,12 @@ Operator가 유효한 Rollout과 Prometheus 연결을 입력한다. 모든 필�
 
 ### Rollout 전략 오류
 
-대상이 Deployment이거나 Blue/Green Rollout이면 검사가 FAIL하고 Environment가 INVALID가 된다.
+대상이 Deployment이거나 등록한 전략과 실제 Rollout 전략이 다르면 검사가 FAIL하고 Environment가 INVALID가 된다.
+
+### Blue/Green 정상 등록
+
+Operator가 `BLUE_GREEN`, active Service와 preview Service를 등록한다. 실제 Rollout의 `blueGreen` 참조와
+일치하고 단일 preview 분석 단계 정책이 ACTIVE이면 Environment가 활성화된다.
 
 ### 필수 label 누락
 

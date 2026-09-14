@@ -515,7 +515,7 @@ paths:
   /releases/{releaseId}/promote:
     post:
       tags: [Operations]
-      summary: 현재 Canary 단계를 다음 단계로 승격
+      summary: 현재 Canary 단계 또는 Blue/Green preview를 승격
       operationId: promoteRelease
       parameters:
         - $ref: '#/components/parameters/ReleaseId'
@@ -1067,10 +1067,16 @@ components:
         containerName:
           type: string
           description: Container in the Rollout pod template whose image is replaced
+        strategy:
+          type: string
+          enum: [CANARY, BLUE_GREEN]
+          default: CANARY
         stableServiceName:
           type: string
+          description: Canary stable Service 또는 Blue/Green active Service
         canaryServiceName:
           type: string
+          description: Canary candidate Service 또는 Blue/Green preview Service
         prometheusConnectionId:
           type: string
           format: uuid
@@ -1092,6 +1098,7 @@ components:
         - namespace
         - rolloutName
         - containerName
+        - strategy
         - status
       properties:
         id:
@@ -1112,6 +1119,9 @@ components:
           type: string
         containerName:
           type: string
+        strategy:
+          type: string
+          enum: [CANARY, BLUE_GREEN]
         status:
           type: string
           enum: [DRAFT, VALIDATING, ACTIVE, ACTIVE_WITH_WARNINGS, INVALID, DISABLED]

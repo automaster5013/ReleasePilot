@@ -13,11 +13,14 @@ public class HttpKubernetesValidationGateway implements KubernetesValidationGate
    if(get(root+"/version",secret.bearerToken()).statusCode()!=200)return unavailable();
    var rollout=get(root+"/apis/argoproj.io/v1alpha1/namespaces/"+ns+"/rollouts/"+name,secret.bearerToken());
    if(rollout.statusCode()!=200)return reachableWithoutRollout(); JsonNode node=json.readTree(rollout.body());
-   String api=text(node,"apiVersion"),kind=text(node,"kind"),uid=text(node,"metadata","uid"); JsonNode canary=node.path("spec").path("strategy").path("canary");
-   String stable=text(canary,"stableService"),candidate=text(canary,"canaryService"); Set<String> existing=new HashSet<>();
+   String api=text(node,"apiVersion"),kind=text(node,"kind"),uid=text(node,"metadata","uid"); JsonNode strategies=node.path("spec").path("strategy");
+   JsonNode canary=strategies.path("canary"),blueGreen=strategies.path("blueGreen");
+   RolloutStrategy strategy=!canary.isMissingNode()?RolloutStrategy.CANARY:(!blueGreen.isMissingNode()?RolloutStrategy.BLUE_GREEN:null);
+   JsonNode selected=strategy==RolloutStrategy.BLUE_GREEN?blueGreen:canary;
+   String stable=text(selected,strategy==RolloutStrategy.BLUE_GREEN?"activeService":"stableService"),candidate=text(selected,strategy==RolloutStrategy.BLUE_GREEN?"previewService":"canaryService"); Set<String> existing=new HashSet<>();
    for(String service:Set.of(env.getStableServiceName(),env.getCanaryServiceName()))if(get(root+"/api/v1/namespaces/"+ns+"/services/"+service,secret.bearerToken()).statusCode()==200)existing.add(service);
    Set<String> verbs=new HashSet<>(); for(String verb:List.of("get","watch","patch"))if(access(root,ns,name,verb,secret.bearerToken()))verbs.add(verb);
-   return new Snapshot(true,api,kind,!canary.isMissingNode(),stable,candidate,existing,verbs,uid);
+   return new Snapshot(true,api,kind,strategy,stable,candidate,existing,verbs,uid);
   }catch(Exception ignored){return unavailable();}
  }
  private HttpResponse<String> get(String uri,String token)throws Exception{return http.send(HttpRequest.newBuilder(URI.create(uri)).timeout(Duration.ofSeconds(10)).header("Authorization","Bearer "+token).header("Accept","application/json").GET().build(),HttpResponse.BodyHandlers.ofString());}
@@ -28,6 +31,6 @@ public class HttpKubernetesValidationGateway implements KubernetesValidationGate
  }
  private String text(JsonNode node,String...path){for(String p:path)node=node.path(p);return node.asText("");}
  private String strip(String value){return value.endsWith("/")?value.substring(0,value.length()-1):value;}
- private Snapshot unavailable(){return new Snapshot(false,"","",false,"","",Set.of(),Set.of(),"");}
- private Snapshot reachableWithoutRollout(){return new Snapshot(true,"","",false,"","",Set.of(),Set.of(),"");}
+ private Snapshot unavailable(){return new Snapshot(false,"","",null,"","",Set.of(),Set.of(),"");}
+ private Snapshot reachableWithoutRollout(){return new Snapshot(true,"","",null,"","",Set.of(),Set.of(),"");}
 }

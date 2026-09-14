@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "name": "blue-green-production-v1",
+  "description": "Preview 검증 후 active Service를 전환하는 Blue/Green 정책",
+  "strategy": "BLUE_GREEN",
+  "steps": [
+    {
+      "weight": 100,
+      "minimumObservationSeconds": 300
+    }
+  ],
+  "metrics": [
+    {
+      "key": "HTTP_5XX_RATE",
+      "required": true,
+      "comparison": "LESS_THAN",
+      "threshold": 0.01,
+      "relativeToBaseline": { "maximumAbsoluteIncrease": 0.005 }
+    },
+    {
+      "key": "HTTP_P95_LATENCY_MS",
+      "required": true,
+      "comparison": "LESS_THAN",
+      "threshold": 500,
+      "relativeToBaseline": { "maximumRelativeIncreasePercent": 20 }
+    },
+    {
+      "key": "REQUEST_COUNT",
+      "required": true,
+      "comparison": "GREATER_THAN_OR_EQUAL",
+      "threshold": 1000
+    }
+  ],
+  "inconclusivePolicy": {
+    "additionalObservationSeconds": 300,
+    "maximumAttempts": 2,
+    "onExhausted": "PAUSE"
+  }
+}

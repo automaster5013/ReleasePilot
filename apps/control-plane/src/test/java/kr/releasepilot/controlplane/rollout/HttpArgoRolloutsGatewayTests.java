@@ -68,6 +68,12 @@ class HttpArgoRolloutsGatewayTests {
         assertThat(result.phase()).isEqualTo("Progressing");assertThat(result.currentStepIndex()).isEqualTo(1);assertThat(result.image()).isEqualTo("target");assertThat(result.aborted()).isFalse();assertThat(result.controllerObservedDesiredGeneration()).isTrue();
     }
 
+    @Test void observesBlueGreenPreviewAsSingleAnalysisStep() throws Exception {
+        server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.createContext("/apis/argoproj.io/v1alpha1/namespaces/demo/rollouts/checkout",exchange->respond(exchange,200,rollout("16","sidecar","target").replace("\"resourceVersion\":\"16\"", "\"resourceVersion\":\"16\",\"generation\":2").replace("\"spec\":", "\"status\":{\"phase\":\"Paused\",\"pauseConditions\":[{\"reason\":\"BlueGreenPause\"}],\"abort\":false,\"observedGeneration\":2},\"spec\":").replace("\"template\":", "\"strategy\":{\"blueGreen\":{\"activeService\":\"checkout-active\",\"previewService\":\"checkout-preview\",\"autoPromotionEnabled\":false}},\"template\":")));server.start();
+        var result=new HttpArgoRolloutsGateway(HttpClient.newHttpClient(),new ObjectMapper()).observe(new ArgoRolloutsGateway.ObserveRequest("http://127.0.0.1:"+server.getAddress().getPort(),"token","demo","checkout","checkout"));
+        assertThat(result.phase()).isEqualTo("Paused");assertThat(result.currentStepIndex()).isZero();assertThat(result.image()).isEqualTo("target");assertThat(result.controllerObservedDesiredGeneration()).isTrue();
+    }
+
     private ArgoRolloutsGateway.StartRequest request(String image) { return new ArgoRolloutsGateway.StartRequest("http://127.0.0.1:" + server.getAddress().getPort(), "token", "demo", "checkout", "checkout", image); }
     private String rollout(String resourceVersion, String sidecarImage, String appImage) { return "{\"metadata\":{\"uid\":\"rollout-uid\",\"resourceVersion\":\""+resourceVersion+"\"},\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"sidecar\",\"image\":\""+sidecarImage+"\"},{\"name\":\"checkout\",\"image\":\""+appImage+"\"}]}}}}"; }
     private void respond(com.sun.net.httpserver.HttpExchange exchange, int status, String body) throws java.io.IOException { byte[] bytes=body.getBytes(StandardCharsets.UTF_8);exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);exchange.close(); }

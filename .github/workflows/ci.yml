@@ -75,8 +75,8 @@ jobs:
         run: >-
           python -c "import json,jsonschema,pathlib;
           s=json.loads(pathlib.Path('policies/schema/release-policy.schema.json').read_text());
-          e=json.loads(pathlib.Path('policies/examples/production-default-v1.json').read_text());
-          jsonschema.validate(e,s)"
+          examples=pathlib.Path('policies/examples').glob('*.json');
+          [jsonschema.validate(json.loads(p.read_text()),s) for p in examples]"
       - name: Parse API and query templates
         run: >-
           python -c "import pathlib,yaml;

@@ -203,7 +203,7 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 
 ## 6. MVP 이후 우선순위
 
-1. Blue/Green 전략
+1. Blue/Green 전략 — 완료 (2026-09-14)
 2. OIDC/SSO
 3. Slack 또는 GitHub Checks 알림·승인 연동
 4. 다중 클러스터
