@@ -6,7 +6,6 @@ on:
 permissions:
   contents: write
   id-token: write
-  pull-requests: write
 env:
   AWS_REGION: ap-northeast-2
 jobs:
@@ -49,6 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/download-artifact@v4
         with: { pattern: digest-*, merge-multiple: true }
       - name: Update pinned image digests
@@ -60,8 +61,6 @@ jobs:
           python scripts/update_releasepilot_images.py image-digests.txt deploy/overlays/aws-demo/kustomization.yaml
           git config user.name releasepilot-bot
           git config user.email releasepilot-bot@users.noreply.github.com
-          git checkout -b "releasepilot/$RELEASE_SHA"
           git add deploy/overlays/aws-demo/kustomization.yaml
           git commit -m "deploy: ReleasePilot $RELEASE_SHA"
-          git push origin HEAD
-          gh pr create --title "Deploy ReleasePilot $RELEASE_SHA" --body "Images are pinned by digest." --base main
+          git push origin main
