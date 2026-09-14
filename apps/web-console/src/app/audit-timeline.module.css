@@ -1,0 +1,12 @@
+.timeline { margin-top: 18px; border: 1px solid #2b3b36; background: #111a18; }
+.timeline > header { display: flex; align-items: end; justify-content: space-between; padding: 24px 26px; }
+.timeline header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
+.timeline h2 { margin-top: 7px; }
+.timeline header span, .empty { color: #7f938b; font-size: 12px; }
+.timeline ol { margin: 0; padding: 0; list-style: none; }
+.timeline li { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: start; padding: 16px 26px; border-top: 1px solid #293730; }
+.timeline li i { width: 9px; height: 9px; margin-top: 4px; border: 2px solid #3adea3; border-radius: 50%; box-shadow: 0 0 0 4px #3adea319; }
+.timeline li div { display: grid; gap: 5px; }
+.timeline li small, .timeline time { color: #71847c; font: 10px monospace; }
+.empty { margin: 0; padding: 20px 26px; border-top: 1px solid #293730; }
+@media(max-width: 600px) { .timeline li { grid-template-columns: 16px 1fr; } .timeline time { grid-column: 2; } }

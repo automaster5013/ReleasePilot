@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDecideRelease, canRequestRelease, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { auditEventLabel, canDecideRelease, canRequestRelease, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -45,6 +45,12 @@ test("recent release choices have a stable compact label", () => {
   assert.equal(releaseOptionLabel({ id: "1", version: "v2.1.0", status: "PENDING_APPROVAL", createdAt: "2026-09-15T00:00:00Z" }), "v2.1.0 · PENDING_APPROVAL · 2026-09-15");
   assert.equal(releaseOptionLabel({ id: "3", version: "v2.1.0", status: "APPROVED", createdAt: "2026-09-15T00:00:00Z", context: { serviceName: "Checkout", environmentName: "production" } }), "Checkout/production · v2.1.0 · APPROVED · 2026-09-15");
   assert.equal(releaseOptionLabel({ id: "2", version: "v1", status: "FAILED", createdAt: "invalid" }), "v1 · FAILED · 날짜 미상");
+});
+
+test("audit events have readable action and privacy-safe actor labels", () => {
+  const base = { id: "1", occurredAt: "2026-09-15T00:00:00Z", correlationId: "correlation", chainSequence: 1 };
+  assert.equal(auditEventLabel({ ...base, eventType: "RELEASE_APPROVED", actorType: "USER", actorId: "12345678-abcd" }), "Release Approved · User 12345678");
+  assert.equal(auditEventLabel({ ...base, eventType: "ROLLOUT_PROMOTE_COMPLETED", actorType: "SYSTEM", actorId: null }), "Rollout Promote Completed · System");
 });
 
 test("release draft validation fails closed before mutation", () => {

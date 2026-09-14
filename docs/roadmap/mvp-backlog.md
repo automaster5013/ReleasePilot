@@ -220,3 +220,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 15. 승인 컨텍스트 상세 화면 — 완료 (2026-09-15, 대상·요청자·artifact·pipeline·불변 정책 단계/임계값 표시)
 16. 최근 릴리스 탐색 Web Console — 완료 (2026-09-15, 권한 범위 목록·상태/버전 선택·새로고침·생성 직후 연결)
 17. 권한 범위 릴리스 목록 정확성 — 완료 (2026-09-15, 권한 필터 후 limit·Service/Environment 대상 식별)
+18. 릴리스 감사 타임라인 Web Console — 완료 (2026-09-15, 시간순 이벤트·actor·correlation·hash chain sequence 표시)

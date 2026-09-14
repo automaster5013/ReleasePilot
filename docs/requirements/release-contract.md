@@ -194,6 +194,11 @@ ROLLING_BACK     → ROLLED_BACK | ROLLBACK_FAILED
 
 감사 이벤트는 애플리케이션의 일반 로그와 분리해 MySQL에 저장한다. 이벤트는 수정하지 않고, 정정이 필요하면 새로운 정정 이벤트를 추가한다.
 
+Web Console의 릴리스 상세는 권한이 확인된 `RELEASE` aggregate 감사 이벤트를 발생 시간순으로 표시한다.
+각 항목에는 이벤트 종류, USER/SYSTEM actor, 발생 시각, correlation ID와 hash chain sequence를 포함한다.
+일반 사용자와 공개 VIEWER에게 원본 `payloadJson`과 hash 값은 노출하지 않으며, SSE 상태 갱신과 사용자 조작
+완료 후 타임라인도 다시 조회한다.
+
 ## 13. 사용자에게 보이는 완료 조건
 
 ### 성공

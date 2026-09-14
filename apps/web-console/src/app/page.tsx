@@ -4,8 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
+import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { canDecideRelease, canRequestRelease, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { AuditEventView, auditEventLabel, canDecideRelease, canRequestRelease, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -72,6 +73,7 @@ export default function Home() {
   const [release, setRelease] = useState<Release | null>(null);
   const [live, setLive] = useState<LiveState>({ releaseStatus: "ANALYZING", steps: demoSteps });
   const [analyses, setAnalyses] = useState<Analysis[]>([{ id: "demo", stepIndex: 2, status: "COMPLETED", attempts: 1, verdict: "PASS", reasonCode: "ALL_RULES_PASSED", evidence: demoEvidence }]);
+  const [auditEvents, setAuditEvents] = useState<AuditEventView[]>([]);
   const [connection, setConnection] = useState("DEMO SNAPSHOT");
   const [error, setError] = useState("");
   const [canOperate, setCanOperate] = useState(false);
@@ -222,18 +224,25 @@ export default function Home() {
 
   async function load(id: string) {
     setError("");
-    const [releaseResponse, analysesResponse] = await Promise.all([
+    const [releaseResponse, analysesResponse, auditResponse] = await Promise.all([
       fetch(`/control-api/releases/${id}`, { credentials: "include" }),
       fetch(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
+      fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" }),
     ]);
-    if (!releaseResponse.ok || !analysesResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
+    if (!releaseResponse.ok || !analysesResponse.ok || !auditResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
     const loadedRelease = await releaseResponse.json() as Release;
     setRelease(loadedRelease);
     setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
     setAnalyses(await analysesResponse.json());
+    setAuditEvents((await auditResponse.json() as { items: AuditEventView[] }).items);
     setActiveId(id);
     setRecentReleases((current) => current.map((item) => item.id === id ? { ...item, status: loadedRelease.status } : item));
   }
+
+  const refreshAudit = useCallback(async (id: string) => {
+    const response = await fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" });
+    if (response.ok) setAuditEvents((await response.json() as { items: AuditEventView[] }).items);
+  }, []);
 
   useEffect(() => {
     if (!activeId) return;
@@ -243,10 +252,11 @@ export default function Home() {
       setConnection("LIVE");
       const response = await fetch(`/control-api/releases/${activeId}/analyses`, { credentials: "include" });
       if (response.ok) setAnalyses(await response.json());
+      await refreshAudit(activeId);
     });
     events.onerror = () => setConnection("RECONNECTING");
     return () => events.close();
-  }, [activeId]);
+  }, [activeId, refreshAudit]);
 
   const latest = analyses.at(-1);
   const evidence = latest?.evidence ?? demoEvidence;
@@ -330,6 +340,7 @@ export default function Home() {
       });
       if (!response.ok) throw new Error(`${action} 요청이 거부되었습니다.`);
       setOperationNotice(`${action} 요청이 접수되었습니다.`);
+      await refreshAudit(activeId);
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
@@ -366,6 +377,7 @@ export default function Home() {
       setRelease((current) => current ? { ...current, status: decided.status } : current);
       setLive((current) => ({ ...current, releaseStatus: decided.status }));
       setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
+      await refreshAudit(activeId);
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
@@ -423,6 +435,7 @@ export default function Home() {
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>
         <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Route 범위와 Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric / Route</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={`${item.metric_key}:${item.route ?? "global"}`}><span><strong>{item.metric_key}</strong>{item.route && <small className={styles.route}>{item.importance ?? "STANDARD"} · {item.route}</small>}<small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
+        <section className={auditStyles.timeline} aria-labelledby="audit-title"><header><div><p>AUDIT TIMELINE</p><h2 id="audit-title">릴리스 변경 기록</h2></div><span>{auditEvents.length} events</span></header>{auditEvents.length ? <ol>{auditEvents.map((event) => <li key={event.id}><i /><div><strong>{auditEventLabel(event)}</strong><small>correlation {event.correlationId.slice(0, 12)}…{event.chainSequence ? ` · chain #${event.chainSequence}` : ""}</small></div><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("ko-KR")}</time></li>)}</ol> : <p className={auditStyles.empty}>{activeId ? "기록된 감사 이벤트가 없습니다." : "릴리스를 선택하면 변경 기록을 확인할 수 있습니다."}</p>}</section>
         <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
           <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={() => void revokeOtherSessions()} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}

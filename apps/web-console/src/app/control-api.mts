@@ -2,6 +2,7 @@ export type CsrfToken = { headerName: string; token: string };
 
 export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
 export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string; context?: { serviceName: string; environmentName: string } };
+export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -12,6 +13,12 @@ export function releaseOptionLabel(release: ReleaseSummary) {
   const date = Number.isNaN(created.getTime()) ? "날짜 미상" : created.toISOString().slice(0, 10);
   const target = release.context ? `${release.context.serviceName}/${release.context.environmentName} · ` : "";
   return `${target}${release.version} · ${release.status} · ${date}`;
+}
+
+export function auditEventLabel(event: AuditEventView) {
+  const action = event.eventType.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  const actor = event.actorType === "SYSTEM" ? "System" : event.actorId ? `User ${event.actorId.slice(0, 8)}` : "User";
+  return `${action} · ${actor}`;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
