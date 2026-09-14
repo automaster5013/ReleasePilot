@@ -23,10 +23,7 @@ data "aws_iam_policy_document" "github_release_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:automaster5013/ReleasePilot:ref:refs/tags/v*",
-        "repo:automaster5013/releasepilot:ref:refs/tags/v*",
-      ]
+      values   = ["repo:automaster5013@247691206/ReleasePilot@1369198899:ref:refs/tags/v*"]
     }
   }
 }
