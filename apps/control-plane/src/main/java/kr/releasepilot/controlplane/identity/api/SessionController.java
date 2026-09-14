@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import kr.releasepilot.controlplane.identity.UserAccountPrincipal;
+import kr.releasepilot.controlplane.identity.SessionRateLimiter;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,19 +41,22 @@ public class SessionController {
     private final String demoUsername;
     private final boolean oidcEnabled;
     private final String oidcRegistrationId;
+    private final SessionRateLimiter rateLimiter;
 
     public SessionController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService,
                              @Value("${releasepilot.demo.enabled:false}") boolean demoEnabled,
                              @Value("${releasepilot.demo.username:releasepilot-demo}") String demoUsername,
                              @Value("${releasepilot.oidc.enabled:false}") boolean oidcEnabled,
                              @Value("${releasepilot.oidc.registration-id:releasepilot}") String oidcRegistrationId,
-                             ObjectProvider<ClientRegistrationRepository> clientRegistrations) {
+                             ObjectProvider<ClientRegistrationRepository> clientRegistrations,
+                             SessionRateLimiter rateLimiter) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.demoEnabled = demoEnabled;
         this.demoUsername = demoUsername;
         this.oidcEnabled = oidcEnabled && clientRegistrations.getIfAvailable() != null;
         this.oidcRegistrationId = oidcRegistrationId;
+        this.rateLimiter = rateLimiter;
     }
 
     @GetMapping("/providers")
@@ -72,15 +76,18 @@ public class SessionController {
             HttpServletRequest request,
             CsrfToken csrfToken
     ) {
+        rateLimiter.checkLogin(request, body.username());
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password())
         );
+        rateLimiter.resetLoginAccount(body.username());
         return establish(authentication, request, csrfToken, false, 1800);
     }
 
     @PostMapping("/demo")
     public SessionResponse demo(HttpServletRequest request, CsrfToken csrfToken) {
         if (!demoEnabled) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
+        rateLimiter.checkDemo(request);
         var principal = userDetailsService.loadUserByUsername(demoUsername);
         var authentication = UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
         return establish(authentication, request, csrfToken, true, 3600);

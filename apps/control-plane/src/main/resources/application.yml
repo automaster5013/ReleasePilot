@@ -57,6 +57,20 @@ management:
         enabled: true
 
 releasepilot:
+  security:
+    rate-limit:
+      enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+      login:
+        ip:
+          max-attempts: ${LOGIN_RATE_LIMIT_IP_MAX:20}
+          window: ${LOGIN_RATE_LIMIT_IP_WINDOW:PT5M}
+        account:
+          max-attempts: ${LOGIN_RATE_LIMIT_ACCOUNT_MAX:5}
+          window: ${LOGIN_RATE_LIMIT_ACCOUNT_WINDOW:PT5M}
+      demo:
+        ip:
+          max-attempts: ${DEMO_RATE_LIMIT_IP_MAX:30}
+          window: ${DEMO_RATE_LIMIT_IP_WINDOW:PT1M}
   rollout:
     worker:
       enabled: ${ROLLOUT_WORKER_ENABLED:true}

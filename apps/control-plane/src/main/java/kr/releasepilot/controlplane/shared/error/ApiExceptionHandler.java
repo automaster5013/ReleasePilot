@@ -9,9 +9,24 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 import kr.releasepilot.controlplane.policy.PolicyService;
+import kr.releasepilot.controlplane.identity.RateLimitExceededException;
+import org.springframework.http.ResponseEntity;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> rateLimited(RateLimitExceededException exception, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
+        problem.setTitle("Authentication rate limit exceeded");
+        problem.setType(URI.create("https://releasepilot.kr/problems/rate-limited"));
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("code", exception.code());
+        problem.setProperty("retryAfterSeconds", exception.retryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", Long.toString(exception.retryAfterSeconds()))
+                .body(problem);
+    }
 
     @ExceptionHandler(PolicyService.InvalidPolicyException.class)
     ProblemDetail invalidPolicy(PolicyService.InvalidPolicyException exception, HttpServletRequest request) {
