@@ -5,13 +5,13 @@ resources: [../../base, ingress.yaml, issuer.yaml, network-policy.yaml, storage-
 images:
   - name: control-plane
     newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/control-plane
-    digest: sha256:67813185d77e4536cfe7b144c5d03117ca90f8b8f4eac54f1811cc73489ddbeb
+    digest: sha256:5c3f3390219739a76bb778621d4511a8b22ddf8992eff9db68b313c3879cd202
   - name: analysis-worker
     newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/analysis-worker
-    digest: sha256:f47326762f2c36cc32898db8c57376950a08c51efe9621b5c116c2a09d1b0cea
+    digest: sha256:50952e47fbe9482e87edb80bb3f9eea8903699e0c3d9f04b8cbf96b43339af32
   - name: web-console
     newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/web-console
-    digest: sha256:533a0188088db97c2d61f5a52cba9e1d691f8661dd72642525f5af30d0135150
+    digest: sha256:21dd16b31a36d39bed25a045c978b33fb6d2397c644ce1675222eba2ace91caf
 patches:
   - target: { kind: Rollout, name: control-plane }
     patch: |-
