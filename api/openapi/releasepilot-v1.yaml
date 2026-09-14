@@ -1501,11 +1501,7 @@ components:
               type: string
               format: uri
             context:
-              type: object
-              required: [serviceName, environmentName]
-              properties:
-                serviceName: {type: string}
-                environmentName: {type: string}
+              $ref: '#/components/schemas/ReleaseContext'
             requester:
               type: object
               required: [displayName, username]
@@ -1529,9 +1525,23 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Release'
+            $ref: '#/components/schemas/ReleaseListItem'
         nextCursor:
           type: [string, 'null']
+    ReleaseListItem:
+      allOf:
+        - $ref: '#/components/schemas/Release'
+        - type: object
+          required: [context]
+          properties:
+            context:
+              $ref: '#/components/schemas/ReleaseContext'
+    ReleaseContext:
+      type: object
+      required: [serviceName, environmentName]
+      properties:
+        serviceName: {type: string}
+        environmentName: {type: string}
     ReleaseStatus:
       type: string
       enum:

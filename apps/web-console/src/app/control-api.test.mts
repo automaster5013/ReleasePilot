@@ -43,6 +43,7 @@ test("release catalog only offers active and validated choices", () => {
 
 test("recent release choices have a stable compact label", () => {
   assert.equal(releaseOptionLabel({ id: "1", version: "v2.1.0", status: "PENDING_APPROVAL", createdAt: "2026-09-15T00:00:00Z" }), "v2.1.0 · PENDING_APPROVAL · 2026-09-15");
+  assert.equal(releaseOptionLabel({ id: "3", version: "v2.1.0", status: "APPROVED", createdAt: "2026-09-15T00:00:00Z", context: { serviceName: "Checkout", environmentName: "production" } }), "Checkout/production · v2.1.0 · APPROVED · 2026-09-15");
   assert.equal(releaseOptionLabel({ id: "2", version: "v1", status: "FAILED", createdAt: "invalid" }), "v1 · FAILED · 날짜 미상");
 });
 

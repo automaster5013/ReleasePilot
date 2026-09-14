@@ -1,7 +1,7 @@
 export type CsrfToken = { headerName: string; token: string };
 
 export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
-export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string };
+export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string; context?: { serviceName: string; environmentName: string } };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -10,7 +10,8 @@ export function selectableCatalogItems<T extends CatalogItem>(items: T[], active
 export function releaseOptionLabel(release: ReleaseSummary) {
   const created = new Date(release.createdAt);
   const date = Number.isNaN(created.getTime()) ? "날짜 미상" : created.toISOString().slice(0, 10);
-  return `${release.version} · ${release.status} · ${date}`;
+  const target = release.context ? `${release.context.serviceName}/${release.context.environmentName} · ` : "";
+  return `${target}${release.version} · ${release.status} · ${date}`;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
