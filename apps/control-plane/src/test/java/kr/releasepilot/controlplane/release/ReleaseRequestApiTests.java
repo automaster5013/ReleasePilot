@@ -31,7 +31,11 @@ import java.time.Instant;import java.util.*;import static org.springframework.se
   execution.started("rollout-uid","10",now);releases.findById(UUID.fromString(releaseId)).orElseThrow().running();
   mvc.perform(post("/api/v1/releases/{id}/pause",releaseId).with(authentication(authToken(approver,"ROLE_OPERATOR"))).with(csrf()).header("Idempotency-Key","pause-operation-0001").contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"incident review\"}")).andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("ACCEPTED"));
   mvc.perform(post("/api/v1/releases/{id}/pause",releaseId).with(authentication(authToken(approver,"ROLE_OPERATOR"))).with(csrf()).header("Idempotency-Key","pause-operation-0001").contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"incident review\"}")).andExpect(status().isAccepted());org.assertj.core.api.Assertions.assertThat(outbox.count()).isEqualTo(2);
-  mvc.perform(get("/api/v1/releases/{id}",releaseId).with(authentication(authToken(approver,"ROLE_APPROVER")))).andExpect(status().isOk()).andExpect(jsonPath("$.policySnapshot.sourcePolicyVersionId").value(policyVersion.getId().toString())).andExpect(jsonPath("$.approval.reason").value("checks passed"));
+  mvc.perform(get("/api/v1/releases/{id}",releaseId).with(authentication(authToken(approver,"ROLE_APPROVER")))).andExpect(status().isOk())
+   .andExpect(jsonPath("$.imageRepository").value("ghcr.io/acme/checkout")).andExpect(jsonPath("$.context.serviceName").value("Checkout")).andExpect(jsonPath("$.context.environmentName").value("production"))
+   .andExpect(jsonPath("$.requester.displayName").value("Developer")).andExpect(jsonPath("$.requester.username").value("release-developer"))
+   .andExpect(jsonPath("$.policySnapshot.sourcePolicyVersionId").value(policyVersion.getId().toString())).andExpect(jsonPath("$.policySnapshot.definition.strategy").value("CANARY")).andExpect(jsonPath("$.policySnapshot.definition.metrics[0].threshold").value(0.01))
+   .andExpect(jsonPath("$.approval.reason").value("checks passed"));
   mvc.perform(get("/api/v1/releases").with(authentication(authToken(approver,"ROLE_APPROVER")))).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(releaseId));
   mvc.perform(get("/api/v1/audit-events").param("aggregateType","RELEASE").param("aggregateId",releaseId).with(authentication(authToken(approver,"ROLE_APPROVER")))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(3)).andExpect(jsonPath("$.items[0].payloadJson").doesNotExist());
  }

@@ -66,6 +66,10 @@ ReleasePilot은 다음 조건을 만족할 때만 요청을 `PENDING_APPROVAL`�
 
 승인자는 승인 또는 거부 사유를 기록한다. 승인 후에는 릴리스 입력, 정책 버전과 Canary 단계가 변경되지 않는다. 변경이 필요하면 기존 요청을 취소하고 새 요청을 만들어야 한다.
 
+릴리스 상세 API와 Web Console은 승인 검토를 위해 Service·Environment 이름, 요청자 표시명과 계정,
+이미지 repository/digest, 변경 요약·Commit SHA·Pipeline URL, 불변 PolicySnapshot의 전략·단계·지표 임계값을
+함께 표시한다. 정책 정보는 현재 활성 정책을 다시 조회하지 않고 요청 시점 snapshot을 사용한다.
+
 ## 6. MVP Canary 실행 계획
 
 production 기본 계획은 다음과 같다.

@@ -1489,8 +1489,10 @@ components:
       allOf:
         - $ref: '#/components/schemas/Release'
         - type: object
-          required: [changeSummary, commitSha, pipelineUrl, steps]
+          required: [imageRepository, changeSummary, commitSha, pipelineUrl, context, requester, policySnapshot, steps]
           properties:
+            imageRepository:
+              type: string
             changeSummary:
               type: string
             commitSha:
@@ -1498,6 +1500,18 @@ components:
             pipelineUrl:
               type: string
               format: uri
+            context:
+              type: object
+              required: [serviceName, environmentName]
+              properties:
+                serviceName: {type: string}
+                environmentName: {type: string}
+            requester:
+              type: object
+              required: [displayName, username]
+              properties:
+                displayName: {type: string}
+                username: {type: string}
             policySnapshot:
               $ref: '#/components/schemas/PolicySnapshotSummary'
             approval:
@@ -1649,7 +1663,7 @@ components:
           enum: [PASS, FAIL, INCONCLUSIVE, null]
     PolicySnapshotSummary:
       type: object
-      required: [sourcePolicyVersionId, name, checksum]
+      required: [sourcePolicyVersionId, name, checksum, definition]
       properties:
         sourcePolicyVersionId:
           type: string
@@ -1658,6 +1672,9 @@ components:
           type: string
         checksum:
           type: string
+        definition:
+          type: object
+          description: 요청 시점에 고정된 release-policy 정의
     CreatePolicyRequest:
       type: object
       additionalProperties: false

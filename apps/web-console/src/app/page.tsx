@@ -29,13 +29,21 @@ type Analysis = {
   reasonCode: string | null;
   evidence: Evidence[];
 };
+type PolicyStep = { weight: number; minimumObservationSeconds: number };
+type PolicyMetric = { key: string; threshold: number; comparison?: string; route?: string; importance?: string };
 type Release = {
   id: string;
   version: string;
+  imageRepository: string;
+  imageDigest: string;
   status: string;
   changeSummary: string;
   commitSha: string;
   pipelineUrl: string;
+  createdAt: string;
+  context: { serviceName: string; environmentName: string };
+  requester: { displayName: string; username: string };
+  policySnapshot: { name: string; checksum: string; definition: { strategy: string; steps: PolicyStep[]; metrics: PolicyMetric[] } };
 };
 type AuthenticationProviders = { oidc: boolean; loginUrl: string | null };
 type SessionResponse = { user: SessionUser; csrfToken: string; expiresAt: string };
@@ -379,6 +387,13 @@ export default function Home() {
             <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
             <div className={styles.stages}>{live.steps.map((step) => <div className={styles.stage} data-status={step.status} key={step.index}><i /><span>{step.weight}%</span><small>{step.status}</small></div>)}</div>
+            {release && <section className={sessionStyles.approvalContext} aria-label="릴리스 승인 컨텍스트">
+              <div><span>대상</span><strong>{release.context.serviceName} · {release.context.environmentName}</strong><small>{release.imageRepository}@{release.imageDigest.slice(0, 19)}…</small></div>
+              <div><span>요청자</span><strong>{release.requester.displayName}</strong><small>{release.requester.username} · {new Date(release.createdAt).toLocaleString("ko-KR")}</small></div>
+              <div><span>변경</span><strong>{release.changeSummary}</strong><small><a href={release.pipelineUrl} target="_blank" rel="noreferrer">Pipeline ↗</a> · {release.commitSha.slice(0, 12)}</small></div>
+              <div><span>정책 snapshot</span><strong>{release.policySnapshot.name} · {release.policySnapshot.definition.strategy}</strong><small>{release.policySnapshot.definition.steps.map((step) => `${step.weight}%/${Math.round(step.minimumObservationSeconds / 60)}m`).join(" → ")}</small></div>
+              <ul>{release.policySnapshot.definition.metrics.map((metric, index) => <li key={`${metric.key}:${metric.route ?? "global"}:${index}`}><strong>{metric.key}{metric.route ? ` · ${metric.route}` : ""}</strong><span>{metric.comparison ?? "THRESHOLD"} {metric.threshold}{metric.importance ? ` · ${metric.importance}` : ""}</span></li>)}</ul>
+            </section>}
             <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
             {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div>}
             {operationNotice && <p className={sessionStyles.operationNotice} role="status">{operationNotice}</p>}
