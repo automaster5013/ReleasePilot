@@ -2,6 +2,8 @@ package kr.releasepilot.controlplane.environment;
 import jakarta.validation.Valid; import jakarta.validation.constraints.*; import kr.releasepilot.controlplane.catalog.CatalogServiceRepository; import kr.releasepilot.controlplane.identity.ProjectAccess; import kr.releasepilot.controlplane.shared.error.NotFoundException;
 import org.springframework.http.*; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import kr.releasepilot.controlplane.identity.UserAccountPrincipal;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import java.time.Instant; import java.util.*;
 @RestController
 public class EnvironmentController {
@@ -17,7 +19,7 @@ public class EnvironmentController {
   if(!projectAccess.canView(catalogService.getProjectId(),authentication))throw new NotFoundException("SERVICE_NOT_FOUND","Service not found");
   return new EnvironmentPage(service.list(serviceId,limit).stream().map(EnvironmentResponse::from).toList(),null);}
  @PostMapping("/api/v1/environments/{id}/validate") @ResponseStatus(HttpStatus.ACCEPTED) @PreAuthorize("hasRole('OPERATOR')")
- ValidationResponse validate(@PathVariable UUID id){var report=service.validate(id);return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
+ ValidationResponse validate(@PathVariable UUID id,@AuthenticationPrincipal UserAccountPrincipal actor){var report=service.validate(id,actor.id());return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
  @GetMapping("/api/v1/environments/{id}/validation-results/latest")
  ValidationResponse latest(@PathVariable UUID id,Authentication authentication){var report=service.latest(id);var catalogService=services.findById(report.environment().getServiceId()).orElseThrow(()->new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found"));if(!projectAccess.canView(catalogService.getProjectId(),authentication))throw new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found");return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
  public record CreateEnvironmentRequest(@NotNull @Pattern(regexp="staging|production") String name,@NotNull UUID clusterId,

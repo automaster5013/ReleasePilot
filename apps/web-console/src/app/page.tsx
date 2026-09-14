@@ -93,6 +93,7 @@ export default function Home() {
   const [environmentValidation, setEnvironmentValidation] = useState<EnvironmentValidation | null>(null);
   const [environmentValidationNotice, setEnvironmentValidationNotice] = useState("");
   const [environmentValidationBusy, setEnvironmentValidationBusy] = useState(false);
+  const [environmentAuditEvents, setEnvironmentAuditEvents] = useState<AuditEventView[]>([]);
   const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestNotice, setRequestNotice] = useState("");
@@ -110,6 +111,11 @@ export default function Home() {
     } finally {
       setAuditIntegrityBusy(false);
     }
+  }, []);
+
+  const refreshEnvironmentAudit = useCallback(async (id: string) => {
+    const response = await fetch(`/control-api/audit-events?aggregateType=ENVIRONMENT&aggregateId=${id}`, { credentials: "include" });
+    if (response.ok) setEnvironmentAuditEvents((await response.json() as { items: AuditEventView[] }).items);
   }, []);
 
   const refreshReleases = useCallback(async () => {
@@ -190,6 +196,16 @@ export default function Home() {
       .catch((failure: Error) => { if (failure.name !== "AbortError") setEnvironmentValidationNotice("최신 환경 점검 결과를 불러올 수 없습니다."); });
     return () => controller.abort();
   }, [releaseDraft.environmentId]);
+
+  useEffect(() => {
+    if (!releaseDraft.environmentId || !canRevalidateEnvironment(sessionUser?.roles ?? [])) return;
+    const controller = new AbortController();
+    fetch(`/control-api/audit-events?aggregateType=ENVIRONMENT&aggregateId=${releaseDraft.environmentId}`, { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<{ items: AuditEventView[] }> : Promise.reject())
+      .then((page) => setEnvironmentAuditEvents(page.items))
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setEnvironmentAuditEvents([]); });
+    return () => controller.abort();
+  }, [releaseDraft.environmentId, sessionUser]);
 
   async function startDemo() {
     const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
@@ -314,18 +330,18 @@ export default function Home() {
 
   function selectProject(value: string) {
     setCatalogNotice(""); setProjectId(value); setServices([]); setEnvironments([]);
-    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
+    setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
     setReleaseDraft((current) => ({ ...current, serviceId: "", environmentId: "" }));
   }
 
   function selectService(value: string) {
     setCatalogNotice(""); setEnvironments([]);
-    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
+    setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
     setReleaseDraft((current) => ({ ...current, serviceId: value, environmentId: "" }));
   }
 
   function selectEnvironment(value: string) {
-    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
+    setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
     updateDraft("environmentId", value);
   }
 
@@ -339,6 +355,7 @@ export default function Home() {
       setEnvironmentValidation(result);
       setEnvironments((current) => current.map((item) => item.id === result.environmentId ? { ...item, status: result.status } : item));
       setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
+      await refreshEnvironmentAudit(result.environmentId);
     } catch (failure) {
       setEnvironmentValidationNotice((failure as Error).message);
     } finally {
@@ -468,7 +485,7 @@ export default function Home() {
             <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Service<select required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => selectEnvironment(event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
-            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}</section>}
+            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <div className={sessionStyles.environmentAudit}><strong>REVALIDATION HISTORY</strong>{environmentAuditEvents.length ? environmentAuditEvents.map((event) => <span key={event.id}>{auditEventLabel(event)} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</span>) : <span>기록된 재검증 이력이 없습니다.</span>}</div>}</section>}
             <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>

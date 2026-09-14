@@ -18,8 +18,8 @@ public class EnvironmentService {
  @Transactional(readOnly=true) public List<Environment> list(UUID serviceId,int limit){
   if(!services.existsById(serviceId))throw new NotFoundException("SERVICE_NOT_FOUND","Service not found");
   return environments.findAllByServiceIdOrderByCreatedAtDesc(serviceId,PageRequest.of(0,Math.clamp(limit,1,100)));}
- @Transactional public ValidationReport validate(UUID id){
-  var env=environments.findById(id).orElseThrow(()->new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found")); var now=clock.instant(); env.validating(now); return inspect(env,now);}
+ @Transactional public ValidationReport validate(UUID id,UUID actorId){
+  var env=environments.findById(id).orElseThrow(()->new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found")); var now=clock.instant(); env.validating(now); var report=inspect(env,now);audits.record(AuditEvent.environmentRevalidated(id,actorId,env.getStatus().name(),report.checkedAt()));return report;}
  @Transactional public boolean claimDue(UUID id,Instant now,Instant activeCutoff,Instant failureCutoff,Instant staleBefore){return environments.claimDue(id,now,activeCutoff,failureCutoff,staleBefore,EnvironmentStatus.VALIDATING,EnvironmentStatus.INVALID,EnvironmentStatus.DISABLED)==1;}
  @Transactional(readOnly=true) public List<UUID> dueIds(Instant activeCutoff,Instant failureCutoff,Instant staleBefore,int batch){return environments.findDueIds(activeCutoff,failureCutoff,staleBefore,EnvironmentStatus.VALIDATING,EnvironmentStatus.INVALID,EnvironmentStatus.DISABLED,PageRequest.of(0,batch));}
  @Transactional public ValidationReport revalidateClaimed(UUID id){

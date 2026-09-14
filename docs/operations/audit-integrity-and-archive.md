@@ -8,6 +8,9 @@ ReleasePilot은 새 감사 이벤트마다 단조 증가하는 `chainSequence`, 
 
 OPERATOR는 `GET /api/v1/audit-events/verify`를 호출해 DB에 저장된 전체 해시 체인을 다시 계산할 수 있다. `valid=false`이면 `failedEventId`가 최초 불일치 이벤트를 가리킨다. V20 이전의 legacy 이벤트는 해시 필드가 없으므로 검증 대상에서 제외되고, V20 이후 체인은 genesis hash부터 시작한다.
 
+`aggregateType=ENVIRONMENT&aggregateId=<uuid>` 조회는 OPERATOR에게만 허용한다. 수동 Environment 재검증은
+USER actor와 `MANUAL` trigger로 기록되고, 정기 재검증은 SYSTEM actor와 `SCHEDULED` trigger를 유지한다.
+
 ## 외부 보관 설정
 
 외부 WORM 저장소나 보관 게이트웨이가 HTTPS PUT과 멱등 키를 지원할 때 다음 환경 변수를 설정한다.

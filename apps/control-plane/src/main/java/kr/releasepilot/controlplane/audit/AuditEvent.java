@@ -79,6 +79,12 @@ public class AuditEvent {
         return event;
     }
 
+    public static AuditEvent environmentRevalidated(UUID environmentId, UUID actorId, String status, Instant occurredAt) {
+        var event = created("ENVIRONMENT", environmentId, "ENVIRONMENT_REVALIDATED", actorId, occurredAt);
+        event.payloadJson = "{\"status\":\"" + status + "\",\"trigger\":\"MANUAL\"}";
+        return event;
+    }
+
     public static AuditEvent rolloutOperation(UUID releaseId, UUID actorId, String phase, String operation,
                                               String payloadJson, Instant occurredAt) {
         var event=created("RELEASE",releaseId,"ROLLOUT_"+operation+"_"+phase,actorId,occurredAt);

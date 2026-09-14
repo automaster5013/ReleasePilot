@@ -120,6 +120,9 @@ ACTIVE | ACTIVE_WITH_WARNINGS | INVALID → DISABLED
 OPERATOR는 선택한 Environment를 CSRF 보호된 요청으로 수동 재검증할 수 있다. UI는 재검증 중 중복 요청을
 차단하고 결과를 즉시 갱신하며, 최신 상태가 `ACTIVE` 또는 `ACTIVE_WITH_WARNINGS`가 아니면 릴리스 요청을
 활성화하지 않는다.
+수동 재검증은 실행자, 결과 상태와 `MANUAL` trigger를 포함하는 `ENVIRONMENT_REVALIDATED` 감사 이벤트를
+업무 트랜잭션에 기록한다. OPERATOR는 선택 Environment의 감사 이력을 시간순으로 조회하며 Web Console은
+실행자, 발생 시각과 hash chain sequence를 표시한다.
 
 ## 7. workload label selector
 
