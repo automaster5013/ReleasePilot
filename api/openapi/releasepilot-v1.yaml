@@ -788,6 +788,22 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /audit-events/verify:
+    get:
+      tags: [Audit]
+      summary: 감사 이벤트 SHA-256 해시 체인 검증
+      operationId: verifyAuditChain
+      responses:
+        '200':
+          description: 현재 해시 체인 검증 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditChainVerification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     sessionCookie:
@@ -1600,6 +1616,30 @@ components:
           format: uuid
         payload:
           type: object
+        chainSequence:
+          type: [integer, 'null']
+          format: int64
+        previousHash:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+        eventHash:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+    AuditChainVerification:
+      type: object
+      required: [valid, verifiedEvents, headHash]
+      properties:
+        valid:
+          type: boolean
+        verifiedEvents:
+          type: integer
+          format: int64
+        failedEventId:
+          type: [string, 'null']
+          format: uuid
+        headHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
     AuditEventPage:
       type: object
       required: [items]

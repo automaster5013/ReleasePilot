@@ -1,7 +1,7 @@
 package kr.releasepilot.controlplane.catalog;
 
 import kr.releasepilot.controlplane.audit.AuditEvent;
-import kr.releasepilot.controlplane.audit.AuditEventRepository;
+import kr.releasepilot.controlplane.audit.AuditTrail;
 import kr.releasepilot.controlplane.shared.error.ConflictException;
 import kr.releasepilot.controlplane.shared.error.NotFoundException;
 import org.springframework.data.domain.PageRequest;
@@ -17,11 +17,11 @@ import java.util.UUID;
 public class CatalogServiceService {
     private final ProjectRepository projects;
     private final CatalogServiceRepository services;
-    private final AuditEventRepository auditEvents;
+    private final AuditTrail auditEvents;
     private final Clock clock;
 
     public CatalogServiceService(ProjectRepository projects, CatalogServiceRepository services,
-                                 AuditEventRepository auditEvents, Clock clock) {
+                                 AuditTrail auditEvents, Clock clock) {
         this.projects = projects;
         this.services = services;
         this.auditEvents = auditEvents;
@@ -42,7 +42,7 @@ public class CatalogServiceService {
         Instant now = clock.instant();
         CatalogService service = services.save(CatalogService.create(
                 projectId, key, name, repositoryUrl, owner, now));
-        auditEvents.save(AuditEvent.serviceCreated(service.getId(), actorId, now));
+        auditEvents.record(AuditEvent.serviceCreated(service.getId(), actorId, now));
         return service;
     }
 

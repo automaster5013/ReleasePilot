@@ -1,7 +1,7 @@
 package kr.releasepilot.controlplane.catalog;
 
 import kr.releasepilot.controlplane.audit.AuditEvent;
-import kr.releasepilot.controlplane.audit.AuditEventRepository;
+import kr.releasepilot.controlplane.audit.AuditTrail;
 import kr.releasepilot.controlplane.shared.error.ConflictException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -16,13 +16,13 @@ import kr.releasepilot.controlplane.identity.ProjectMembershipRepository;
 @Service
 public class ProjectService {
     private final ProjectRepository projectRepository;
-    private final AuditEventRepository auditEventRepository;
+    private final AuditTrail auditEventRepository;
     private final Clock clock;
     private final ProjectMembershipRepository memberships;
 
     public ProjectService(
             ProjectRepository projectRepository,
-            AuditEventRepository auditEventRepository,
+            AuditTrail auditEventRepository,
             Clock clock,
             ProjectMembershipRepository memberships
     ) {
@@ -39,7 +39,7 @@ public class ProjectService {
         }
         var now = clock.instant();
         Project project = projectRepository.save(Project.create(key, name, description, now));
-        auditEventRepository.save(AuditEvent.projectCreated(project.getId(), actorId, now));
+        auditEventRepository.record(AuditEvent.projectCreated(project.getId(), actorId, now));
         return project;
     }
 

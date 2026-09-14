@@ -83,6 +83,12 @@ releasepilot:
     poll-interval: ${GITHUB_CHECKS_POLL_INTERVAL:PT5S}
     lease-timeout: ${GITHUB_CHECKS_LEASE_TIMEOUT:PT2M}
     batch-size: ${GITHUB_CHECKS_BATCH_SIZE:20}
+  audit:
+    archive:
+      enabled: ${AUDIT_ARCHIVE_ENABLED:false}
+      endpoint: ${AUDIT_ARCHIVE_ENDPOINT:http://localhost:9080/audit/}
+      token: ${AUDIT_ARCHIVE_TOKEN:}
+      poll-interval: ${AUDIT_ARCHIVE_POLL_INTERVAL:PT10S}
   bootstrap-operator:
     enabled: ${BOOTSTRAP_OPERATOR_ENABLED:false}
     username: ${BOOTSTRAP_OPERATOR_USERNAME:operator}

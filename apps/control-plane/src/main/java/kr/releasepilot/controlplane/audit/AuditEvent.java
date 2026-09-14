@@ -30,6 +30,12 @@ public class AuditEvent {
     private UUID correlationId;
     @Column(name = "payload_json", nullable = false, columnDefinition = "json")
     private String payloadJson;
+    @Column(name = "chain_sequence", unique = true)
+    private Long chainSequence;
+    @Column(name = "previous_hash", length = 64)
+    private String previousHash;
+    @Column(name = "event_hash", length = 64, unique = true)
+    private String eventHash;
 
     protected AuditEvent() {
     }
@@ -83,4 +89,6 @@ public class AuditEvent {
     public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
     public String getEventType(){return eventType;} public String getActorType(){return actorType;} public UUID getActorId(){return actorId;}
     public Instant getOccurredAt(){return occurredAt;} public UUID getCorrelationId(){return correlationId;} public String getPayloadJson(){return payloadJson;}
+    public Long getChainSequence(){return chainSequence;} public String getPreviousHash(){return previousHash;} public String getEventHash(){return eventHash;}
+    void seal(long sequence,String previousHash,String eventHash){if(this.eventHash!=null)throw new IllegalStateException("Audit event is already sealed");this.chainSequence=sequence;this.previousHash=previousHash;this.eventHash=eventHash;}
 }

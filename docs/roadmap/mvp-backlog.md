@@ -208,4 +208,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 3. Slack 또는 GitHub Checks 알림·승인 연동 — GitHub Checks 완료 (2026-09-14, token 연결은 배포 설정)
 4. 다중 클러스터 — 완료 (2026-09-14, 클러스터별 Environment 대상 지정 및 일괄 권한 검증)
 5. route별 중요도 정책 — 완료 (2026-09-14, OpenTelemetry `http.route` 범위와 CRITICAL fail-closed 판정)
-6. 감사 이벤트 해시 체인과 외부 보관
+6. 감사 이벤트 해시 체인과 외부 보관 — 완료 (2026-09-14, SHA-256 전역 체인·검증 API·트랜잭션 전달함·멱등 HTTPS 보관 재시도)
