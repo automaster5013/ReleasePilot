@@ -1,0 +1,3 @@
+package kr.releasepilot.controlplane.analysis;
+import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import java.time.*;
+@Service public class AnalysisJobRecoveryService{private final AnalysisJobRepository jobs;private final Clock clock;public AnalysisJobRecoveryService(AnalysisJobRepository jobs,Clock clock){this.jobs=jobs;this.clock=clock;}@Transactional public int recoverExpired(Duration lease,int limit){int count=0;Instant before=clock.instant().minus(lease);while(count<limit){var job=jobs.findFirstByStatusAndClaimedAtLessThanEqualOrderByClaimedAtAsc(AnalysisJobStatus.PROCESSING,before);if(job.isEmpty())break;job.get().recover(clock.instant());count++;}return count;}}

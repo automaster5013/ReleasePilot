@@ -1,0 +1,14 @@
+package kr.releasepilot.controlplane.audit;
+import kr.releasepilot.controlplane.catalog.*;import kr.releasepilot.controlplane.identity.*;import kr.releasepilot.controlplane.release.*;import kr.releasepilot.controlplane.shared.error.NotFoundException;
+import org.springframework.data.domain.PageRequest;import org.springframework.security.access.AccessDeniedException;import org.springframework.security.core.Authentication;import org.springframework.web.bind.annotation.*;import java.time.Instant;import java.util.*;
+@RestController @RequestMapping("/api/v1/audit-events")public class AuditController{
+ private final AuditEventRepository events;private final ReleaseRepository releases;private final CatalogServiceRepository services;private final ProjectAccess access;
+ public AuditController(AuditEventRepository events,ReleaseRepository releases,CatalogServiceRepository services,ProjectAccess access){this.events=events;this.releases=releases;this.services=services;this.access=access;}
+ @GetMapping AuditPage list(@RequestParam(required=false)String aggregateType,@RequestParam(required=false)UUID aggregateId,@RequestParam(defaultValue="20")int limit,Authentication auth){
+  boolean operator=auth.getAuthorities().stream().anyMatch(a->a.getAuthority().equals("ROLE_OPERATOR"));List<AuditEvent> values;
+  if("RELEASE".equals(aggregateType)&&aggregateId!=null){var release=releases.findById(aggregateId).orElseThrow(()->new NotFoundException("RELEASE_NOT_FOUND","Release not found"));var catalog=services.findById(release.getServiceId()).orElseThrow();if(!access.canView(catalog.getProjectId(),auth))throw new NotFoundException("RELEASE_NOT_FOUND","Release not found");values=events.findByAggregateTypeAndAggregateIdOrderByOccurredAtAsc("RELEASE",aggregateId);
+  }else{if(!operator)throw new AccessDeniedException("Raw audit search requires operator role");values=events.findAllByOrderByOccurredAtDesc(PageRequest.of(0,Math.clamp(limit,1,100)));}
+  var items=values.stream().map(value->AuditView.from(value,operator)).toList();return new AuditPage(items,null);}
+ public record AuditView(UUID id,String aggregateType,UUID aggregateId,String eventType,String actorType,UUID actorId,Instant occurredAt,UUID correlationId,String payloadJson){static AuditView from(AuditEvent value,boolean raw){return new AuditView(value.getId(),value.getAggregateType(),value.getAggregateId(),value.getEventType(),value.getActorType(),value.getActorId(),value.getOccurredAt(),value.getCorrelationId(),raw?value.getPayloadJson():null);}}
+ public record AuditPage(List<AuditView> items,String nextCursor){}
+}

@@ -1,0 +1,3 @@
+package kr.releasepilot.controlplane.analysis;
+import jakarta.persistence.LockModeType;import org.springframework.data.jpa.repository.*;import java.time.Instant;import java.util.*;
+public interface AnalysisJobRepository extends JpaRepository<AnalysisJob,UUID>{boolean existsByStepId(UUID stepId);List<AnalysisJob> findByStepIdIn(Collection<UUID> stepIds);@Lock(LockModeType.PESSIMISTIC_WRITE)Optional<AnalysisJob> findFirstByStatusInAndAvailableAtLessThanEqualOrderByCreatedAtAsc(Collection<AnalysisJobStatus> statuses,Instant now);@Lock(LockModeType.PESSIMISTIC_WRITE)Optional<AnalysisJob> findFirstByStatusAndClaimedAtLessThanEqualOrderByClaimedAtAsc(AnalysisJobStatus status,Instant before);}

@@ -1,0 +1,1542 @@
+openapi: 3.1.0
+info:
+  title: ReleasePilot Control Plane API
+  version: 0.1.0
+  description: >-
+    ReleasePilot MVP의 릴리스 요청, 승인, Canary 운영 명령,
+    정책 및 감사 조회 API 계약이다.
+servers:
+  - url: /api/v1
+    description: Same-origin API
+tags:
+  - name: Session
+  - name: Catalog
+  - name: Releases
+  - name: Approvals
+  - name: Operations
+  - name: Policies
+  - name: Audit
+paths:
+  /session/csrf:
+    get:
+      tags: [Session]
+      summary: 로그인 전 CSRF token 발급
+      operationId: getCsrfToken
+      security: []
+      responses:
+        '200':
+          description: CSRF token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfToken'
+  /session:
+    get:
+      tags: [Session]
+      summary: 현재 세션 조회
+      operationId: getCurrentSession
+      responses:
+        '200':
+          description: 현재 사용자와 권한
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /session/login:
+    post:
+      tags: [Session]
+      summary: 사용자 로그인
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공. 응답 cookie로 서버 세션을 설정한다.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          description: 로그인 시도 제한 초과
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /session/demo:
+    post:
+      tags: [Session]
+      summary: 읽기 전용 데모 세션 시작
+      operationId: startDemoSession
+      security: []
+      responses:
+        '200':
+          description: VIEWER 데모 세션 생성됨
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '429':
+          description: 데모 세션 발급 제한 초과
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /session/logout:
+    post:
+      tags: [Session]
+      summary: 현재 세션 종료
+      operationId: logout
+      responses:
+        '204':
+          description: 로그아웃 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /projects:
+    post:
+      tags: [Catalog]
+      summary: 프로젝트 생성
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: 프로젝트 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags: [Catalog]
+      summary: 프로젝트 목록 조회
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 프로젝트 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                  nextCursor:
+                    type: [string, 'null']
+  /projects/{projectId}/services:
+    post:
+      tags: [Catalog]
+      summary: 서비스 등록
+      operationId: createService
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '201':
+          description: 서비스 등록됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /projects/{projectId}/memberships:
+    post:
+      tags: [Catalog]
+      summary: 프로젝트 멤버 추가
+      operationId: addProjectMembership
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AddProjectMembershipRequest'}
+      responses:
+        '201':
+          description: 멤버 추가됨
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectMembership'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      tags: [Catalog]
+      summary: 프로젝트 멤버 목록
+      operationId: listProjectMemberships
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 프로젝트 멤버 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/ProjectMembership'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags: [Catalog]
+      summary: 프로젝트 서비스 목록 조회
+      operationId: listServices
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 서비스 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  nextCursor:
+                    type: [string, 'null']
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /services/{serviceId}/environments:
+    post:
+      tags: [Catalog]
+      summary: 서비스 환경 등록
+      operationId: createEnvironment
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEnvironmentRequest'
+      responses:
+        '201':
+          description: DRAFT 환경 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /connections/clusters:
+    post:
+      tags: [Catalog]
+      summary: Kubernetes 클러스터 연결 등록
+      operationId: createClusterConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateClusterConnectionRequest'}
+      responses:
+        '201':
+          description: 미검증 클러스터 연결 생성됨
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClusterConnection'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      tags: [Catalog]
+      summary: Kubernetes 클러스터 연결 목록
+      operationId: listClusterConnections
+      responses:
+        '200':
+          description: 클러스터 연결 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/ClusterConnection'}
+  /connections/prometheus:
+    post:
+      tags: [Catalog]
+      summary: Prometheus 연결 등록
+      operationId: createPrometheusConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreatePrometheusConnectionRequest'}
+      responses:
+        '201':
+          description: 미검증 Prometheus 연결 생성됨
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrometheusConnection'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      tags: [Catalog]
+      summary: Prometheus 연결 목록
+      operationId: listPrometheusConnections
+      responses:
+        '200':
+          description: Prometheus 연결 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PrometheusConnection'}
+  /environments/{environmentId}/validate:
+    post:
+      tags: [Catalog]
+      summary: 외부 리소스와 관측 계약 검증
+      operationId: validateEnvironment
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: 검증 작업 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationReceipt'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /environments/{environmentId}/validation-results/latest:
+    get:
+      tags: [Catalog]
+      summary: 최근 환경 검증 결과 조회
+      operationId: getLatestEnvironmentValidation
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+      responses:
+        '200':
+          description: 최근 검증 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentValidation'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /releases:
+    post:
+      tags: [Releases]
+      summary: 릴리스 요청 생성
+      operationId: createRelease
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReleaseRequest'
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    get:
+      tags: [Releases]
+      summary: 릴리스 목록 조회
+      operationId: listReleases
+      parameters:
+        - name: serviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: environmentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ReleaseStatus'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 릴리스 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleasePage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /releases/{releaseId}:
+    get:
+      tags: [Releases]
+      summary: 릴리스 상세 조회
+      operationId: getRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+      responses:
+        '200':
+          description: 릴리스 상세
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /releases/{releaseId}/approve:
+    post:
+      tags: [Approvals]
+      summary: 릴리스 승인
+      operationId: approveRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+      responses:
+        '200':
+          description: 승인됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/reject:
+    post:
+      tags: [Approvals]
+      summary: 릴리스 거부
+      operationId: rejectRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+      responses:
+        '200':
+          description: 거부됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/promote:
+    post:
+      tags: [Operations]
+      summary: 현재 Canary 단계를 다음 단계로 승격
+      operationId: promoteRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/OperationReason'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/analyses:
+    get:
+      tags: [Releases]
+      summary: 단계별 분석 판정과 증거 조회
+      operationId: listReleaseAnalyses
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+      responses:
+        '200':
+          description: 분석 작업 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /releases/{releaseId}/pause:
+    post:
+      tags: [Operations]
+      summary: 실행 중인 릴리스 일시정지
+      operationId: pauseRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/OperationReason'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/resume:
+    post:
+      tags: [Operations]
+      summary: 일시정지된 릴리스 재개
+      operationId: resumeRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/OperationReason'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/abort:
+    post:
+      tags: [Operations]
+      summary: 릴리스 중단 및 롤백 요청
+      operationId: abortRelease
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/OperationReason'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /releases/{releaseId}/events:
+    get:
+      tags: [Releases]
+      summary: 릴리스 상태 이벤트 스트림
+      description: 연결 시점의 현재 snapshot과 이후 변경된 release-state 이벤트를 전달하는 SSE 스트림이다.
+      operationId: streamReleaseEvents
+      parameters:
+        - $ref: '#/components/parameters/ReleaseId'
+      responses:
+        '200':
+          description: SSE 이벤트 스트림
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /policies:
+    post:
+      tags: [Policies]
+      summary: 정책 생성
+      operationId: createPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyRequest'
+      responses:
+        '201':
+          description: 정책 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /policies/{policyId}/versions:
+    post:
+      tags: [Policies]
+      summary: 정책 초안 버전 생성
+      operationId: createPolicyVersion
+      parameters:
+        - name: policyId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyVersionRequest'
+      responses:
+        '201':
+          description: 정책 초안 버전 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyVersion'
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/UnprocessableEntity'}
+  /policies/versions/{policyVersionId}/activate:
+    post:
+      tags: [Policies]
+      summary: 정책 버전 활성화
+      operationId: activatePolicyVersion
+      parameters:
+        - name: policyVersionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 활성화됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyVersion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /audit-events:
+    get:
+      tags: [Audit]
+      summary: 감사 이벤트 조회
+      operationId: listAuditEvents
+      parameters:
+        - name: aggregateType
+          in: query
+          schema:
+            type: string
+        - name: aggregateId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 감사 이벤트 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: RELEASEPILOT_SESSION
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EnvironmentId:
+      name: environmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReleaseId:
+      name: releaseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 같은 사용자와 operation에서 24시간 동안 중복 실행을 방지한다.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  requestBodies:
+    OperationReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OperationReasonRequest'
+  responses:
+    BadRequest:
+      description: 요청 형식이 잘못됨
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: 인증 필요
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: 권한 부족
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: 현재 상태 또는 동시 실행과 충돌
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: 형식은 유효하지만 의미 검증 실패
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    OperationAccepted:
+      description: 비동기 운영 명령 접수됨
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OperationReceipt'
+  schemas:
+    CsrfToken:
+      type: object
+      required: [headerName, token]
+      properties:
+        headerName:
+          const: X-CSRF-TOKEN
+        token:
+          type: string
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 100
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+    Session:
+      type: object
+      required: [user, csrfToken, expiresAt]
+      properties:
+        user:
+          $ref: '#/components/schemas/SessionUser'
+        csrfToken:
+          type: string
+          description: unsafe method 호출 시 X-CSRF-TOKEN header로 보낸다.
+        expiresAt:
+          type: string
+          format: date-time
+    SessionUser:
+      type: object
+      required: [id, displayName, roles, demo]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [VIEWER, DEVELOPER, APPROVER, OPERATOR]
+        demo:
+          type: boolean
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [key, name]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          maxLength: 63
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+    Project:
+      type: object
+      required: [id, key, name, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]
+        createdAt:
+          type: string
+          format: date-time
+    AddProjectMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, role]
+      properties:
+        userId: {type: string, format: uuid}
+        role: {type: string, enum: [VIEWER, DEVELOPER, APPROVER]}
+    ProjectMembership:
+      type: object
+      required: [id, projectId, userId, role, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        projectId: {type: string, format: uuid}
+        userId: {type: string, format: uuid}
+        role: {type: string, enum: [VIEWER, DEVELOPER, APPROVER]}
+        createdAt: {type: string, format: date-time}
+    CreateServiceRequest:
+      type: object
+      additionalProperties: false
+      required: [key, name, repositoryUrl, owner]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          maxLength: 63
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        repositoryUrl:
+          type: string
+          format: uri
+          pattern: '^https://'
+        owner:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Service:
+      type: object
+      required: [id, projectId, key, name, repositoryUrl, owner, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        repositoryUrl:
+          type: string
+          format: uri
+        owner:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]
+        createdAt:
+          type: string
+          format: date-time
+    CreateClusterConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [name, apiServer, allowedNamespaces, secretRef]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        apiServer: {type: string, format: uri, pattern: '^https://'}
+        allowedNamespaces:
+          type: array
+          minItems: 1
+          items: {type: string}
+        secretRef: {type: string, minLength: 1, maxLength: 255}
+    ClusterConnection:
+      allOf:
+        - $ref: '#/components/schemas/CreateClusterConnectionRequest'
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id: {type: string, format: uuid}
+            status: {type: string, enum: [UNVERIFIED, ACTIVE, INVALID, DISABLED]}
+            lastValidatedAt: {type: [string, 'null'], format: date-time}
+            createdAt: {type: string, format: date-time}
+    CreatePrometheusConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [name, baseUrl, queryTimeoutSeconds]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        baseUrl: {type: string, format: uri}
+        secretRef: {type: [string, 'null'], maxLength: 255}
+        queryTimeoutSeconds: {type: integer, minimum: 1, maximum: 120}
+    PrometheusConnection:
+      allOf:
+        - $ref: '#/components/schemas/CreatePrometheusConnectionRequest'
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id: {type: string, format: uuid}
+            status: {type: string, enum: [UNVERIFIED, ACTIVE, INVALID, DISABLED]}
+            lastValidatedAt: {type: [string, 'null'], format: date-time}
+            createdAt: {type: string, format: date-time}
+    CreateEnvironmentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - clusterId
+        - namespace
+        - rolloutName
+        - containerName
+        - stableServiceName
+        - canaryServiceName
+        - prometheusConnectionId
+        - workloadLabelSelector
+        - defaultPolicyVersionId
+      properties:
+        name:
+          type: string
+          enum: [staging, production]
+        clusterId:
+          type: string
+          format: uuid
+        namespace:
+          type: string
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+        rolloutName:
+          type: string
+        containerName:
+          type: string
+          description: Container in the Rollout pod template whose image is replaced
+        stableServiceName:
+          type: string
+        canaryServiceName:
+          type: string
+        prometheusConnectionId:
+          type: string
+          format: uuid
+        workloadLabelSelector:
+          type: object
+          minProperties: 1
+          additionalProperties:
+            type: string
+        defaultPolicyVersionId:
+          type: string
+          format: uuid
+    Environment:
+      type: object
+      required:
+        - id
+        - serviceId
+        - name
+        - clusterId
+        - namespace
+        - rolloutName
+        - containerName
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          enum: [staging, production]
+        clusterId:
+          type: string
+          format: uuid
+        namespace:
+          type: string
+        rolloutName:
+          type: string
+        containerName:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, VALIDATING, ACTIVE, ACTIVE_WITH_WARNINGS, INVALID, DISABLED]
+        lastValidatedAt:
+          type: [string, 'null']
+          format: date-time
+    ValidationReceipt:
+      type: object
+      required: [validationId, environmentId, status, acceptedAt]
+      properties:
+        validationId:
+          type: string
+          format: uuid
+        environmentId:
+          type: string
+          format: uuid
+        status:
+          const: ACCEPTED
+        acceptedAt:
+          type: string
+          format: date-time
+    EnvironmentValidation:
+      type: object
+      required: [id, environmentId, status, checks, startedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        environmentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [RUNNING, PASSED, PASSED_WITH_WARNINGS, FAILED]
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationCheck'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, 'null']
+          format: date-time
+    ValidationCheck:
+      type: object
+      required: [key, result, message]
+      properties:
+        key:
+          type: string
+        result:
+          type: string
+          enum: [PASS, WARNING, FAIL]
+        message:
+          type: string
+        details:
+          type: object
+    CreateReleaseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - serviceId
+        - environmentId
+        - version
+        - imageRepository
+        - imageDigest
+        - changeSummary
+        - commitSha
+        - pipelineUrl
+      properties:
+        serviceId:
+          type: string
+          format: uuid
+        environmentId:
+          type: string
+          format: uuid
+        version:
+          type: string
+          minLength: 1
+          maxLength: 100
+        imageRepository:
+          type: string
+          minLength: 1
+          maxLength: 500
+        imageDigest:
+          type: string
+          pattern: '^sha256:[a-f0-9]{64}$'
+        changeSummary:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        commitSha:
+          type: string
+          pattern: '^[a-fA-F0-9]{40}$'
+        pipelineUrl:
+          type: string
+          format: uri
+        requestedPolicyVersionId:
+          type: string
+          format: uuid
+    Release:
+      type: object
+      required:
+        - id
+        - serviceId
+        - environmentId
+        - version
+        - imageDigest
+        - status
+        - requestedBy
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        serviceId:
+          type: string
+          format: uuid
+        environmentId:
+          type: string
+          format: uuid
+        version:
+          type: string
+        imageDigest:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReleaseStatus'
+        requestedBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        approvedAt:
+          type: [string, 'null']
+          format: date-time
+        startedAt:
+          type: [string, 'null']
+          format: date-time
+        finishedAt:
+          type: [string, 'null']
+          format: date-time
+    ReleaseDetail:
+      allOf:
+        - $ref: '#/components/schemas/Release'
+        - type: object
+          required: [changeSummary, commitSha, pipelineUrl, steps]
+          properties:
+            changeSummary:
+              type: string
+            commitSha:
+              type: string
+            pipelineUrl:
+              type: string
+              format: uri
+            policySnapshot:
+              $ref: '#/components/schemas/PolicySnapshotSummary'
+            approval:
+              anyOf:
+                - $ref: '#/components/schemas/ApprovalDecision'
+                - type: 'null'
+            steps:
+              type: array
+              items:
+                $ref: '#/components/schemas/RolloutStep'
+    ReleasePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Release'
+        nextCursor:
+          type: [string, 'null']
+    ReleaseStatus:
+      type: string
+      enum:
+        - DRAFT
+        - VALIDATING
+        - VALIDATION_FAILED
+        - PENDING_APPROVAL
+        - APPROVED
+        - REJECTED
+        - CANCELED
+        - DEPLOYING
+        - ANALYZING
+        - PROMOTING
+        - PAUSED
+        - ROLLING_BACK
+        - ROLLED_BACK
+        - ROLLBACK_FAILED
+        - SUCCEEDED
+        - FAILED
+    DecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    OperationReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    AnalysisJob:
+      type: object
+      required: [id, stepIndex, status, attempts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepIndex:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, RETRY_WAIT, COMPLETED]
+        attempts:
+          type: integer
+          minimum: 0
+        verdict:
+          type: [string, 'null']
+          enum: [PASS, FAIL, INCONCLUSIVE, null]
+        reasonCode:
+          type: [string, 'null']
+        evidence:
+          type: array
+          description: 민감정보를 제외한 MetricEvaluation 목록
+          items:
+            type: object
+    OperationReceipt:
+      type: object
+      required: [operationId, releaseId, status, acceptedAt]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        releaseId:
+          type: string
+          format: uuid
+        status:
+          const: ACCEPTED
+        acceptedAt:
+          type: string
+          format: date-time
+    ApprovalDecision:
+      type: object
+      required: [decision, decidedBy, reason, decidedAt]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED]
+        decidedBy:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+    RolloutStep:
+      type: object
+      required: [index, weight, minimumObservationSeconds, status]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+        minimumObservationSeconds:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, DEPLOYING, OBSERVING, EVALUATING, PASSED, FAILED, INCONCLUSIVE]
+        decision:
+          type: [string, 'null']
+          enum: [PASS, FAIL, INCONCLUSIVE, null]
+    PolicySnapshotSummary:
+      type: object
+      required: [sourcePolicyVersionId, name, checksum]
+      properties:
+        sourcePolicyVersionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        checksum:
+          type: string
+    CreatePolicyRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Policy:
+      type: object
+      required: [id, name, status, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        status: {type: string, enum: [ACTIVE, DISABLED]}
+        createdAt: {type: string, format: date-time}
+    CreatePolicyVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [definition]
+      properties:
+        definition:
+          type: object
+          description: release-policy.schema.json을 따라야 한다.
+    PolicyVersion:
+      type: object
+      required: [id, policyId, version, status, checksum, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        policyId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, RETIRED]
+        checksum:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    AuditEvent:
+      type: object
+      required:
+        - id
+        - aggregateType
+        - aggregateId
+        - eventType
+        - actorType
+        - occurredAt
+        - correlationId
+        - payload
+      properties:
+        id:
+          type: string
+          format: uuid
+        aggregateType:
+          type: string
+        aggregateId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        actorType:
+          type: string
+          enum: [USER, SYSTEM]
+        actorId:
+          type: [string, 'null']
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+          format: uuid
+        causationId:
+          type: [string, 'null']
+          format: uuid
+        payload:
+          type: object
+    AuditEventPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        nextCursor:
+          type: [string, 'null']
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details
+      required: [type, title, status, code, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+        traceId:
+          type: string
+        violations:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+security:
+  - sessionCookie: []

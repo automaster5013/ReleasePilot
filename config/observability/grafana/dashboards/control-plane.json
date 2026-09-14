@@ -1,0 +1,12 @@
+{
+  "title": "ReleasePilot Control Plane",
+  "uid": "releasepilot-control-plane",
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "API request rate", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}, "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{application=\"releasepilot-control-plane\"}[5m]))", "legendFormat": "requests/s"}]},
+    {"id": 2, "type": "timeseries", "title": "API p95 latency", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"releasepilot-control-plane\"}[5m])))", "legendFormat": "p95"}]},
+    {"id": 3, "type": "logs", "title": "Correlated logs", "gridPos": {"h": 10, "w": 24, "x": 0, "y": 8}, "targets": [{"expr": "{service_name=\"releasepilot-control-plane\"} | json | correlationId != ``", "refId": "A"}]}
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://releasepilot.kr/schemas/release-policy.schema.json",
+  "title": "ReleasePilot Release Policy",
+  "description": "ReleasePilot MVP에서 사용하는 버전 고정형 Canary 릴리스 정책",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "strategy",
+    "steps",
+    "metrics",
+    "inconclusivePolicy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "strategy": {
+      "const": "CANARY"
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/canaryStep"
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/metricRule"
+      }
+    },
+    "inconclusivePolicy": {
+      "$ref": "#/$defs/inconclusivePolicy"
+    }
+  },
+  "$defs": {
+    "canaryStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weight", "minimumObservationSeconds"],
+      "properties": {
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "minimumObservationSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 86400
+        }
+      }
+    },
+    "metricRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "required",
+        "comparison",
+        "threshold"
+      ],
+      "properties": {
+        "key": {
+          "enum": [
+            "HTTP_5XX_RATE",
+            "HTTP_P95_LATENCY_MS",
+            "REQUEST_COUNT"
+          ]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "comparison": {
+          "enum": [
+            "LESS_THAN",
+            "LESS_THAN_OR_EQUAL",
+            "GREATER_THAN_OR_EQUAL"
+          ]
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0
+        },
+        "relativeToBaseline": {
+          "$ref": "#/$defs/baselineRule"
+        }
+      }
+    },
+    "baselineRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "maximumAbsoluteIncrease": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximumRelativeIncreasePercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    },
+    "inconclusivePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "additionalObservationSeconds",
+        "maximumAttempts",
+        "onExhausted"
+      ],
+      "properties": {
+        "additionalObservationSeconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 3600
+        },
+        "maximumAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "onExhausted": {
+          "const": "PAUSE"
+        }
+      }
+    }
+  }
+}

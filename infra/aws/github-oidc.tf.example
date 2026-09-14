@@ -1,0 +1,15 @@
+# Add to the AWS Terraform root after replacing repository owner/name.
+module "github_oidc" {
+  source = "terraform-aws-modules/iam/aws//modules/iam-github-oidc-role"
+  version = "~> 6.0"
+  name = "releasepilot-github-release"
+  subjects = ["YOUR_ORG/YOUR_REPO:ref:refs/tags/v*"]
+  policies = { ecr = aws_iam_policy.release_ecr.arn }
+}
+resource "aws_iam_policy" "release_ecr" {
+  name = "releasepilot-ecr-publish"
+  policy = jsonencode({ Version="2012-10-17", Statement=[
+    { Effect="Allow", Action=["ecr:GetAuthorizationToken"], Resource="*" },
+    { Effect="Allow", Action=["ecr:BatchCheckLayerAvailability","ecr:CompleteLayerUpload","ecr:InitiateLayerUpload","ecr:PutImage","ecr:UploadLayerPart"], Resource="arn:aws:ecr:*:*:repository/releasepilot/*" }
+  ] })
+}

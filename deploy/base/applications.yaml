@@ -1,0 +1,94 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: control-plane }
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: { duration: 60s }
+        - setWeight: 50
+        - pause: {}
+  selector: { matchLabels: { app: control-plane } }
+  template:
+    metadata: { labels: { app: control-plane } }
+    spec:
+      containers:
+        - name: control-plane
+          image: control-plane:latest
+          ports: [{ containerPort: 8080 }]
+          envFrom: [{ secretRef: { name: releasepilot-runtime } }]
+          env:
+            - { name: DATABASE_URL, value: "jdbc:mysql://mysql:3306/releasepilot" }
+            - { name: DATABASE_USERNAME, value: "releasepilot" }
+            - { name: SESSION_COOKIE_SECURE, value: "true" }
+            - { name: DEMO_SESSION_ENABLED, value: "true" }
+            - { name: ANALYSIS_WORKER_URL, value: "http://analysis-worker:8090" }
+            - { name: OTEL_TRACING_ENABLED, value: "true" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector.monitoring:4318/v1/traces" }
+          readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8080 }, initialDelaySeconds: 20 }
+          livenessProbe: { httpGet: { path: /actuator/health/liveness, port: 8080 }, initialDelaySeconds: 40 }
+          resources: { requests: { cpu: 250m, memory: 384Mi }, limits: { memory: 768Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: control-plane }
+spec: { selector: { app: control-plane }, ports: [{ port: 8080, targetPort: 8080 }] }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: analysis-worker }
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: { duration: 60s }
+        - setWeight: 50
+        - pause: {}
+  selector: { matchLabels: { app: analysis-worker } }
+  template:
+    metadata: { labels: { app: analysis-worker } }
+    spec:
+      containers:
+        - name: analysis-worker
+          image: analysis-worker:latest
+          ports: [{ containerPort: 8090 }]
+          readinessProbe: { httpGet: { path: /health, port: 8090 }, initialDelaySeconds: 5 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 256Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: analysis-worker }
+spec: { selector: { app: analysis-worker }, ports: [{ port: 8090, targetPort: 8090 }] }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: web-console }
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: { duration: 60s }
+        - setWeight: 50
+        - pause: {}
+  selector: { matchLabels: { app: web-console } }
+  template:
+    metadata: { labels: { app: web-console } }
+    spec:
+      containers:
+        - name: web-console
+          image: web-console:latest
+          ports: [{ containerPort: 3000 }]
+          env: [{ name: CONTROL_PLANE_INTERNAL_URL, value: "http://control-plane:8080" }]
+          readinessProbe: { httpGet: { path: /health, port: 3000 }, initialDelaySeconds: 5 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 384Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: web-console }
+spec: { selector: { app: web-console }, ports: [{ port: 3000, targetPort: 3000 }] }

@@ -1,0 +1,49 @@
+schemaVersion: '1.0'
+name: otel-http-server-v1
+metrics:
+  REQUEST_COUNT:
+    unit: requests
+    resultType: scalar
+    promql: >-
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}"}[${window}]))
+  HTTP_5XX_RATE:
+    unit: ratio
+    resultType: scalar
+    promql: >-
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}",
+      http_response_status_code=~"5.."}[${window}]))
+      /
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}"}[${window}]))
+  HTTP_P95_LATENCY_MS:
+    unit: milliseconds
+    resultType: scalar
+    promql: >-
+      histogram_quantile(0.95,
+      sum by (le) (rate(http_server_request_duration_seconds_bucket{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}"}[${window}]))) * 1000
+allowedVariables:
+  service_namespace:
+    pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+  service_name:
+    pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+  deployment_environment:
+    enum: [staging, production]
+  release_track:
+    enum: [stable, canary]
+  window:
+    pattern: '^[1-9][0-9]*[smh]$'

@@ -1,0 +1,12 @@
+package kr.releasepilot.controlplane.policy;
+import kr.releasepilot.controlplane.shared.error.*; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets; import java.security.MessageDigest; import java.time.Clock; import java.util.*;
+@Service public class PolicyService {
+ private final PolicyRepository policies;private final PolicyVersionRepository versions;private final PolicyDefinitionValidator validator;private final Clock clock;
+ public PolicyService(PolicyRepository policies,PolicyVersionRepository versions,PolicyDefinitionValidator validator,Clock clock){this.policies=policies;this.versions=versions;this.validator=validator;this.clock=clock;}
+ @Transactional public Policy create(String name){if(policies.existsByName(name))throw new ConflictException("POLICY_NAME_ALREADY_EXISTS","Policy name already exists");return policies.save(Policy.create(name,clock.instant()));}
+ @Transactional public PolicyVersion createVersion(UUID policyId,String definition,UUID actor){if(!policies.existsById(policyId))throw new NotFoundException("POLICY_NOT_FOUND","Policy not found");var result=validator.validate(definition);if(!result.valid())throw new InvalidPolicyException(result.violations());int next=versions.findTopByPolicyIdOrderByVersionDesc(policyId).map(v->v.getVersion()+1).orElse(1);return versions.save(PolicyVersion.draft(policyId,next,definition,sha256(definition),actor,clock.instant()));}
+ @Transactional public PolicyVersion activate(UUID id){var value=versions.findById(id).orElseThrow(()->new NotFoundException("POLICY_VERSION_NOT_FOUND","Policy version not found"));if(versions.existsByPolicyIdAndStatus(value.getPolicyId(),PolicyVersionStatus.ACTIVE))throw new ConflictException("ACTIVE_POLICY_VERSION_EXISTS","Retire the current active version first");value.activate();return value;}
+ private String sha256(String value){try{return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
+ public static class InvalidPolicyException extends RuntimeException{private final List<String> violations;public InvalidPolicyException(List<String> violations){super("Policy definition is invalid");this.violations=violations;}public List<String> getViolations(){return violations;}}
+}

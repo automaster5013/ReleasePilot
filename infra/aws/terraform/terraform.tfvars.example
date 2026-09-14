@@ -1,0 +1,5 @@
+aws_region         = "ap-northeast-2"
+cluster_name       = "releasepilot-demo"
+domain_name        = "releasepilot.kr"
+create_route53_zone = true
+owner              = "your-name"

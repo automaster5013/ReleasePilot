@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+
+  control-plane:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/control-plane
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: bash mvnw --batch-mode verify
+
+  analysis-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/analysis-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.13'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  web-console:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web-console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/web-console/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install jsonschema pyyaml
+      - name: Validate release policy example
+        run: >-
+          python -c "import json,jsonschema,pathlib;
+          s=json.loads(pathlib.Path('policies/schema/release-policy.schema.json').read_text());
+          e=json.loads(pathlib.Path('policies/examples/production-default-v1.json').read_text());
+          jsonschema.validate(e,s)"
+      - name: Parse API and query templates
+        run: >-
+          python -c "import pathlib,yaml;
+          yaml.safe_load(pathlib.Path('api/openapi/releasepilot-v1.yaml').read_text());
+          yaml.safe_load(pathlib.Path('config/observability/query-templates-v1.yaml').read_text())"

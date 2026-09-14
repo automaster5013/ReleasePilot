@@ -1,0 +1,12 @@
+package kr.releasepilot.controlplane.rollout;
+import jakarta.persistence.*;import java.time.Instant;import java.util.UUID;
+@Entity @Table(name="rollout_steps",uniqueConstraints=@UniqueConstraint(name="uk_rollout_step_index",columnNames={"execution_id","step_index"}))
+public class RolloutStep{
+ @Id private UUID id;@Column(name="execution_id",nullable=false)private UUID executionId;@Column(name="step_index",nullable=false)private int stepIndex;@Column(name="target_weight",nullable=false)private int targetWeight;@Column(name="minimum_observation_seconds",nullable=false)private int minimumObservationSeconds;@Enumerated(EnumType.STRING)@Column(nullable=false,length=20)private RolloutStepStatus status;@Column(name="started_at")private Instant startedAt;@Column(name="evaluation_started_at")private Instant evaluationStartedAt;@Column(name="finished_at")private Instant finishedAt;protected RolloutStep(){}
+ public static RolloutStep pending(UUID executionId,int index,int weight,int observationSeconds){if(weight<1||weight>100)throw new IllegalArgumentException("weight must be between 1 and 100");if(observationSeconds<0)throw new IllegalArgumentException("observation seconds cannot be negative");var step=new RolloutStep();step.id=UUID.randomUUID();step.executionId=executionId;step.stepIndex=index;step.targetWeight=weight;step.minimumObservationSeconds=observationSeconds;step.status=RolloutStepStatus.PENDING;return step;}
+ public UUID getId(){return id;}public UUID getExecutionId(){return executionId;}public int getStepIndex(){return stepIndex;}public int getTargetWeight(){return targetWeight;}public int getMinimumObservationSeconds(){return minimumObservationSeconds;}public RolloutStepStatus getStatus(){return status;}public Instant getStartedAt(){return startedAt;}
+ public void start(Instant now){if(status!=RolloutStepStatus.PENDING)throw new IllegalStateException("Step is not pending");status=RolloutStepStatus.RUNNING;startedAt=now;}
+ public void evaluating(Instant now){if(status!=RolloutStepStatus.RUNNING)throw new IllegalStateException("Step is not running");status=RolloutStepStatus.EVALUATING;evaluationStartedAt=now;}
+ public void pass(Instant now){if(status!=RolloutStepStatus.RUNNING&&status!=RolloutStepStatus.EVALUATING)throw new IllegalStateException("Step is not active");status=RolloutStepStatus.PASSED;finishedAt=now;}
+ public void fail(Instant now){if(status!=RolloutStepStatus.EVALUATING)throw new IllegalStateException("Step is not evaluating");status=RolloutStepStatus.FAILED;finishedAt=now;}
+}

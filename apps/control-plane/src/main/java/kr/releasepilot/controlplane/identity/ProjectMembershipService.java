@@ -1,0 +1,8 @@
+package kr.releasepilot.controlplane.identity;
+import kr.releasepilot.controlplane.catalog.ProjectRepository; import kr.releasepilot.controlplane.shared.error.*; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.time.Clock; import java.util.*;
+@Service public class ProjectMembershipService {
+ private final ProjectRepository projects;private final UserAccountRepository users;private final ProjectMembershipRepository memberships;private final Clock clock;
+ public ProjectMembershipService(ProjectRepository projects,UserAccountRepository users,ProjectMembershipRepository memberships,Clock clock){this.projects=projects;this.users=users;this.memberships=memberships;this.clock=clock;}
+ @Transactional public ProjectMembership add(UUID projectId,UUID userId,Role role){if(!projects.existsById(projectId))throw new NotFoundException("PROJECT_NOT_FOUND","Project not found");if(!users.existsById(userId))throw new NotFoundException("USER_NOT_FOUND","User not found");if(role==Role.OPERATOR)throw new ConflictException("OPERATOR_MEMBERSHIP_NOT_ALLOWED","OPERATOR is a platform role");if(memberships.existsByProjectIdAndUserId(projectId,userId))throw new ConflictException("PROJECT_MEMBERSHIP_EXISTS","Project membership already exists");return memberships.save(ProjectMembership.create(projectId,userId,role,clock.instant()));}
+ @Transactional(readOnly=true) public List<ProjectMembership> list(UUID projectId){if(!projects.existsById(projectId))throw new NotFoundException("PROJECT_NOT_FOUND","Project not found");return memberships.findByProjectIdOrderByCreatedAtAsc(projectId);}
+}

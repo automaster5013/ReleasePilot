@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: releasepilot-demo
+  namespace: releasepilot-demo
+spec:
+  replicas: 5
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels: {app: releasepilot-demo}
+  template:
+    metadata:
+      labels:
+        app: releasepilot-demo
+        service_namespace: releasepilot-demo
+        service_name: releasepilot-demo
+    spec:
+      containers:
+        - name: releasepilot-demo
+          image: argoproj/rollouts-demo:blue
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe:
+            httpGet: {path: /, port: http}
+  strategy:
+    canary:
+      stableService: demo-stable
+      canaryService: demo-canary
+      steps:
+        - setWeight: 10
+        - pause: {}
+        - setWeight: 30
+        - pause: {}
+        - setWeight: 60
+        - pause: {}
+        - setWeight: 100
+        - pause: {}

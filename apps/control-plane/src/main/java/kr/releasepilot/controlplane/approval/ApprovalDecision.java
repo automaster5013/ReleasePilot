@@ -1,0 +1,6 @@
+package kr.releasepilot.controlplane.approval;
+import jakarta.persistence.*;import java.time.Instant;import java.util.UUID;
+@Entity @Table(name="approval_decisions")public class ApprovalDecision{
+ public enum Decision{APPROVED,REJECTED}@Id private UUID id;@Column(name="release_id",nullable=false,unique=true)private UUID releaseId;@Column(name="decided_by",nullable=false)private UUID decidedBy;@Enumerated(EnumType.STRING)@Column(nullable=false,length=20)private Decision decision;@Column(nullable=false,length=1000)private String reason;@Column(name="idempotency_key",nullable=false,length=128)private String idempotencyKey;@Column(name="decided_at",nullable=false)private Instant decidedAt;protected ApprovalDecision(){}
+ public static ApprovalDecision create(UUID release,UUID actor,Decision decision,String reason,String key,Instant now){var d=new ApprovalDecision();d.id=UUID.randomUUID();d.releaseId=release;d.decidedBy=actor;d.decision=decision;d.reason=reason;d.idempotencyKey=key;d.decidedAt=now;return d;}public UUID getReleaseId(){return releaseId;}public Decision getDecision(){return decision;}public UUID getDecidedBy(){return decidedBy;}public String getReason(){return reason;}public Instant getDecidedAt(){return decidedAt;}
+}

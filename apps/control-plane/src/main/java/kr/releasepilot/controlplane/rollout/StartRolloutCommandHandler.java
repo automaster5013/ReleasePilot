@@ -1,0 +1,25 @@
+package kr.releasepilot.controlplane.rollout;
+
+import kr.releasepilot.controlplane.audit.*;import kr.releasepilot.controlplane.connection.*;
+import kr.releasepilot.controlplane.environment.EnvironmentRepository;
+import kr.releasepilot.controlplane.release.*;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.Clock;
+
+@Component
+public class StartRolloutCommandHandler implements RolloutCommandHandler {
+    private final RolloutExecutionRepository executions; private final ReleaseRepository releases;
+    private final ReleaseArtifactRepository artifacts; private final EnvironmentRepository environments;
+    private final ClusterConnectionRepository clusters; private final SecretResolver secrets;
+    private final ArgoRolloutsGateway argo;private final RolloutStepRepository steps;private final AuditEventRepository audits;private final tools.jackson.databind.ObjectMapper json; private final Clock clock;
+    public StartRolloutCommandHandler(RolloutExecutionRepository executions,ReleaseRepository releases,ReleaseArtifactRepository artifacts,EnvironmentRepository environments,ClusterConnectionRepository clusters,SecretResolver secrets,ArgoRolloutsGateway argo,RolloutStepRepository steps,AuditEventRepository audits,tools.jackson.databind.ObjectMapper json,Clock clock){this.executions=executions;this.releases=releases;this.artifacts=artifacts;this.environments=environments;this.clusters=clusters;this.secrets=secrets;this.argo=argo;this.steps=steps;this.audits=audits;this.json=json;this.clock=clock;}
+    @Override @Transactional public void handle(Command command){
+        var execution=executions.findById(command.executionId()).orElseThrow();var release=releases.findById(execution.getReleaseId()).orElseThrow();
+        var artifact=artifacts.findByReleaseId(release.getId()).orElseThrow();var env=environments.findById(release.getEnvironmentId()).orElseThrow();
+        var cluster=clusters.findById(execution.getClusterId()).orElseThrow();var secret=secrets.resolve(cluster.getSecretRef()).orElseThrow(()->new IllegalStateException("Cluster secret is unavailable"));
+        if("START_ROLLOUT".equals(command.type())){var now=clock.instant();var observed=argo.start(new ArgoRolloutsGateway.StartRequest(cluster.getApiServer(),secret.bearerToken(),execution.getNamespace(),execution.getRolloutName(),env.getContainerName(),artifact.getImageRepository()+"@"+artifact.getImageDigest()));execution.started(observed.uid(),observed.resourceVersion(),now);release.running();var rolloutSteps=steps.findByExecutionIdOrderByStepIndexAsc(execution.getId());if(!rolloutSteps.isEmpty()&&rolloutSteps.getFirst().getStatus()==RolloutStepStatus.PENDING)rolloutSteps.getFirst().start(now);return;}
+        ArgoRolloutsGateway.Action action=switch(command.type()){case "PROMOTE_ROLLOUT"->ArgoRolloutsGateway.Action.PROMOTE;case "PAUSE_ROLLOUT"->ArgoRolloutsGateway.Action.PAUSE;case "RESUME_ROLLOUT"->ArgoRolloutsGateway.Action.RESUME;case "ABORT_ROLLOUT"->ArgoRolloutsGateway.Action.ABORT;default->throw new IllegalArgumentException("Unsupported rollout command: "+command.type());};
+        if(execution.getRolloutUid()==null)throw new IllegalStateException("Rollout execution UID is unavailable");var now=clock.instant();var observed=argo.control(new ArgoRolloutsGateway.ControlRequest(cluster.getApiServer(),secret.bearerToken(),execution.getNamespace(),execution.getRolloutName(),execution.getRolloutUid(),action));if(action==ArgoRolloutsGateway.Action.PROMOTE){var rolloutSteps=steps.findByExecutionIdOrderByStepIndexAsc(execution.getId());int current=execution.getCurrentStepIndex();if(current>=rolloutSteps.size())throw new IllegalStateException("No Canary step is available for promotion");rolloutSteps.get(current).pass(now);if(current+1<rolloutSteps.size())rolloutSteps.get(current+1).start(now);}execution.controlled(action,observed.resourceVersion(),now);release.controlled(action,now);try{var payload=json.readValue(command.payloadJson(),RolloutOperationService.Payload.class);audits.save(AuditEvent.rolloutOperation(release.getId(),payload.actorId(),"SUCCEEDED",action.name(),json.writeValueAsString(java.util.Map.of("reason",payload.reason(),"resourceVersion",observed.resourceVersion())),now));}catch(Exception e){throw new IllegalStateException("Cannot record rollout operation audit",e);}
+    }
+}

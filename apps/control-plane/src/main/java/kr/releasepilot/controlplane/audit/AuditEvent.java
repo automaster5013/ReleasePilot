@@ -1,0 +1,80 @@
+package kr.releasepilot.controlplane.audit;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.UUID;
+import kr.releasepilot.controlplane.shared.config.CorrelationIdFilter;
+
+@Entity
+@Table(name = "audit_events")
+public class AuditEvent {
+    @Id
+    private UUID id;
+    @Column(name = "aggregate_type", nullable = false, length = 60)
+    private String aggregateType;
+    @Column(name = "aggregate_id", nullable = false)
+    private UUID aggregateId;
+    @Column(name = "event_type", nullable = false, length = 100)
+    private String eventType;
+    @Column(name = "actor_type", nullable = false, length = 20)
+    private String actorType;
+    @Column(name = "actor_id")
+    private UUID actorId;
+    @Column(name = "occurred_at", nullable = false)
+    private Instant occurredAt;
+    @Column(name = "correlation_id", nullable = false)
+    private UUID correlationId;
+    @Column(name = "payload_json", nullable = false, columnDefinition = "json")
+    private String payloadJson;
+
+    protected AuditEvent() {
+    }
+
+    public static AuditEvent projectCreated(UUID projectId, UUID actorId, Instant occurredAt) {
+        return created("PROJECT", projectId, "PROJECT_CREATED", actorId, occurredAt);
+    }
+
+    public static AuditEvent serviceCreated(UUID serviceId, UUID actorId, Instant occurredAt) {
+        return created("SERVICE", serviceId, "SERVICE_CREATED", actorId, occurredAt);
+    }
+
+    public static AuditEvent connectionCreated(String type, UUID connectionId, UUID actorId, Instant occurredAt) {
+        return created(type, connectionId, type + "_CREATED", actorId, occurredAt);
+    }
+
+    public static AuditEvent releaseRequested(UUID releaseId, UUID actorId, Instant occurredAt) {
+        return created("RELEASE", releaseId, "RELEASE_REQUESTED", actorId, occurredAt);
+    }
+
+    public static AuditEvent releaseDecision(UUID releaseId, UUID actorId, String decision, Instant occurredAt) {
+        return created("RELEASE", releaseId, "RELEASE_" + decision, actorId, occurredAt);
+    }
+
+    public static AuditEvent rolloutOperation(UUID releaseId, UUID actorId, String phase, String operation,
+                                              String payloadJson, Instant occurredAt) {
+        var event=created("RELEASE",releaseId,"ROLLOUT_"+operation+"_"+phase,actorId,occurredAt);
+        event.payloadJson=payloadJson;return event;
+    }
+
+    private static AuditEvent created(String aggregateType, UUID aggregateId, String eventType,
+                                      UUID actorId, Instant occurredAt) {
+        AuditEvent event = new AuditEvent();
+        event.id = UUID.randomUUID();
+        event.aggregateType = aggregateType;
+        event.aggregateId = aggregateId;
+        event.eventType = eventType;
+        event.actorType = "USER";
+        event.actorId = actorId;
+        event.occurredAt = occurredAt;
+        event.correlationId = CorrelationIdFilter.current();
+        event.payloadJson = "{}";
+        return event;
+    }
+    public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
+    public String getEventType(){return eventType;} public String getActorType(){return actorType;} public UUID getActorId(){return actorId;}
+    public Instant getOccurredAt(){return occurredAt;} public UUID getCorrelationId(){return correlationId;} public String getPayloadJson(){return payloadJson;}
+}

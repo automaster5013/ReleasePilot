@@ -1,0 +1,41 @@
+[project]
+name = "releasepilot-analysis-worker"
+version = "0.1.0"
+description = "Prometheus metric analysis worker for ReleasePilot"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "httpx>=0.28,<1",
+  "pydantic>=2.11,<3",
+  "prometheus-client>=0.23,<1",
+  "pyyaml>=6.0,<7",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4,<9",
+  "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/releasepilot_analysis_worker"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/releasepilot_analysis_worker/query-templates-v1.yaml" = "releasepilot_analysis_worker/query-templates-v1.yaml"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

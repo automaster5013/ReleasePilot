@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-stable
+  namespace: releasepilot-demo
+spec:
+  selector: {app: releasepilot-demo}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-canary
+  namespace: releasepilot-demo
+spec:
+  selector: {app: releasepilot-demo}
+  ports: [{name: http, port: 80, targetPort: http}]

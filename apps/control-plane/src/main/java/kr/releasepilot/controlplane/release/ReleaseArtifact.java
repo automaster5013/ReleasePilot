@@ -1,0 +1,3 @@
+package kr.releasepilot.controlplane.release;
+import jakarta.persistence.*;import java.util.UUID;
+@Entity @Table(name="release_artifacts")public class ReleaseArtifact{@Id private UUID id;@Column(name="release_id",nullable=false,unique=true)private UUID releaseId;@Column(name="image_repository",nullable=false,length=500)private String imageRepository;@Column(name="image_digest",nullable=false,length=71)private String imageDigest;protected ReleaseArtifact(){}public static ReleaseArtifact create(UUID release,String repo,String digest){var a=new ReleaseArtifact();a.id=UUID.randomUUID();a.releaseId=release;a.imageRepository=repo;a.imageDigest=digest;return a;}public String getImageRepository(){return imageRepository;}public String getImageDigest(){return imageDigest;}}

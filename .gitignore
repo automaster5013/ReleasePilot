@@ -1,0 +1,35 @@
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+*.local
+
+# Java
+apps/control-plane/target/
+
+# Python
+apps/analysis-worker/.venv/
+apps/analysis-worker/.pytest_cache/
+apps/analysis-worker/pytest-cache-files-*/
+apps/analysis-worker/.ruff_cache/
+apps/analysis-worker/**/__pycache__/
+
+# Node
+apps/web-console/node_modules/
+apps/web-console/.next/
+apps/web-console/out/
+
+# Task-local caches
+work/
+infra/aws/terraform/.terraform/
+infra/aws/terraform/*.tfstate*
+infra/aws/terraform/*.tfplan
+infra/aws/terraform/crash.log
+
+# Generated test and coverage output
+coverage/
+*.log

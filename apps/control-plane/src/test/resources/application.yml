@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:releasepilot;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  session:
+    store-type: none
+  flyway:
+    enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+
+releasepilot:
+  analysis:
+    enabled: false
+  rollout:
+    worker:
+      enabled: false
+  bootstrap-operator:
+    enabled: false

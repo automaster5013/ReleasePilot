@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: releasepilot-control-plane
+  datasource:
+    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/releasepilot}
+    username: ${DATABASE_USERNAME:releasepilot}
+    password: ${DATABASE_PASSWORD:releasepilot-local}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    timeout: 30m
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        name: RELEASEPILOT_SESSION
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+
+logging:
+  pattern:
+    level: "%5p [correlationId:%X{correlationId:-none}] [traceId:%X{traceId:-none}]"
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    export:
+      otlp:
+        enabled: ${OTEL_TRACING_ENABLED:false}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+releasepilot:
+  rollout:
+    worker:
+      enabled: ${ROLLOUT_WORKER_ENABLED:true}
+      poll-interval: ${ROLLOUT_WORKER_POLL_INTERVAL:PT2S}
+      lease-timeout: ${ROLLOUT_WORKER_LEASE_TIMEOUT:PT2M}
+      batch-size: ${ROLLOUT_WORKER_BATCH_SIZE:20}
+  analysis:
+    enabled: ${ANALYSIS_ENABLED:true}
+    worker-url: ${ANALYSIS_WORKER_URL:http://localhost:8090}
+    poll-interval: ${ANALYSIS_POLL_INTERVAL:PT5S}
+    lease-timeout: ${ANALYSIS_LEASE_TIMEOUT:PT2M}
+    batch-size: ${ANALYSIS_BATCH_SIZE:20}
+  demo:
+    enabled: ${DEMO_SESSION_ENABLED:false}
+    username: ${DEMO_SESSION_USERNAME:releasepilot-demo}
+  bootstrap-operator:
+    enabled: ${BOOTSTRAP_OPERATOR_ENABLED:false}
+    username: ${BOOTSTRAP_OPERATOR_USERNAME:operator}
+    password: ${BOOTSTRAP_OPERATOR_PASSWORD:}
+    display-name: ${BOOTSTRAP_OPERATOR_DISPLAY_NAME:ReleasePilot Operator}
