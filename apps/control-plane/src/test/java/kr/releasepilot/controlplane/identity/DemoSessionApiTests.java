@@ -30,4 +30,10 @@ class DemoSessionApiTests {
                         .contentType("application/json").content("{\"reason\":\"must be rejected\"}"))
                 .andExpect(status().isForbidden());
     }
+    @Test void reportsOidcAsDisabledWithoutAClientRegistration() throws Exception {
+        mvc.perform(get("/api/v1/session/providers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.oidc").value(false))
+                .andExpect(jsonPath("$.loginUrl").doesNotExist());
+    }
 }

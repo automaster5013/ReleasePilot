@@ -17,6 +17,19 @@ tags:
   - name: Policies
   - name: Audit
 paths:
+  /session/providers:
+    get:
+      tags: [Session]
+      summary: 사용 가능한 조직 로그인 방식 조회
+      operationId: getAuthenticationProviders
+      security: []
+      responses:
+        '200':
+          description: 공개 인증 공급자 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticationProviders'
   /session/csrf:
     get:
       tags: [Session]
@@ -850,6 +863,14 @@ components:
           schema:
             $ref: '#/components/schemas/OperationReceipt'
   schemas:
+    AuthenticationProviders:
+      type: object
+      required: [oidc]
+      properties:
+        oidc:
+          type: boolean
+        loginUrl:
+          type: [string, 'null']
     CsrfToken:
       type: object
       required: [headerName, token]

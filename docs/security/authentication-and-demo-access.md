@@ -52,7 +52,36 @@ Grafana를 공개할 경우 `grafana.releasepilot.kr`로 분리하되 익명 관
 - 최초 로그인 시 password 변경을 요구하고 bootstrap 기능을 비활성화한다.
 - 데모 VIEWER는 비밀번호를 공개하는 공용 계정 대신 “읽기 전용 데모 시작” 동작으로 짧은 demo session을 발급한다.
 
-OIDC, GitHub OAuth 또는 Amazon Cognito는 MVP 이후 교체 후보로 둔다. 도메인 로직은 인증 제공자가 아니라 내부 User ID와 Role만 참조한다.
+도메인 로직은 인증 제공자가 아니라 내부 User ID와 Role만 참조한다.
+
+### 조직 OIDC/SSO
+
+조직 로그인은 표준 Authorization Code + OpenID Connect 흐름을 사용한다. 공급자가 검증한
+`issuer + subject`를 `external_identities`의 불변 키로 연결하고, 이메일·이름·그룹 claim으로
+기존 계정을 추측하거나 운영 권한을 부여하지 않는다. 역할과 프로젝트 멤버십은 ReleasePilot의
+내부 `UserAccount`가 계속 유일한 권한 원천이다.
+
+기본 설정은 `OIDC_ENABLED=false`, `OIDC_AUTO_PROVISION=false`다. 자동 프로비저닝을 명시적으로
+활성화하면 `OIDC_ALLOWED_EMAIL_DOMAINS`에 포함된 검증 이메일만 새 계정으로 만들며 전역 역할은
+항상 `VIEWER`다. 프로젝트 멤버십은 별도로 부여해야 한다. 비활성화된 내부 계정은 연결된 외부
+ID가 유효해도 로그인할 수 없다.
+
+공급자 연결 시 Spring Boot 표준 설정을 secret 또는 배포 환경 변수로 주입한다. 저장소에는
+client secret을 넣지 않는다.
+
+```properties
+OIDC_ENABLED=true
+OIDC_REGISTRATION_ID=releasepilot
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_CLIENT_ID=...
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_CLIENT_SECRET=...
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_AUTHORIZATION_GRANT_TYPE=authorization_code
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_REDIRECT_URI={baseUrl}/login/oauth2/code/{registrationId}
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_SCOPE=openid,profile,email
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_RELEASEPILOT_PROVIDER=releasepilot
+SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_RELEASEPILOT_ISSUER_URI=https://idp.example.com
+```
+
+등록할 redirect URI는 `https://releasepilot.kr/login/oauth2/code/releasepilot`이다.
 
 ## 5. 공개 범위
 

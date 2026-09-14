@@ -72,6 +72,11 @@ releasepilot:
   demo:
     enabled: ${DEMO_SESSION_ENABLED:false}
     username: ${DEMO_SESSION_USERNAME:releasepilot-demo}
+  oidc:
+    enabled: ${OIDC_ENABLED:false}
+    registration-id: ${OIDC_REGISTRATION_ID:releasepilot}
+    auto-provision: ${OIDC_AUTO_PROVISION:false}
+    allowed-email-domains: ${OIDC_ALLOWED_EMAIL_DOMAINS:}
   bootstrap-operator:
     enabled: ${BOOTSTRAP_OPERATOR_ENABLED:false}
     username: ${BOOTSTRAP_OPERATOR_USERNAME:operator}

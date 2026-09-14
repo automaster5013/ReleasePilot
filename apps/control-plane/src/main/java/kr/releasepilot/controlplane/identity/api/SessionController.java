@@ -14,6 +14,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -36,14 +38,27 @@ public class SessionController {
     private final UserDetailsService userDetailsService;
     private final boolean demoEnabled;
     private final String demoUsername;
+    private final boolean oidcEnabled;
+    private final String oidcRegistrationId;
 
     public SessionController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService,
                              @Value("${releasepilot.demo.enabled:false}") boolean demoEnabled,
-                             @Value("${releasepilot.demo.username:releasepilot-demo}") String demoUsername) {
+                             @Value("${releasepilot.demo.username:releasepilot-demo}") String demoUsername,
+                             @Value("${releasepilot.oidc.enabled:false}") boolean oidcEnabled,
+                             @Value("${releasepilot.oidc.registration-id:releasepilot}") String oidcRegistrationId,
+                             ObjectProvider<ClientRegistrationRepository> clientRegistrations) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.demoEnabled = demoEnabled;
         this.demoUsername = demoUsername;
+        this.oidcEnabled = oidcEnabled && clientRegistrations.getIfAvailable() != null;
+        this.oidcRegistrationId = oidcRegistrationId;
+    }
+
+    @GetMapping("/providers")
+    public AuthenticationProviders providers() {
+        return new AuthenticationProviders(oidcEnabled,
+                oidcEnabled ? "/oauth2/authorization/" + oidcRegistrationId : null);
     }
 
     @GetMapping("/csrf")
@@ -129,5 +144,8 @@ public class SessionController {
     }
 
     public record CsrfResponse(String headerName, String token) {
+    }
+
+    public record AuthenticationProviders(boolean oidc, String loginUrl) {
     }
 }

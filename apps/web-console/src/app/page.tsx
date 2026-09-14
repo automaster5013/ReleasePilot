@@ -32,6 +32,7 @@ type Release = {
   commitSha: string;
   pipelineUrl: string;
 };
+type AuthenticationProviders = { oidc: boolean; loginUrl: string | null };
 
 const demoSteps: Step[] = [
   { index: 0, weight: 10, status: "PASSED" },
@@ -55,6 +56,14 @@ export default function Home() {
   const [connection, setConnection] = useState("DEMO SNAPSHOT");
   const [error, setError] = useState("");
   const [canOperate, setCanOperate] = useState(false);
+  const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
+
+  useEffect(() => {
+    fetch("/control-api/session/providers")
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then(setAuthenticationProviders)
+      .catch(() => setAuthenticationProviders({ oidc: false, loginUrl: null }));
+  }, []);
 
   async function startDemo() {
     const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
@@ -114,7 +123,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <span className={styles.live}><i />{connection}<button onClick={startDemo}>읽기 전용 데모</button></span>
+        <span className={styles.live}><i />{connection}{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></span>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>
