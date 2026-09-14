@@ -135,6 +135,65 @@ paths:
           description: 로그아웃 완료
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /session/active:
+    get:
+      tags: [Session]
+      summary: 현재 사용자의 활성 세션 조회
+      operationId: listActiveSessions
+      responses:
+        '200':
+          description: 원본 session ID를 노출하지 않는 활성 세션 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveSessionPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: 영속 session 저장소를 사용할 수 없음
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /session/active/{reference}:
+    delete:
+      tags: [Session]
+      summary: 현재 사용자가 소유한 활성 세션 무효화
+      operationId: revokeActiveSession
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{24}$'
+      responses:
+        '204':
+          description: 세션 무효화 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /session/revoke-others:
+    post:
+      tags: [Session]
+      summary: 현재 세션을 제외한 사용자의 모든 세션 무효화
+      operationId: revokeOtherSessions
+      responses:
+        '200':
+          description: 무효화 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionRevocationResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /projects:
     post:
       tags: [Catalog]
@@ -982,6 +1041,40 @@ components:
             enum: [VIEWER, DEVELOPER, APPROVER, OPERATOR]
         demo:
           type: boolean
+    ActiveSessionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveSession'
+    ActiveSession:
+      type: object
+      required: [reference, current, createdAt, lastAccessedAt, expiresAt]
+      properties:
+        reference:
+          type: string
+          pattern: '^[a-f0-9]{24}$'
+          description: 원본 session ID에서 파생한 비가역 참조값
+        current:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastAccessedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    SessionRevocationResult:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: integer
+          minimum: 0
     CreateProjectRequest:
       type: object
       additionalProperties: false

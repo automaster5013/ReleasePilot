@@ -66,6 +66,12 @@ public class AuditEvent {
         return created("RELEASE", releaseId, "RELEASE_" + decision, actorId, occurredAt);
     }
 
+    public static AuditEvent sessionsRevoked(UUID userId, UUID actorId, int count, String scope, Instant occurredAt) {
+        var event = created("USER", userId, "SESSIONS_REVOKED", actorId, occurredAt);
+        event.payloadJson = "{\"count\":" + count + ",\"scope\":\"" + scope + "\"}";
+        return event;
+    }
+
     public static AuditEvent rolloutOperation(UUID releaseId, UUID actorId, String phase, String operation,
                                               String payloadJson, Instant occurredAt) {
         var event=created("RELEASE",releaseId,"ROLLOUT_"+operation+"_"+phase,actorId,occurredAt);

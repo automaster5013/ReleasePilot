@@ -25,6 +25,10 @@ class DemoSessionApiTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.demo").value(true))
                 .andExpect(jsonPath("$.user.roles[0]").value("VIEWER")).andReturn();
         var session=(MockHttpSession)result.getRequest().getSession(false);
+        mvc.perform(get("/api/v1/session/active").session(session))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/session/revoke-others").session(session).with(csrf()))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/releases/"+UUID.randomUUID()+"/abort").session(session).with(csrf())
                         .header("Idempotency-Key",UUID.randomUUID()+"demo")
                         .contentType("application/json").content("{\"reason\":\"must be rejected\"}"))

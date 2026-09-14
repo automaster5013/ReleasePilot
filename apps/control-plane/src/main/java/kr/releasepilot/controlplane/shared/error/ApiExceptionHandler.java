@@ -10,10 +10,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.net.URI;
 import kr.releasepilot.controlplane.policy.PolicyService;
 import kr.releasepilot.controlplane.identity.RateLimitExceededException;
+import kr.releasepilot.controlplane.identity.SessionManagementService;
 import org.springframework.http.ResponseEntity;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(SessionManagementService.SessionStoreUnavailableException.class)
+    ProblemDetail sessionStoreUnavailable(SessionManagementService.SessionStoreUnavailableException exception,
+                                          HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Session store unavailable");
+        problem.setType(URI.create("https://releasepilot.kr/problems/session-store-unavailable"));
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("code", "SESSION_STORE_UNAVAILABLE");
+        return problem;
+    }
 
     @ExceptionHandler(RateLimitExceededException.class)
     ResponseEntity<ProblemDetail> rateLimited(RateLimitExceededException exception, HttpServletRequest request) {

@@ -8,12 +8,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import kr.releasepilot.controlplane.identity.UserAccountPrincipal;
 import kr.releasepilot.controlplane.identity.SessionRateLimiter;
+import kr.releasepilot.controlplane.identity.SessionManagementService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -42,6 +44,7 @@ public class SessionController {
     private final boolean oidcEnabled;
     private final String oidcRegistrationId;
     private final SessionRateLimiter rateLimiter;
+    private final SessionManagementService sessions;
 
     public SessionController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService,
                              @Value("${releasepilot.demo.enabled:false}") boolean demoEnabled,
@@ -49,7 +52,7 @@ public class SessionController {
                              @Value("${releasepilot.oidc.enabled:false}") boolean oidcEnabled,
                              @Value("${releasepilot.oidc.registration-id:releasepilot}") String oidcRegistrationId,
                              ObjectProvider<ClientRegistrationRepository> clientRegistrations,
-                             SessionRateLimiter rateLimiter) {
+                             SessionRateLimiter rateLimiter, SessionManagementService sessions) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.demoEnabled = demoEnabled;
@@ -57,6 +60,7 @@ public class SessionController {
         this.oidcEnabled = oidcEnabled && clientRegistrations.getIfAvailable() != null;
         this.oidcRegistrationId = oidcRegistrationId;
         this.rateLimiter = rateLimiter;
+        this.sessions = sessions;
     }
 
     @GetMapping("/providers")
@@ -111,6 +115,29 @@ public class SessionController {
         return response(authentication, csrfToken, session);
     }
 
+    @GetMapping("/active")
+    public ActiveSessions active(Authentication authentication, HttpSession current) {
+        rejectDemo(current);
+        var principal = (UserAccountPrincipal) authentication.getPrincipal();
+        return new ActiveSessions(sessions.list(principal.getUsername(), current.getId()));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/active/{reference}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revoke(@org.springframework.web.bind.annotation.PathVariable String reference,
+                       Authentication authentication, HttpSession current) {
+        rejectDemo(current);
+        var principal = (UserAccountPrincipal) authentication.getPrincipal();
+        sessions.revoke(principal.getUsername(), principal.id(), reference);
+    }
+
+    @PostMapping("/revoke-others")
+    public RevocationResult revokeOthers(Authentication authentication, HttpSession current) {
+        rejectDemo(current);
+        var principal = (UserAccountPrincipal) authentication.getPrincipal();
+        return new RevocationResult(sessions.revokeOthers(principal.getUsername(), principal.id(), current.getId()));
+    }
+
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logout(
@@ -138,6 +165,12 @@ public class SessionController {
         );
     }
 
+    private void rejectDemo(HttpSession session) {
+        if (Boolean.TRUE.equals(session.getAttribute("RELEASEPILOT_DEMO"))) {
+            throw new AccessDeniedException("Session management is unavailable for shared demo sessions");
+        }
+    }
+
     public record LoginRequest(
             @NotBlank @Size(max = 100) String username,
             @NotBlank @Size(max = 200) String password
@@ -155,4 +188,7 @@ public class SessionController {
 
     public record AuthenticationProviders(boolean oidc, String loginUrl) {
     }
+
+    public record ActiveSessions(List<SessionManagementService.SessionView> items) {}
+    public record RevocationResult(int revoked) {}
 }

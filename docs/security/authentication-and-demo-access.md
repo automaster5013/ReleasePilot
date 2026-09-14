@@ -135,7 +135,10 @@ SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_RELEASEPILOT_ISSUER_URI=https://idp.examp
 - 일반 사용자 idle timeout: 30분
 - 일반 사용자 absolute timeout: 12시간
 - VIEWER demo session absolute timeout: 60분
-- 동시 세션 수 제한은 MVP에서 강제하지 않지만 사용자별 세션 목록과 전체 무효화 기능을 고려한다.
+- `GET /api/v1/session/active`는 원본 session ID 대신 SHA-256 기반 24자리 참조값과 접속 시각만 반환한다.
+- 사용자는 선택한 자신의 세션 또는 현재 세션을 제외한 모든 세션을 즉시 무효화할 수 있다. 다른 사용자의
+  참조값은 존재 여부를 숨기기 위해 `404 SESSION_NOT_FOUND`로 응답하며 무효화 결과는 감사 체인에 기록한다.
+- 공유 VIEWER demo 계정은 방문자 사이의 세션 간섭을 막기 위해 활성 세션 조회와 무효화 API를 사용할 수 없다.
 - 서버 재시작 후에도 세션을 유지해야 하면 Spring Session JDBC를 사용한다.
 
 ## 8. 웹 보안 기준

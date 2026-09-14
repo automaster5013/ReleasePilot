@@ -210,3 +210,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 5. route별 중요도 정책 — 완료 (2026-09-14, OpenTelemetry `http.route` 범위와 CRITICAL fail-closed 판정)
 6. 감사 이벤트 해시 체인과 외부 보관 — 완료 (2026-09-14, SHA-256 전역 체인·검증 API·트랜잭션 전달함·S3 Object Lock WORM 보관)
 7. 인증 endpoint rate limit — 완료 (2026-09-15, 로그인 IP·계정 및 demo session IP의 MySQL 공유 제한, 429/Retry-After 계약)
+8. 사용자 활성 세션 관리 — 완료 (2026-09-15, 안전한 세션 참조 조회·선택/일괄 무효화·감사 기록)
