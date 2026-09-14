@@ -39,6 +39,9 @@
 .environmentValidation { grid-column: 1 / -1; padding: 14px; border: 1px solid #344740; background: #0b1210; }
 .environmentValidation > header { display: flex; justify-content: space-between; gap: 12px; }
 .environmentValidation > header > strong { color: #3adea3; font: 650 10px monospace; letter-spacing: .1em; }
+.environmentValidation > header div { display: flex; align-items: center; gap: 9px; }
+.environmentValidation > header button { border: 1px solid #496158; background: transparent; color: #d8e8e1; padding: 6px 9px; font-size: 10px; cursor: pointer; }
+.environmentValidation > header button:disabled { opacity: .45; cursor: wait; }
 .environmentValidation > header span, .environmentValidation > small, .environmentValidation p { color: #81958d; font-size: 11px; }
 .environmentValidation ul { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin: 12px 0 0; padding: 0; list-style: none; }
 .environmentValidation li { display: flex; gap: 9px; padding: 9px; border: 1px solid #293730; }

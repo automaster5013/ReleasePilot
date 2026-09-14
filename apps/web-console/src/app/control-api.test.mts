@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -65,6 +65,14 @@ test("environment validation summaries prioritize failures and warnings", () => 
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "PASS", message: "ok" }] }), "1 checks passed");
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "WARNING", message: "slow" }] }), "1 warnings");
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "FAIL", message: "denied" }, { code: "B", outcome: "WARNING", message: "slow" }] }), "1 failed checks");
+});
+
+test("environment revalidation is operator-only and failed readiness blocks releases", () => {
+  assert.equal(canRevalidateEnvironment(["DEVELOPER"]), false);
+  assert.equal(canRevalidateEnvironment(["OPERATOR"]), true);
+  assert.equal(environmentAllowsRelease(null), false);
+  assert.equal(environmentAllowsRelease({ environmentId: "env", status: "INVALID", checkedAt: "now", checks: [] }), false);
+  assert.equal(environmentAllowsRelease({ environmentId: "env", status: "ACTIVE_WITH_WARNINGS", checkedAt: "now", checks: [] }), true);
 });
 
 test("release draft validation fails closed before mutation", () => {

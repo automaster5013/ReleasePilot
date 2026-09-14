@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -92,6 +92,7 @@ export default function Home() {
   const [environments, setEnvironments] = useState<CatalogItem[]>([]);
   const [environmentValidation, setEnvironmentValidation] = useState<EnvironmentValidation | null>(null);
   const [environmentValidationNotice, setEnvironmentValidationNotice] = useState("");
+  const [environmentValidationBusy, setEnvironmentValidationBusy] = useState(false);
   const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestNotice, setRequestNotice] = useState("");
@@ -328,6 +329,23 @@ export default function Home() {
     updateDraft("environmentId", value);
   }
 
+  async function revalidateEnvironment() {
+    if (!releaseDraft.environmentId || !canRevalidateEnvironment(sessionUser?.roles ?? []) || environmentValidationBusy) return;
+    setEnvironmentValidationBusy(true); setEnvironmentValidationNotice("");
+    try {
+      const response = await fetch(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+      if (!response.ok) throw new Error("환경 재검증 요청이 거부되었습니다.");
+      const result = await response.json() as EnvironmentValidation;
+      setEnvironmentValidation(result);
+      setEnvironments((current) => current.map((item) => item.id === result.environmentId ? { ...item, status: result.status } : item));
+      setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
+    } catch (failure) {
+      setEnvironmentValidationNotice((failure as Error).message);
+    } finally {
+      setEnvironmentValidationBusy(false);
+    }
+  }
+
   async function requestRelease(event: FormEvent) {
     event.preventDefault();
     if (requestBusy || !canRequestRelease(sessionUser?.roles ?? [])) return;
@@ -450,7 +468,7 @@ export default function Home() {
             <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Service<select required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => selectEnvironment(event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
-            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}</header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}</section>}
+            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}</section>}
             <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>
@@ -458,7 +476,7 @@ export default function Home() {
             <label>Commit SHA<input required pattern="[a-fA-F0-9]{40}" value={releaseDraft.commitSha} onChange={(event) => updateDraft("commitSha", event.target.value)} /></label>
             <label>Pipeline URL<input required type="url" maxLength={1000} value={releaseDraft.pipelineUrl} onChange={(event) => updateDraft("pipelineUrl", event.target.value)} /></label>
             <label className={sessionStyles.wide}>Policy Version ID <small>선택 사항 · 비우면 Environment 기본 정책</small><input value={releaseDraft.requestedPolicyVersionId} onChange={(event) => updateDraft("requestedPolicyVersionId", event.target.value)} placeholder="UUID" /></label>
-            <button disabled={requestBusy}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
+            <button disabled={requestBusy || Boolean(releaseDraft.environmentId && !environmentAllowsRelease(environmentValidation))}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
           </form>
           {catalogNotice && <p role="alert">{catalogNotice}</p>}
           {requestNotice && <p role="status">{requestNotice}</p>}

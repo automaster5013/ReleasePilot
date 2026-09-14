@@ -37,6 +37,14 @@ export function environmentValidationSummary(result: EnvironmentValidation) {
   return failed ? `${failed} failed checks` : warnings ? `${warnings} warnings` : `${result.checks.length} checks passed`;
 }
 
+export function canRevalidateEnvironment(roles: string[]) {
+  return roles.includes("OPERATOR");
+}
+
+export function environmentAllowsRelease(result: EnvironmentValidation | null) {
+  return result !== null && ["ACTIVE", "ACTIVE_WITH_WARNINGS"].includes(result.status);
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;

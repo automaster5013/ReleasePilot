@@ -117,6 +117,9 @@ ACTIVE | ACTIVE_WITH_WARNINGS | INVALID → DISABLED
 릴리스 요청 Web Console은 Environment 선택 시 최신 검증 시각, 전체 상태와 항목별 PASS/WARNING/FAIL을 표시한다.
 최신 검증 결과 조회는 Environment가 속한 Service의 Project 권한을 다시 확인하며, 권한이 없으면 존재 여부를
 노출하지 않도록 `ENVIRONMENT_NOT_FOUND`를 반환한다.
+OPERATOR는 선택한 Environment를 CSRF 보호된 요청으로 수동 재검증할 수 있다. UI는 재검증 중 중복 요청을
+차단하고 결과를 즉시 갱신하며, 최신 상태가 `ACTIVE` 또는 `ACTIVE_WITH_WARNINGS`가 아니면 릴리스 요청을
+활성화하지 않는다.
 
 ## 7. workload label selector
 
