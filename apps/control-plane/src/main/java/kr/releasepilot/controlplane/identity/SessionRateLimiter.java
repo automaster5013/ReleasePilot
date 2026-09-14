@@ -10,22 +10,19 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class SessionRateLimiter {
-    private static final int MAX_KEYS = 10_000;
-    private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
+    private final AuthenticationRateLimitStore store;
     private final Clock clock;
     private final boolean enabled;
     private final Limit loginIp;
     private final Limit loginAccount;
     private final Limit demoIp;
-    private final AtomicLong requests = new AtomicLong();
 
     public SessionRateLimiter(
             Clock clock,
+            AuthenticationRateLimitStore store,
             @Value("${releasepilot.security.rate-limit.enabled:true}") boolean enabled,
             @Value("${releasepilot.security.rate-limit.login.ip.max-attempts:20}") int loginIpMax,
             @Value("${releasepilot.security.rate-limit.login.ip.window:PT5M}") Duration loginIpWindow,
@@ -35,6 +32,7 @@ public class SessionRateLimiter {
             @Value("${releasepilot.security.rate-limit.demo.ip.window:PT1M}") Duration demoIpWindow
     ) {
         this.clock = clock;
+        this.store = store;
         this.enabled = enabled;
         this.loginIp = new Limit(loginIpMax, loginIpWindow);
         this.loginAccount = new Limit(loginAccountMax, loginAccountWindow);
@@ -54,32 +52,15 @@ public class SessionRateLimiter {
     }
 
     public void resetLoginAccount(String username) {
-        if (enabled) windows.remove(key("login-account", username.toLowerCase(Locale.ROOT).strip()));
+        if (enabled) store.reset(key("login-account", username.toLowerCase(Locale.ROOT).strip()));
     }
 
     private void consume(String scope, String subject, Limit limit, String code) {
-        cleanupOccasionally();
         long now = clock.instant().getEpochSecond();
         long windowSeconds = Math.max(1, limit.window().toSeconds());
         long windowStart = Math.floorDiv(now, windowSeconds) * windowSeconds;
-        var retryAfter = new AtomicLong();
-        windows.compute(key(scope, subject), (ignored, existing) -> {
-            Window current = existing == null || existing.startedAt() != windowStart
-                    ? new Window(windowStart, 0, windowSeconds) : existing;
-            if (current.count() >= limit.maxAttempts()) {
-                retryAfter.set(Math.max(1, current.startedAt() + current.windowSeconds() - now));
-                return current;
-            }
-            return new Window(current.startedAt(), current.count() + 1, current.windowSeconds());
-        });
-        if (retryAfter.get() > 0) throw new RateLimitExceededException(code, retryAfter.get());
-    }
-
-    private void cleanupOccasionally() {
-        if ((requests.incrementAndGet() & 255) != 0 && windows.size() <= MAX_KEYS) return;
-        long now = clock.instant().getEpochSecond();
-        windows.entrySet().removeIf(entry -> entry.getValue().startedAt() + entry.getValue().windowSeconds() <= now);
-        if (windows.size() > MAX_KEYS) windows.clear();
+        var decision = store.consume(key(scope, subject), windowStart, windowSeconds, limit.maxAttempts(), now);
+        if (!decision.allowed()) throw new RateLimitExceededException(code, decision.retryAfterSeconds());
     }
 
     private static String clientAddress(HttpServletRequest request) {
@@ -123,6 +104,4 @@ public class SessionRateLimiter {
                 throw new IllegalArgumentException("Rate limit must use a positive count and window");
         }
     }
-
-    private record Window(long startedAt, int count, long windowSeconds) {}
 }

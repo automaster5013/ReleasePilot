@@ -60,6 +60,7 @@ releasepilot:
   security:
     rate-limit:
       enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+      cleanup-interval: ${AUTH_RATE_LIMIT_CLEANUP_INTERVAL:PT10M}
       login:
         ip:
           max-attempts: ${LOGIN_RATE_LIMIT_IP_MAX:20}

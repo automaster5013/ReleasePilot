@@ -145,9 +145,10 @@ SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_RELEASEPILOT_ISSUER_URI=https://idp.examp
 - 로그인과 demo session 발급에 IP 및 계정 기준 rate limit을 적용한다.
 - 기본값은 로그인 IP당 5분 20회, 정규화된 계정당 5분 5회, demo session IP당 1분 30회다.
   제한을 넘으면 `429`와 `Retry-After`, `LOGIN_RATE_LIMITED` 또는 `DEMO_SESSION_RATE_LIMITED`를 반환한다.
-  계정과 IP는 SHA-256 키로만 메모리에 보관하며 로그인 성공 시 계정 카운터를 초기화한다.
-  전달된 client IP는 사설 ingress proxy에서 온 요청에만 신뢰한다. 이 제한은 애플리케이션 인스턴스별
-  방어선이며, 운영 전환 시 WAF 또는 공유 저장소 기반 전역 제한을 함께 적용한다.
+  계정과 IP는 SHA-256 키로만 공유 MySQL 제한 저장소에 보관하며 로그인 성공 시 계정 카운터를 초기화한다.
+  전달된 client IP는 사설 ingress proxy에서 온 요청에만 신뢰한다. 고정 시간창 갱신은 행 잠금과 별도
+  트랜잭션으로 직렬화하므로 모든 애플리케이션 인스턴스가 동일한 전역 한도를 공유한다. 만료된 키는
+  주기적으로 삭제한다. 운영 전환 시에는 애플리케이션 도달 전 공격을 줄이기 위해 WAF도 함께 적용한다.
 - 로그인 실패 응답은 계정 존재 여부를 구분하지 않는다.
 - redirect 대상은 allowlist로 제한한다.
 - 상태 변경 요청은 JSON만 허용하고 CSRF 검사를 통과해야 한다.
