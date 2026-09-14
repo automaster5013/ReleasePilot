@@ -36,6 +36,45 @@ metrics:
       service_name="${service_name}",
       deployment_environment="${deployment_environment}",
       release_track="${release_track}"}[${window}]))) * 1000
+  REQUEST_COUNT_BY_ROUTE:
+    unit: requests
+    resultType: scalar
+    promql: >-
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}",
+      http_route="${http_route}"}[${window}]))
+  HTTP_5XX_RATE_BY_ROUTE:
+    unit: ratio
+    resultType: scalar
+    promql: >-
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}",
+      http_route="${http_route}",
+      http_response_status_code=~"5.."}[${window}]))
+      /
+      sum(increase(http_server_request_duration_seconds_count{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}",
+      http_route="${http_route}"}[${window}]))
+  HTTP_P95_LATENCY_MS_BY_ROUTE:
+    unit: milliseconds
+    resultType: scalar
+    promql: >-
+      histogram_quantile(0.95,
+      sum by (le) (rate(http_server_request_duration_seconds_bucket{
+      service_namespace="${service_namespace}",
+      service_name="${service_name}",
+      deployment_environment="${deployment_environment}",
+      release_track="${release_track}",
+      http_route="${http_route}"}[${window}]))) * 1000
 allowedVariables:
   service_namespace:
     pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
@@ -47,3 +86,5 @@ allowedVariables:
     enum: [stable, canary]
   window:
     pattern: '^[1-9][0-9]*[smh]$'
+  http_route:
+    pattern: '^/[-A-Za-z0-9._~/{}]+$'

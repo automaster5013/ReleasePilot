@@ -100,8 +100,28 @@
         },
         "relativeToBaseline": {
           "$ref": "#/$defs/baselineRule"
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^/[-A-Za-z0-9._~/{}]+$"
+        },
+        "importance": {
+          "enum": ["STANDARD", "CRITICAL"],
+          "default": "STANDARD"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["importance"],
+            "properties": {"importance": {"const": "CRITICAL"}}
+          },
+          "then": {
+            "required": ["route"],
+            "properties": {"required": {"const": true}}
+          }
+        }
+      ]
     },
     "baselineRule": {
       "type": "object",

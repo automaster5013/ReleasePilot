@@ -45,6 +45,25 @@
       "required": true,
       "comparison": "GREATER_THAN_OR_EQUAL",
       "threshold": 1000
+    },
+    {
+      "key": "HTTP_5XX_RATE",
+      "required": true,
+      "comparison": "LESS_THAN",
+      "threshold": 0.005,
+      "relativeToBaseline": {
+        "maximumAbsoluteIncrease": 0.002
+      },
+      "route": "/checkout/{id}",
+      "importance": "CRITICAL"
+    },
+    {
+      "key": "REQUEST_COUNT",
+      "required": true,
+      "comparison": "GREATER_THAN_OR_EQUAL",
+      "threshold": 100,
+      "route": "/checkout/{id}",
+      "importance": "CRITICAL"
     }
   ],
   "inconclusivePolicy": {

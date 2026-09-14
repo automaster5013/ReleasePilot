@@ -1438,6 +1438,23 @@ components:
           description: 민감정보를 제외한 MetricEvaluation 목록
           items:
             type: object
+            required: [metric_key, verdict, reason_code, threshold, query_template_id, canary_query_hash, importance]
+            properties:
+              metric_key: {type: string, enum: [HTTP_5XX_RATE, HTTP_P95_LATENCY_MS, REQUEST_COUNT]}
+              route: {type: [string, 'null'], description: OpenTelemetry http.route template}
+              importance: {type: string, enum: [STANDARD, CRITICAL]}
+              verdict: {type: string, enum: [PASS, FAIL, INCONCLUSIVE]}
+              reason_code: {type: string}
+              baseline_value: {type: [number, 'null']}
+              canary_value: {type: [number, 'null']}
+              threshold: {type: number}
+              query_template_id: {type: string}
+              baseline_query_hash: {type: [string, 'null']}
+              canary_query_hash: {type: string}
+              window_start: {type: string, format: date-time}
+              window_end: {type: string, format: date-time}
+              source_id: {type: string}
+              policy_snapshot_checksum: {type: string}
     OperationReceipt:
       type: object
       required: [operationId, releaseId, status, acceptedAt]

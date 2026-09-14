@@ -14,6 +14,8 @@ type Evidence = {
   threshold: number;
   query_template_id: string;
   canary_query_hash: string;
+  route?: string | null;
+  importance?: "STANDARD" | "CRITICAL";
 };
 type Analysis = {
   id: string;
@@ -44,6 +46,7 @@ const demoEvidence: Evidence[] = [
   { metric_key: "HTTP_5XX_RATE", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: 0.0018, canary_value: 0.0021, threshold: 0.01, query_template_id: "otel-http-server-v1:HTTP_5XX_RATE", canary_query_hash: "2771e562ab326d103068d983a8bdba57" },
   { metric_key: "HTTP_P95_LATENCY_MS", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: 251, canary_value: 284, threshold: 500, query_template_id: "otel-http-server-v1:HTTP_P95_LATENCY_MS", canary_query_hash: "840b9a38a30f7eca53a108968ad1f0de" },
   { metric_key: "REQUEST_COUNT", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: null, canary_value: 1842, threshold: 1000, query_template_id: "otel-http-server-v1:REQUEST_COUNT", canary_query_hash: "2ca7105ec53b7e222a1b7e4f665fe984" },
+  { metric_key: "HTTP_5XX_RATE", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: 0.0008, canary_value: 0.0012, threshold: 0.005, query_template_id: "otel-http-server-v1:HTTP_5XX_RATE_BY_ROUTE", canary_query_hash: "91ab6c9272af816713b9722213f45e10", route: "/checkout/{id}", importance: "CRITICAL" },
 ];
 const grafanaUrl = process.env.NEXT_PUBLIC_GRAFANA_URL;
 
@@ -140,7 +143,7 @@ export default function Home() {
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>
-        <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={item.metric_key}><span><strong>{item.metric_key}</strong><small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
+        <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Route 범위와 Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric / Route</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={`${item.metric_key}:${item.route ?? "global"}`}><span><strong>{item.metric_key}</strong>{item.route && <small className={styles.route}>{item.importance ?? "STANDARD"} · {item.route}</small>}<small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
       </section>
     </main>
   );

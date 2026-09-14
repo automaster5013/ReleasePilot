@@ -10,6 +10,11 @@ class Verdict(StrEnum):
     INCONCLUSIVE = "INCONCLUSIVE"
 
 
+class RouteImportance(StrEnum):
+    STANDARD = "STANDARD"
+    CRITICAL = "CRITICAL"
+
+
 class RelativeLimit(BaseModel):
     maximumAbsoluteIncrease: float | None = None
     maximumRelativeIncreasePercent: float | None = None
@@ -21,6 +26,14 @@ class MetricRule(BaseModel):
     comparison: str
     threshold: float
     relativeToBaseline: RelativeLimit | None = None
+    route: str | None = Field(default=None,pattern=r"^/[-A-Za-z0-9._~/{}]+$")
+    importance: RouteImportance = RouteImportance.STANDARD
+
+    @model_validator(mode="after")
+    def validate_route_importance(self) -> "MetricRule":
+        if self.importance == RouteImportance.CRITICAL and self.route is None:
+            raise ValueError("CRITICAL importance requires route")
+        return self
 
 
 class Labels(BaseModel):
@@ -62,6 +75,8 @@ class MetricEvidence(BaseModel):
     window_end: datetime
     source_id: str
     policy_snapshot_checksum: str
+    route: str | None = None
+    importance: RouteImportance = RouteImportance.STANDARD
 
 
 class AnalysisResponse(BaseModel):

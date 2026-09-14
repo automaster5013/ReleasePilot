@@ -1,6 +1,13 @@
 from pathlib import Path
 
-from .models import AnalysisRequest, AnalysisResponse, MetricEvidence, MetricRule, Verdict
+from .models import (
+    AnalysisRequest,
+    AnalysisResponse,
+    MetricEvidence,
+    MetricRule,
+    RouteImportance,
+    Verdict,
+)
 from .prometheus import PrometheusClient, PrometheusError
 from .templates import QueryTemplateRegistry, RenderedQuery
 
@@ -15,7 +22,7 @@ class AnalysisEvaluator:
         required = [
             item
             for item, rule in zip(evidence, request.metrics, strict=True)
-            if rule.required
+            if rule.required or rule.importance == RouteImportance.CRITICAL
         ]
         if any(item.verdict == Verdict.FAIL for item in required):
             return AnalysisResponse(
@@ -39,11 +46,13 @@ class AnalysisEvaluator:
         common = request.labels.model_dump()
         seconds = int((request.window_end - request.window_start).total_seconds())
         common["window"] = f"{seconds}s"
+        template_key = f"{rule.key}_BY_ROUTE" if rule.route else rule.key
+        route = {"http_route": rule.route} if rule.route else {}
         canary_query = self._registry.render(
-            rule.key, {**common, "release_track": "canary"}
+            template_key, {**common, **route, "release_track": "canary"}
         )
         baseline_query = self._registry.render(
-            rule.key, {**common, "release_track": "stable"}
+            template_key, {**common, **route, "release_track": "stable"}
         )
         baseline: float | None = None
         try:
@@ -68,6 +77,8 @@ class AnalysisEvaluator:
             window_end=request.window_end,
             source_id=request.source_id,
             policy_snapshot_checksum=request.policy_snapshot_checksum,
+            route=rule.route,
+            importance=rule.importance,
         )
 
     async def _query(self, request: AnalysisRequest, query: RenderedQuery) -> float:

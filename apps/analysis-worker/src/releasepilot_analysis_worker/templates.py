@@ -24,7 +24,13 @@ class QueryTemplateRegistry:
     def render(self, metric_key: str, variables: dict[str, str]) -> RenderedQuery:
         if metric_key not in self._metrics:
             raise ValueError(f"unknown metric template: {metric_key}")
-        if set(variables) != set(self._variables):
+        template = self._metrics[metric_key]["promql"]
+        required = {
+            match.group("named") or match.group("braced")
+            for match in Template.pattern.finditer(template)
+            if match.group("named") or match.group("braced")
+        }
+        if set(variables) != required:
             raise ValueError("query variables do not match the allowlist")
         for name, value in variables.items():
             rule = self._variables[name]
@@ -32,7 +38,7 @@ class QueryTemplateRegistry:
                 raise ValueError(f"invalid query variable: {name}")
             if "pattern" in rule and re.fullmatch(rule["pattern"], value) is None:
                 raise ValueError(f"invalid query variable: {name}")
-        rendered = Template(self._metrics[metric_key]["promql"]).substitute(variables)
+        rendered = Template(template).substitute(variables)
         query = " ".join(rendered.split())
         return RenderedQuery(
             template_id=f"{self._name}:{metric_key}",

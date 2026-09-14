@@ -75,6 +75,8 @@ external-dns, cert-manager, Argo CD와 digest 기반 GitOps 정의는 `infra/aws
   불일치를 실행 전에 차단합니다.
 - 여러 Kubernetes 클러스터를 등록할 수 있으며, Environment가 배포 대상을 명시적으로 고정합니다.
   일괄 연결 검증은 namespace별 Argo Rollouts 권한을 확인하고 실패한 클러스터로의 새 릴리스를 차단합니다.
+- 전역 평균과 별도로 OpenTelemetry `http.route`별 metric을 평가하며, CRITICAL route의 회귀는
+  다른 전역 지표가 정상이더라도 릴리스를 중단합니다.
 - 애플리케이션 이미지는 Git 태그에서 빌드하고 digest를 Git에 기록해 Argo CD가 동일 산출물을 재현합니다.
 - 초기 데모는 비용과 운영 복잡도를 낮추기 위해 EKS 내부 단일 MySQL을 사용합니다. 프로덕션 전환 시 RDS와
   전용 secret manager, WAF, 인증된 관측성 엔드포인트가 필요합니다.

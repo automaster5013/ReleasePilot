@@ -14,7 +14,7 @@ from releasepilot_analysis_worker.templates import QueryTemplateRegistry
 class FakePrometheus:
     def __init__(
         self,
-        values: dict[tuple[str, str], float] | None = None,
+        values: dict[tuple[str, ...], float] | None = None,
         error: str | None = None,
     ):
         self.values = values or {}
@@ -30,6 +30,9 @@ class FakePrometheus:
         else:
             metric = "REQUEST_COUNT"
         track = "canary" if 'release_track="canary"' in query else "stable"
+        route = "/checkout/{id}" if 'http_route="/checkout/{id}"' in query else None
+        if (metric, track, route) in self.values:
+            return self.values[(metric, track, route)]
         return self.values[(metric, track)]
 
 
@@ -95,11 +98,38 @@ def test_prometheus_failure_never_promotes():
     assert {item.reason_code for item in result.evidence} == {"QUERY_TIMEOUT"}
 
 
+def test_critical_route_failure_blocks_release_even_when_global_metrics_pass():
+    values = {
+        ("HTTP_5XX_RATE", "canary"): 0.004, ("HTTP_5XX_RATE", "stable"): 0.002,
+        ("HTTP_P95_LATENCY_MS", "canary"): 110, ("HTTP_P95_LATENCY_MS", "stable"): 100,
+        ("REQUEST_COUNT", "canary"): 1200,
+        ("HTTP_5XX_RATE", "canary", "/checkout/{id}"): 0.03,
+        ("HTTP_5XX_RATE", "stable", "/checkout/{id}"): 0.002,
+    }
+    scoped = request().model_copy(deep=True)
+    scoped.metrics.append(type(scoped.metrics[0]).model_validate({
+        "key": "HTTP_5XX_RATE", "required": False, "comparison": "LESS_THAN",
+        "threshold": 0.01, "route": "/checkout/{id}", "importance": "CRITICAL",
+        "relativeToBaseline": {"maximumAbsoluteIncrease": 0.005},
+    }))
+    result = asyncio.run(AnalysisEvaluator(registry(), FakePrometheus(values)).evaluate(scoped))
+    assert result.verdict == Verdict.FAIL
+    assert result.evidence[-1].route == "/checkout/{id}"
+    assert result.evidence[-1].importance == "CRITICAL"
+    assert result.evidence[-1].query_template_id.endswith("HTTP_5XX_RATE_BY_ROUTE")
+
+
 def test_template_rejects_label_injection():
     with pytest.raises(ValueError, match="invalid query variable"):
         registry().render("REQUEST_COUNT", {
             "service_namespace": 'shop"} or vector(1)', "service_name": "checkout",
             "deployment_environment": "production", "release_track": "canary", "window": "300s",
+        })
+    with pytest.raises(ValueError, match="invalid query variable"):
+        registry().render("REQUEST_COUNT_BY_ROUTE", {
+            "service_namespace": "shop", "service_name": "checkout",
+            "deployment_environment": "production", "release_track": "canary", "window": "300s",
+            "http_route": '/checkout"} or vector(1)',
         })
 
 
