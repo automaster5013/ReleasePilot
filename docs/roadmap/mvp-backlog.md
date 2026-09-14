@@ -222,3 +222,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 17. 권한 범위 릴리스 목록 정확성 — 완료 (2026-09-15, 권한 필터 후 limit·Service/Environment 대상 식별)
 18. 릴리스 감사 타임라인 Web Console — 완료 (2026-09-15, 시간순 이벤트·actor·correlation·hash chain sequence 표시)
 19. 감사 해시 체인 무결성 Web Console — 완료 (2026-09-15, OPERATOR 전용 전체 체인 검증·실패 이벤트 경고·수동 재검증)
+20. 릴리스 요청 Environment 검증 근거 — 완료 (2026-09-15, 선택 환경의 최신 항목별 점검·검증 시각 표시와 프로젝트 권한 은닉)

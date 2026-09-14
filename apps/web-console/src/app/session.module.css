@@ -36,6 +36,18 @@
 .releaseRequest select:disabled { opacity: .45; }
 .releaseRequest textarea { min-height: 88px; resize: vertical; }
 .releaseRequest .wide { grid-column: 1 / -1; }
+.environmentValidation { grid-column: 1 / -1; padding: 14px; border: 1px solid #344740; background: #0b1210; }
+.environmentValidation > header { display: flex; justify-content: space-between; gap: 12px; }
+.environmentValidation > header > strong { color: #3adea3; font: 650 10px monospace; letter-spacing: .1em; }
+.environmentValidation > header span, .environmentValidation > small, .environmentValidation p { color: #81958d; font-size: 11px; }
+.environmentValidation ul { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin: 12px 0 0; padding: 0; list-style: none; }
+.environmentValidation li { display: flex; gap: 9px; padding: 9px; border: 1px solid #293730; }
+.environmentValidation li > b { color: #7ce8bd; font: 650 9px monospace; }
+.environmentValidation li[data-outcome="WARNING"] > b { color: #ffcf78; }
+.environmentValidation li[data-outcome="FAIL"] > b { color: #ffacb0; }
+.environmentValidation li span { display: grid; gap: 3px; }
+.environmentValidation li span strong { font-size: 11px; }
+.environmentValidation li span small { color: #71847c; }
 .releaseRequest form > button { justify-self: start; border: 0; background: #3adea3; color: #07100d; padding: 11px 18px; font-weight: 800; cursor: pointer; }
 .releaseRequest form > button:disabled { opacity: .4; cursor: wait; }
 .releaseRequest > p { margin: 0; padding: 14px 24px; border-top: 1px solid #293730; color: #c9e8dc; }
@@ -46,6 +58,8 @@
   .sessionList small { grid-column: auto; }
   .releaseRequest form { grid-template-columns: 1fr; }
   .releaseRequest .wide { grid-column: auto; }
+  .environmentValidation { grid-column: auto; }
+  .environmentValidation ul { grid-template-columns: 1fr; }
   .approvalContext { grid-template-columns: 1fr; }
   .approvalContext ul { grid-column: auto; grid-template-columns: 1fr; }
 }

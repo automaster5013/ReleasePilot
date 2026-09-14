@@ -23,6 +23,10 @@ class EnvironmentApiTests {
    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(id)).andExpect(jsonPath("$.items[0].name").value("production"));
   mvc.perform(post("/api/v1/environments/{id}/validate",id).with(authentication(operator())).with(csrf()))
    .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("INVALID")).andExpect(jsonPath("$.checks.length()").value(11)).andExpect(jsonPath("$.checks[6].code").value("ROLLOUT_RBAC"));
+  mvc.perform(get("/api/v1/environments/{id}/validation-results/latest",id).with(authentication(operator())))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.checks.length()").value(11));
+  mvc.perform(get("/api/v1/environments/{id}/validation-results/latest",id).with(authentication(viewer())))
+   .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ENVIRONMENT_NOT_FOUND"));
   org.assertj.core.api.Assertions.assertThat(results.findByEnvironmentIdOrderByCheckedAtAsc(UUID.fromString(id))).hasSize(11);
  }
  @Test void hidesEnvironmentCatalogOutsideProjectMembership() throws Exception {

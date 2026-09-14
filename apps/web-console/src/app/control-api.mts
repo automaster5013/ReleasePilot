@@ -4,6 +4,7 @@ export type CatalogItem = { id: string; name: string; status: string; key?: stri
 export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string; context?: { serviceName: string; environmentName: string } };
 export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null };
 export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
+export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; checks: { code: string; outcome: string; message: string }[] };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -28,6 +29,12 @@ export function canVerifyAudit(roles: string[]) {
 
 export function auditIntegrityLabel(result: AuditChainVerification) {
   return result.valid ? `Verified · ${result.verifiedEvents} events` : `Integrity failure · event ${result.failedEventId?.slice(0, 8) ?? "unknown"}`;
+}
+
+export function environmentValidationSummary(result: EnvironmentValidation) {
+  const failed = result.checks.filter((check) => check.outcome === "FAIL").length;
+  const warnings = result.checks.filter((check) => check.outcome === "WARNING").length;
+  return failed ? `${failed} failed checks` : warnings ? `${warnings} warnings` : `${result.checks.length} checks passed`;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {

@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -90,6 +90,8 @@ export default function Home() {
   const [projects, setProjects] = useState<CatalogItem[]>([]);
   const [services, setServices] = useState<CatalogItem[]>([]);
   const [environments, setEnvironments] = useState<CatalogItem[]>([]);
+  const [environmentValidation, setEnvironmentValidation] = useState<EnvironmentValidation | null>(null);
+  const [environmentValidationNotice, setEnvironmentValidationNotice] = useState("");
   const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestNotice, setRequestNotice] = useState("");
@@ -177,6 +179,16 @@ export default function Home() {
       .catch((failure: Error) => { if (failure.name !== "AbortError") setCatalogNotice("서비스의 환경을 불러올 수 없습니다."); });
     return () => controller.abort();
   }, [releaseDraft.serviceId]);
+
+  useEffect(() => {
+    if (!releaseDraft.environmentId) return;
+    const controller = new AbortController();
+    fetch(`/control-api/environments/${releaseDraft.environmentId}/validation-results/latest`, { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<EnvironmentValidation> : Promise.reject())
+      .then(setEnvironmentValidation)
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setEnvironmentValidationNotice("최신 환경 점검 결과를 불러올 수 없습니다."); });
+    return () => controller.abort();
+  }, [releaseDraft.environmentId]);
 
   async function startDemo() {
     const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
@@ -301,12 +313,19 @@ export default function Home() {
 
   function selectProject(value: string) {
     setCatalogNotice(""); setProjectId(value); setServices([]); setEnvironments([]);
+    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
     setReleaseDraft((current) => ({ ...current, serviceId: "", environmentId: "" }));
   }
 
   function selectService(value: string) {
     setCatalogNotice(""); setEnvironments([]);
+    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
     setReleaseDraft((current) => ({ ...current, serviceId: value, environmentId: "" }));
+  }
+
+  function selectEnvironment(value: string) {
+    setEnvironmentValidation(null); setEnvironmentValidationNotice("");
+    updateDraft("environmentId", value);
   }
 
   async function requestRelease(event: FormEvent) {
@@ -430,7 +449,8 @@ export default function Home() {
           <form onSubmit={(event) => void requestRelease(event)}>
             <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Service<select required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
-            <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => updateDraft("environmentId", event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
+            <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => selectEnvironment(event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
+            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}</header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}</section>}
             <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>

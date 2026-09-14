@@ -19,7 +19,7 @@ public class EnvironmentController {
  @PostMapping("/api/v1/environments/{id}/validate") @ResponseStatus(HttpStatus.ACCEPTED) @PreAuthorize("hasRole('OPERATOR')")
  ValidationResponse validate(@PathVariable UUID id){var report=service.validate(id);return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
  @GetMapping("/api/v1/environments/{id}/validation-results/latest")
- ValidationResponse latest(@PathVariable UUID id){var report=service.latest(id);return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
+ ValidationResponse latest(@PathVariable UUID id,Authentication authentication){var report=service.latest(id);var catalogService=services.findById(report.environment().getServiceId()).orElseThrow(()->new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found"));if(!projectAccess.canView(catalogService.getProjectId(),authentication))throw new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found");return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
  public record CreateEnvironmentRequest(@NotNull @Pattern(regexp="staging|production") String name,@NotNull UUID clusterId,
   @NotBlank @Pattern(regexp="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$") String namespace,
   @NotBlank @Size(max=253) String rolloutName,@NotBlank @Size(max=253) @Pattern(regexp="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$") String containerName,RolloutStrategy strategy,@NotBlank @Size(max=253) String stableServiceName,

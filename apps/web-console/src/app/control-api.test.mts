@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -58,6 +58,13 @@ test("audit integrity verification is operator-only and has stable labels", () =
   assert.equal(canVerifyAudit(["OPERATOR"]), true);
   assert.equal(auditIntegrityLabel({ valid: true, verifiedEvents: 42, failedEventId: null, headHash: "abc" }), "Verified · 42 events");
   assert.equal(auditIntegrityLabel({ valid: false, verifiedEvents: 7, failedEventId: "12345678-abcd", headHash: "abc" }), "Integrity failure · event 12345678");
+});
+
+test("environment validation summaries prioritize failures and warnings", () => {
+  const base = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z" };
+  assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "PASS", message: "ok" }] }), "1 checks passed");
+  assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "WARNING", message: "slow" }] }), "1 warnings");
+  assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "FAIL", message: "denied" }, { code: "B", outcome: "WARNING", message: "slow" }] }), "1 failed checks");
 });
 
 test("release draft validation fails closed before mutation", () => {

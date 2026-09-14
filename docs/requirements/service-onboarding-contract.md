@@ -114,6 +114,10 @@ ACTIVE | ACTIVE_WITH_WARNINGS | INVALID → DISABLED
 
 활성 릴리스가 존재하면 Environment의 Kubernetes 대상, Prometheus 연결, label selector 또는 기본 정책을 변경할 수 없다.
 
+릴리스 요청 Web Console은 Environment 선택 시 최신 검증 시각, 전체 상태와 항목별 PASS/WARNING/FAIL을 표시한다.
+최신 검증 결과 조회는 Environment가 속한 Service의 Project 권한을 다시 확인하며, 권한이 없으면 존재 여부를
+노출하지 않도록 `ENVIRONMENT_NOT_FOUND`를 반환한다.
+
 ## 7. workload label selector
 
 ReleasePilot이 모든 Prometheus 시계열을 검색하지 않도록 Environment는 고정 label 집합을 가진다.
