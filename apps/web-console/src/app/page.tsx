@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { canDecideRelease, CsrfToken, mutationHeaders } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, CsrfToken, mutationHeaders, ReleaseDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -53,6 +53,7 @@ const demoEvidence: Evidence[] = [
   { metric_key: "HTTP_5XX_RATE", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: 0.0008, canary_value: 0.0012, threshold: 0.005, query_template_id: "otel-http-server-v1:HTTP_5XX_RATE_BY_ROUTE", canary_query_hash: "91ab6c9272af816713b9722213f45e10", route: "/checkout/{id}", importance: "CRITICAL" },
 ];
 const grafanaUrl = process.env.NEXT_PUBLIC_GRAFANA_URL;
+const emptyReleaseDraft: ReleaseDraft = { serviceId: "", environmentId: "", version: "", imageRepository: "", imageDigest: "", changeSummary: "", commitSha: "", pipelineUrl: "", requestedPolicyVersionId: "" };
 
 export default function Home() {
   const [releaseId, setReleaseId] = useState("");
@@ -69,6 +70,9 @@ export default function Home() {
   const [sessionNotice, setSessionNotice] = useState("");
   const [operationBusy, setOperationBusy] = useState(false);
   const [operationNotice, setOperationNotice] = useState("");
+  const [releaseDraft, setReleaseDraft] = useState<ReleaseDraft>(emptyReleaseDraft);
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [requestNotice, setRequestNotice] = useState("");
   const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
 
@@ -192,6 +196,46 @@ export default function Home() {
     try { await load(releaseId.trim()); } catch (failure) { setError((failure as Error).message); }
   }
 
+  function updateDraft(field: keyof ReleaseDraft, value: string) {
+    setReleaseDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  async function requestRelease(event: FormEvent) {
+    event.preventDefault();
+    if (requestBusy || !canRequestRelease(sessionUser?.roles ?? [])) return;
+    const validation = validateReleaseDraft(releaseDraft);
+    if (validation) { setError(validation); return; }
+    setRequestBusy(true);
+    setRequestNotice("");
+    setError("");
+    try {
+      const response = await fetch("/control-api/releases", {
+        method: "POST", credentials: "include",
+        headers: mutationHeaders(await csrfToken(), { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }),
+        body: JSON.stringify({
+          ...releaseDraft,
+          serviceId: releaseDraft.serviceId.trim(), environmentId: releaseDraft.environmentId.trim(),
+          version: releaseDraft.version.trim(), imageRepository: releaseDraft.imageRepository.trim(),
+          changeSummary: releaseDraft.changeSummary.trim(), commitSha: releaseDraft.commitSha.trim(),
+          pipelineUrl: releaseDraft.pipelineUrl.trim(),
+          requestedPolicyVersionId: releaseDraft.requestedPolicyVersionId.trim() || null,
+        }),
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
+        throw new Error(problem?.detail ?? "릴리스 요청이 거부되었습니다.");
+      }
+      const created = await response.json() as { id: string };
+      setReleaseId(created.id);
+      setRequestNotice(`릴리스 ${created.id} 요청이 생성되었습니다.`);
+      await load(created.id);
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      setRequestBusy(false);
+    }
+  }
+
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
@@ -269,6 +313,22 @@ export default function Home() {
           <form onSubmit={submit}><input aria-label="Release ID" placeholder="Release UUID" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} /><button>불러오기</button></form>
         </header>
         {error && <p className={styles.error} role="alert">{error}</p>}
+        {canRequestRelease(sessionUser?.roles ?? []) && <details className={sessionStyles.releaseRequest}>
+          <summary>NEW RELEASE REQUEST <span>Developer workflow</span></summary>
+          <form onSubmit={(event) => void requestRelease(event)}>
+            <label>Service ID<input required value={releaseDraft.serviceId} onChange={(event) => updateDraft("serviceId", event.target.value)} placeholder="UUID" /></label>
+            <label>Environment ID<input required value={releaseDraft.environmentId} onChange={(event) => updateDraft("environmentId", event.target.value)} placeholder="UUID" /></label>
+            <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
+            <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
+            <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>
+            <label className={sessionStyles.wide}>Change summary<textarea required maxLength={2000} value={releaseDraft.changeSummary} onChange={(event) => updateDraft("changeSummary", event.target.value)} /></label>
+            <label>Commit SHA<input required pattern="[a-fA-F0-9]{40}" value={releaseDraft.commitSha} onChange={(event) => updateDraft("commitSha", event.target.value)} /></label>
+            <label>Pipeline URL<input required type="url" maxLength={1000} value={releaseDraft.pipelineUrl} onChange={(event) => updateDraft("pipelineUrl", event.target.value)} /></label>
+            <label className={sessionStyles.wide}>Policy Version ID <small>선택 사항 · 비우면 Environment 기본 정책</small><input value={releaseDraft.requestedPolicyVersionId} onChange={(event) => updateDraft("requestedPolicyVersionId", event.target.value)} placeholder="UUID" /></label>
+            <button disabled={requestBusy}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
+          </form>
+          {requestNotice && <p role="status">{requestNotice}</p>}
+        </details>}
         <section className={styles.grid}>
           <article className={styles.releaseCard}>
             <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>

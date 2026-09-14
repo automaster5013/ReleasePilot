@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDecideRelease, mutationHeaders } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, mutationHeaders, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -22,4 +22,28 @@ test("operator mutations include JSON and idempotency headers", () => {
     "Idempotency-Key": "operation-123456",
     "Content-Type": "application/json",
   });
+});
+
+test("developer-capable roles can request a release", () => {
+  assert.equal(canRequestRelease(["VIEWER"]), false);
+  assert.equal(canRequestRelease(["DEVELOPER"]), true);
+  assert.equal(canRequestRelease(["APPROVER"]), true);
+  assert.equal(canRequestRelease(["OPERATOR"]), true);
+});
+
+test("release draft validation fails closed before mutation", () => {
+  const valid = {
+    serviceId: "123e4567-e89b-42d3-a456-426614174000",
+    environmentId: "123e4567-e89b-42d3-a456-426614174001",
+    version: "v1.2.3",
+    imageRepository: "registry.example/releasepilot",
+    imageDigest: `sha256:${"a".repeat(64)}`,
+    changeSummary: "Ship the release request console",
+    commitSha: "b".repeat(40),
+    pipelineUrl: "https://github.com/example/actions/runs/1",
+    requestedPolicyVersionId: "",
+  };
+  assert.equal(validateReleaseDraft(valid), null);
+  assert.match(validateReleaseDraft({ ...valid, imageDigest: "latest" }) ?? "", /digest/);
+  assert.match(validateReleaseDraft({ ...valid, pipelineUrl: "javascript:alert(1)" }) ?? "", /HTTP/);
 });
