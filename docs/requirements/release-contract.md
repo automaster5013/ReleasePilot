@@ -219,6 +219,9 @@ Canary 버전의 5xx 오류율이 임계값을 초과한다. ReleasePilot은 추
 ### 시나리오 D: 승인 거부
 
 승인자가 사유와 함께 요청을 거부한다. Kubernetes에는 어떤 변경도 발생하지 않으며 결정이 감사 로그에 남는다.
+Web Console은 `PENDING_APPROVAL` 상태에서 APPROVER에게만 Approve/Reject를 표시하고, CSRF token과
+멱등 키를 포함해 결정을 제출한 뒤 응답 상태를 즉시 화면에 반영한다. Production 요청자의 자기 승인은
+`SELF_APPROVAL_NOT_ALLOWED` 안내로 표시한다.
 
 ### 시나리오 E: 제어 서버 재시작
 

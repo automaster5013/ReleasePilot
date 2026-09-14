@@ -13,6 +13,10 @@
 .sessionEmpty, .sessionNotice { padding: 20px 26px; color: #8fa39b; }
 .sessionNotice { border-top: 1px solid #293730; color: #c9e8dc; }
 .operationNotice { margin: 0; padding: 12px 26px; border-top: 1px solid #293730; color: #c9e8dc; }
+.approvalActions { display: flex; align-items: center; gap: 8px; padding: 14px 26px; border-top: 1px solid #293730; }
+.approvalActions span { margin-right: auto; color: #ffcf78; font: 650 10px monospace; letter-spacing: .12em; }
+.approvalActions button { border: 0; background: #3adea3; color: #07100d; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+.approvalActions button:disabled { opacity: .35; cursor: not-allowed; }
 @media(max-width: 600px) {
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }

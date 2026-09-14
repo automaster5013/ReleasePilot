@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { CsrfToken, mutationHeaders } from "./control-api.mts";
+import { canDecideRelease, CsrfToken, mutationHeaders } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -162,7 +162,9 @@ export default function Home() {
       fetch(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
     ]);
     if (!releaseResponse.ok || !analysesResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
-    setRelease(await releaseResponse.json());
+    const loadedRelease = await releaseResponse.json() as Release;
+    setRelease(loadedRelease);
+    setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
     setAnalyses(await analysesResponse.json());
     setActiveId(id);
   }
@@ -219,6 +221,42 @@ export default function Home() {
     }
   }
 
+  async function decide(action: "approve" | "reject") {
+    if (!activeId || operationInFlight.current) return;
+    const reason = window.prompt(`${action === "approve" ? "승인" : "거부"} 사유를 입력하세요.`)?.trim();
+    if (reason === undefined) return;
+    if (reason.length === 0 || reason.length > 1000) {
+      setError("결정 사유는 1자 이상 1000자 이하여야 합니다.");
+      return;
+    }
+    operationInFlight.current = true;
+    setOperationBusy(true);
+    setOperationNotice("");
+    setError("");
+    try {
+      const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
+      const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
+        method: "POST", credentials: "include",
+        headers: mutationHeaders(await csrfToken(), { idempotencyKey, json: true }),
+        body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
+        if (problem?.code === "SELF_APPROVAL_NOT_ALLOWED") throw new Error("요청자는 자신의 릴리스를 승인할 수 없습니다.");
+        throw new Error(problem?.detail ?? `${action} 요청이 거부되었습니다.`);
+      }
+      const decided = await response.json() as { status: string };
+      setRelease((current) => current ? { ...current, status: decided.status } : current);
+      setLive((current) => ({ ...current, releaseStatus: decided.status }));
+      setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      operationInFlight.current = false;
+      setOperationBusy(false);
+    }
+  }
+
   return (
     <main className={styles.page}>
       <nav className={styles.nav}>
@@ -237,6 +275,7 @@ export default function Home() {
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
             <div className={styles.stages}>{live.steps.map((step) => <div className={styles.stage} data-status={step.status} key={step.index}><i /><span>{step.weight}%</span><small>{step.status}</small></div>)}</div>
             <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
+            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div>}
             {operationNotice && <p className={sessionStyles.operationNotice} role="status">{operationNotice}</p>}
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>

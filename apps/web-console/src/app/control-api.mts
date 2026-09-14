@@ -6,3 +6,7 @@ export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: str
   if (options.json) headers["Content-Type"] = "application/json";
   return headers;
 }
+
+export function canDecideRelease(roles: string[], releaseStatus: string | undefined) {
+  return roles.includes("APPROVER") && releaseStatus === "PENDING_APPROVAL";
+}
