@@ -18,3 +18,15 @@ OPERATOR는 `GET /api/v1/audit-events/verify`를 호출해 DB에 저장된 전�
 - `AUDIT_ARCHIVE_POLL_INTERVAL=PT10S`
 
 객체 키는 `<sequence>-<eventHash>.json`이며 `Idempotency-Key`에도 같은 event hash를 사용한다. 보관 객체에는 원본 이벤트와 체인 필드가 모두 포함되므로 DB 사본과 독립적으로 연속성과 내용을 검증할 수 있다. endpoint와 token은 감사 payload나 로그에 기록하지 않는다.
+
+### AWS 운영 환경
+
+AWS overlay는 `AUDIT_ARCHIVE_PROVIDER=s3`를 사용한다. Terraform은 공개 접근을 전부 차단하고 AES-256 암호화, Versioning, 30일 COMPLIANCE Object Lock을 적용한 버킷을 생성한다. Control Plane ServiceAccount에는 EKS Pod Identity로 `audit-events/*`의 `s3:PutObject`와 bucket 위치 조회만 허용하며 읽기·덮어쓰기·삭제 권한은 부여하지 않는다. 객체 생성은 `If-None-Match: *` 조건을 사용해 같은 체인 항목의 덮어쓰기를 거부한다.
+
+운영 확인:
+
+```powershell
+aws s3api get-object-lock-configuration --bucket releasepilot-demo-audit-327771416502
+aws eks list-pod-identity-associations --cluster-name releasepilot-demo
+aws s3api list-objects-v2 --bucket releasepilot-demo-audit-327771416502 --prefix audit-events/
+```

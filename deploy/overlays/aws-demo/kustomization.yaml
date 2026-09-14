@@ -12,3 +12,18 @@ images:
   - name: web-console
     newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/web-console
     digest: sha256:2b7c3f5d5c2dbaa12d22e7febf9fb71d24cf76661c04b9771017e92d432cfed2
+patches:
+  - target: { kind: Rollout, name: control-plane }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: AUDIT_ARCHIVE_ENABLED, value: "true" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: AUDIT_ARCHIVE_PROVIDER, value: "s3" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: AUDIT_ARCHIVE_S3_BUCKET, value: "releasepilot-demo-audit-327771416502" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: AWS_REGION, value: "ap-northeast-2" }

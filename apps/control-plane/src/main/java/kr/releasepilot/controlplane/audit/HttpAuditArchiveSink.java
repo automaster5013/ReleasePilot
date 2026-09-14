@@ -1,7 +1,7 @@
 package kr.releasepilot.controlplane.audit;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -10,7 +10,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 
 @Component
-@ConditionalOnProperty(prefix="releasepilot.audit.archive",name="enabled",havingValue="true")
+@ConditionalOnExpression("${releasepilot.audit.archive.enabled:false} and '${releasepilot.audit.archive.provider:http}' == 'http'")
 class HttpAuditArchiveSink implements AuditArchiveSink {
     private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final ObjectMapper json;

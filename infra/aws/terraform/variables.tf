@@ -18,3 +18,12 @@ variable "owner" {
   type    = string
   default = "releasepilot"
 }
+variable "audit_retention_days" {
+  type        = number
+  default     = 30
+  description = "S3 Object Lock compliance retention for immutable audit objects"
+  validation {
+    condition     = var.audit_retention_days >= 1
+    error_message = "audit_retention_days must be at least one day."
+  }
+}

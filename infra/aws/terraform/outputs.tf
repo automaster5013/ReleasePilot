@@ -6,4 +6,6 @@ output "route53_name_servers" {
 }
 output "external_dns_role_arn" { value = var.create_route53_zone ? aws_iam_role.external_dns[0].arn : null }
 output "github_release_role_arn" { value = aws_iam_role.github_release.arn }
+output "audit_archive_bucket" { value = aws_s3_bucket.audit_archive.id }
+output "audit_archive_role_arn" { value = aws_iam_role.audit_archive.arn }
 output "estimated_cost_warning" { value = "EKS control plane, Auto Mode nodes, NAT Gateway and NLB incur charges. Destroy demo resources when not in use." }
