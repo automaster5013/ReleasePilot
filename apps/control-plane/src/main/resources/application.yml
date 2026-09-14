@@ -77,6 +77,12 @@ releasepilot:
     registration-id: ${OIDC_REGISTRATION_ID:releasepilot}
     auto-provision: ${OIDC_AUTO_PROVISION:false}
     allowed-email-domains: ${OIDC_ALLOWED_EMAIL_DOMAINS:}
+  github-checks:
+    enabled: ${GITHUB_CHECKS_ENABLED:false}
+    secret-ref: ${GITHUB_CHECKS_SECRET_REF:env:GITHUB_CHECKS_TOKEN}
+    poll-interval: ${GITHUB_CHECKS_POLL_INTERVAL:PT5S}
+    lease-timeout: ${GITHUB_CHECKS_LEASE_TIMEOUT:PT2M}
+    batch-size: ${GITHUB_CHECKS_BATCH_SIZE:20}
   bootstrap-operator:
     enabled: ${BOOTSTRAP_OPERATOR_ENABLED:false}
     username: ${BOOTSTRAP_OPERATOR_USERNAME:operator}

@@ -205,7 +205,7 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 
 1. Blue/Green 전략 — 완료 (2026-09-14)
 2. OIDC/SSO — 완료 (2026-09-14, 공급자 연결은 배포 설정)
-3. Slack 또는 GitHub Checks 알림·승인 연동
+3. Slack 또는 GitHub Checks 알림·승인 연동 — GitHub Checks 완료 (2026-09-14, token 연결은 배포 설정)
 4. 다중 클러스터
 5. route별 중요도 정책
 6. 감사 이벤트 해시 체인과 외부 보관
