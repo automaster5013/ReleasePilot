@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auditEventLabel, canDecideRelease, canRequestRelease, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canVerifyAudit, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -51,6 +51,13 @@ test("audit events have readable action and privacy-safe actor labels", () => {
   const base = { id: "1", occurredAt: "2026-09-15T00:00:00Z", correlationId: "correlation", chainSequence: 1 };
   assert.equal(auditEventLabel({ ...base, eventType: "RELEASE_APPROVED", actorType: "USER", actorId: "12345678-abcd" }), "Release Approved · User 12345678");
   assert.equal(auditEventLabel({ ...base, eventType: "ROLLOUT_PROMOTE_COMPLETED", actorType: "SYSTEM", actorId: null }), "Rollout Promote Completed · System");
+});
+
+test("audit integrity verification is operator-only and has stable labels", () => {
+  assert.equal(canVerifyAudit(["VIEWER"]), false);
+  assert.equal(canVerifyAudit(["OPERATOR"]), true);
+  assert.equal(auditIntegrityLabel({ valid: true, verifiedEvents: 42, failedEventId: null, headHash: "abc" }), "Verified · 42 events");
+  assert.equal(auditIntegrityLabel({ valid: false, verifiedEvents: 7, failedEventId: "12345678-abcd", headHash: "abc" }), "Integrity failure · event 12345678");
 });
 
 test("release draft validation fails closed before mutation", () => {

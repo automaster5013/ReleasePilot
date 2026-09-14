@@ -3,6 +3,7 @@ export type CsrfToken = { headerName: string; token: string };
 export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
 export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string; context?: { serviceName: string; environmentName: string } };
 export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null };
+export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -19,6 +20,14 @@ export function auditEventLabel(event: AuditEventView) {
   const action = event.eventType.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   const actor = event.actorType === "SYSTEM" ? "System" : event.actorId ? `User ${event.actorId.slice(0, 8)}` : "User";
   return `${action} · ${actor}`;
+}
+
+export function canVerifyAudit(roles: string[]) {
+  return roles.includes("OPERATOR");
+}
+
+export function auditIntegrityLabel(result: AuditChainVerification) {
+  return result.valid ? `Verified · ${result.verifiedEvents} events` : `Integrity failure · event ${result.failedEventId?.slice(0, 8) ?? "unknown"}`;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {

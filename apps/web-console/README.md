@@ -11,6 +11,8 @@ Next.js 기반 ReleasePilot 웹 콘솔입니다.
 목록 항목은 Service/Environment 대상을 함께 표시하고 서버가 권한 범위를 적용한 뒤 최신 항목 수를 제한합니다.
 릴리스 상세의 감사 타임라인은 상태 변경 이벤트, actor, 발생 시각, correlation ID와 hash chain sequence를
 시간순으로 보여주며 비운영자에게 원본 감사 payload를 노출하지 않습니다.
+OPERATOR는 같은 화면에서 전체 감사 해시 체인의 무결성과 검증 이벤트 수를 확인하고 재검증할 수 있습니다.
+검증 실패 시 최초 실패 이벤트가 경고로 표시되며, 일반 사용자와 공개 demo는 검증 API를 호출하지 않습니다.
 
 ## 실행
 

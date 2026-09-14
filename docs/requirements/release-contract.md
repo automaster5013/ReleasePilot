@@ -198,6 +198,9 @@ Web Console의 릴리스 상세는 권한이 확인된 `RELEASE` aggregate 감�
 각 항목에는 이벤트 종류, USER/SYSTEM actor, 발생 시각, correlation ID와 hash chain sequence를 포함한다.
 일반 사용자와 공개 VIEWER에게 원본 `payloadJson`과 hash 값은 노출하지 않으며, SSE 상태 갱신과 사용자 조작
 완료 후 타임라인도 다시 조회한다.
+OPERATOR 화면은 전체 감사 해시 체인의 서버 검증 결과와 검증 이벤트 수를 표시하며 수동 재검증을 제공한다.
+검증 실패는 최초 실패 이벤트 ID와 함께 명시적인 경고로 표시한다. OPERATOR가 아닌 브라우저는 전체 체인
+검증 API를 호출하지 않는다.
 
 ## 13. 사용자에게 보이는 완료 조건
 

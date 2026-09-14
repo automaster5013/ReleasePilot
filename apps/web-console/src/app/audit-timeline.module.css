@@ -3,10 +3,15 @@
 .timeline header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
 .timeline h2 { margin-top: 7px; }
 .timeline header span, .empty { color: #7f938b; font-size: 12px; }
+.summary { display: flex; align-items: flex-end; gap: 10px; }
+.summary button { border: 1px solid #36594d; background: #14231f; color: #7ce8bd; padding: 8px 10px; font: 650 10px monospace; cursor: pointer; }
+.summary button[data-valid="false"] { border-color: #763f43; background: #2b181a; color: #ffacb0; }
+.summary button:disabled { cursor: wait; opacity: .65; }
+.integrityAlert { margin: 0; padding: 13px 26px; border-top: 1px solid #763f43; background: #2b181a; color: #ffb9bc; font-size: 12px; }
 .timeline ol { margin: 0; padding: 0; list-style: none; }
 .timeline li { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: start; padding: 16px 26px; border-top: 1px solid #293730; }
 .timeline li i { width: 9px; height: 9px; margin-top: 4px; border: 2px solid #3adea3; border-radius: 50%; box-shadow: 0 0 0 4px #3adea319; }
 .timeline li div { display: grid; gap: 5px; }
 .timeline li small, .timeline time { color: #71847c; font: 10px monospace; }
 .empty { margin: 0; padding: 20px 26px; border-top: 1px solid #293730; }
-@media(max-width: 600px) { .timeline li { grid-template-columns: 16px 1fr; } .timeline time { grid-column: 2; } }
+@media(max-width: 600px) { .timeline > header { align-items: flex-start; flex-direction: column; gap: 14px; } .summary { align-items: flex-start; flex-direction: column; } .timeline li { grid-template-columns: 16px 1fr; } .timeline time { grid-column: 2; } }
