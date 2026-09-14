@@ -63,10 +63,21 @@ class SessionManagementServiceTests {
     @Test
     void cannotRevokeAnotherUsersUnknownSessionReference() {
         when(repository.findByPrincipalName("member")).thenReturn(Map.of());
-        assertThatThrownBy(() -> service.revoke("member", UUID.randomUUID(), "not-owned"))
+        assertThatThrownBy(() -> service.revoke("member", UUID.randomUUID(), "not-owned", "current"))
                 .isInstanceOfSatisfying(NotFoundException.class,
                         failure -> assertThat(failure.getCode()).isEqualTo("SESSION_NOT_FOUND"));
         verify(repository, never()).deleteById(any());
+    }
+
+    @Test
+    void reportsWhenTheRevokedSessionIsCurrent() {
+        var current = session("current", Instant.parse("2026-09-14T23:00:00Z"));
+        var stored = map(current);
+        when(repository.findByPrincipalName("member")).thenReturn(stored);
+
+        assertThat(service.revoke("member", UUID.randomUUID(),
+                SessionManagementService.reference("current"), "current")).isTrue();
+        verify(repository).deleteById("current");
     }
 
     private static Session session(String id, Instant lastAccessedAt) {

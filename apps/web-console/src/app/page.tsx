@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
+import sessionStyles from "./session.module.css";
+import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -35,6 +37,7 @@ type Release = {
   pipelineUrl: string;
 };
 type AuthenticationProviders = { oidc: boolean; loginUrl: string | null };
+type SessionResponse = { user: SessionUser; csrfToken: string; expiresAt: string };
 
 const demoSteps: Step[] = [
   { index: 0, weight: 10, status: "PASSED" },
@@ -59,6 +62,10 @@ export default function Home() {
   const [connection, setConnection] = useState("DEMO SNAPSHOT");
   const [error, setError] = useState("");
   const [canOperate, setCanOperate] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState("");
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
 
   useEffect(() => {
@@ -66,15 +73,83 @@ export default function Home() {
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then(setAuthenticationProviders)
       .catch(() => setAuthenticationProviders({ oidc: false, loginUrl: null }));
+    fetch("/control-api/session", { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<SessionResponse> : Promise.reject())
+      .then((current) => {
+        setSessionUser(current.user);
+        setCanOperate(current.user.roles.includes("OPERATOR"));
+        if (!current.user.demo) void refreshSessions().catch(() => setSessionNotice("활성 세션을 불러올 수 없습니다."));
+      })
+      .catch(() => undefined);
   }, []);
 
   async function startDemo() {
     const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
     const response = await fetch("/control-api/session/demo", { method: "POST", credentials: "include", headers: { [csrf.headerName]: csrf.token } });
     if (!response.ok) { setError("공개 데모 세션을 시작할 수 없습니다."); return; }
-    const session = await response.json();
+    const session = await response.json() as SessionResponse;
+    setSessionUser(session.user);
+    setActiveSessions([]);
     setCanOperate(session.user.roles.includes("OPERATOR"));
     setConnection("DEMO · VIEW ONLY");
+  }
+
+  async function csrfHeaders() {
+    const response = await fetch("/control-api/session/csrf", { credentials: "include" });
+    if (!response.ok) throw new Error("보안 토큰을 갱신할 수 없습니다.");
+    const csrf = await response.json() as { headerName: string; token: string };
+    return { [csrf.headerName]: csrf.token };
+  }
+
+  async function refreshSessions() {
+    const response = await fetch("/control-api/session/active", { credentials: "include" });
+    if (!response.ok) throw new Error("활성 세션을 불러올 수 없습니다.");
+    const body = await response.json() as { items: ActiveSession[] };
+    setActiveSessions(body.items);
+  }
+
+  async function revokeSession(session: ActiveSession) {
+    if (!window.confirm(session.current ? "현재 세션을 종료하시겠습니까?" : "선택한 세션을 종료하시겠습니까?")) return;
+    setSessionBusy(true);
+    setSessionNotice("");
+    try {
+      const response = await fetch(`/control-api/session/active/${session.reference}`, {
+        method: "DELETE", credentials: "include", headers: await csrfHeaders(),
+      });
+      if (!response.ok) throw new Error("세션 종료 요청이 거부되었습니다.");
+      if (session.current) {
+        setSessionUser(null);
+        setActiveSessions([]);
+        setCanOperate(false);
+        setSessionNotice("현재 세션이 종료되었습니다.");
+      } else {
+        await refreshSessions();
+        setSessionNotice("선택한 세션을 종료했습니다.");
+      }
+    } catch (failure) {
+      setSessionNotice((failure as Error).message);
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function revokeOtherSessions() {
+    if (!window.confirm("현재 세션을 제외한 모든 세션을 종료하시겠습니까?")) return;
+    setSessionBusy(true);
+    setSessionNotice("");
+    try {
+      const response = await fetch("/control-api/session/revoke-others", {
+        method: "POST", credentials: "include", headers: await csrfHeaders(),
+      });
+      if (!response.ok) throw new Error("다른 세션 종료 요청이 거부되었습니다.");
+      const result = await response.json() as { revoked: number };
+      await refreshSessions();
+      setSessionNotice(`${result.revoked}개의 다른 세션을 종료했습니다.`);
+    } catch (failure) {
+      setSessionNotice((failure as Error).message);
+    } finally {
+      setSessionBusy(false);
+    }
   }
 
   async function load(id: string) {
@@ -144,6 +219,13 @@ export default function Home() {
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>
         <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Route 범위와 Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric / Route</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={`${item.metric_key}:${item.route ?? "global"}`}><span><strong>{item.metric_key}</strong>{item.route && <small className={styles.route}>{item.importance ?? "STANDARD"} · {item.route}</small>}<small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
+        <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
+          <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={() => void revokeOtherSessions()} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
+          {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}
+          {sessionUser?.demo && <p className={sessionStyles.sessionEmpty}>공유 데모에서는 다른 방문자의 연결을 보호하기 위해 세션 관리가 비활성화됩니다.</p>}
+          {canManageSessions(sessionUser) && <div className={sessionStyles.sessionList}>{activeSessions.map((item) => <article key={item.reference}><div><strong>{item.current ? "현재 세션" : "활성 세션"}</strong><code>{item.reference}</code><small>최근 사용 {formatSessionTime(item.lastAccessedAt)} · 만료 {formatSessionTime(item.expiresAt)}</small></div><button onClick={() => void revokeSession(item)} disabled={sessionBusy}>{item.current ? "로그아웃" : "종료"}</button></article>)}</div>}
+          {sessionNotice && <p className={sessionStyles.sessionNotice} role="status">{sessionNotice}</p>}
+        </section>
       </section>
     </main>
   );

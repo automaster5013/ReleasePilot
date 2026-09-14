@@ -59,6 +59,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web-console/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build

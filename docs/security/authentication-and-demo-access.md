@@ -139,6 +139,8 @@ SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_RELEASEPILOT_ISSUER_URI=https://idp.examp
 - 사용자는 선택한 자신의 세션 또는 현재 세션을 제외한 모든 세션을 즉시 무효화할 수 있다. 다른 사용자의
   참조값은 존재 여부를 숨기기 위해 `404 SESSION_NOT_FOUND`로 응답하며 무효화 결과는 감사 체인에 기록한다.
 - 공유 VIEWER demo 계정은 방문자 사이의 세션 간섭을 막기 위해 활성 세션 조회와 무효화 API를 사용할 수 없다.
+- 웹 콘솔의 `ACCOUNT SECURITY` 영역은 조직 사용자에게 현재 세션과 최근 사용·만료 시각을 표시하며,
+  개별 세션 또는 현재 세션을 제외한 모든 세션을 확인 후 종료할 수 있게 한다.
 - 서버 재시작 후에도 세션을 유지해야 하면 Spring Session JDBC를 사용한다.
 
 ## 8. 웹 보안 기준

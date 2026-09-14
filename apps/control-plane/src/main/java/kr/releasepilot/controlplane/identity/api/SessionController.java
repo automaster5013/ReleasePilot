@@ -128,7 +128,9 @@ public class SessionController {
                        Authentication authentication, HttpSession current) {
         rejectDemo(current);
         var principal = (UserAccountPrincipal) authentication.getPrincipal();
-        sessions.revoke(principal.getUsername(), principal.id(), reference);
+        if (sessions.revoke(principal.getUsername(), principal.id(), reference, current.getId())) {
+            current.invalidate();
+        }
     }
 
     @PostMapping("/revoke-others")

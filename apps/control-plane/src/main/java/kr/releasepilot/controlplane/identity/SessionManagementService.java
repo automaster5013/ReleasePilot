@@ -40,7 +40,7 @@ public class SessionManagementService {
     }
 
     @Transactional
-    public void revoke(String username, UUID actorId, String reference) {
+    public boolean revoke(String username, UUID actorId, String reference, String currentSessionId) {
         var repository = repository();
         var session = repository.findByPrincipalName(username).values().stream()
                 .filter(candidate -> reference(candidate.getId()).equals(reference))
@@ -48,6 +48,7 @@ public class SessionManagementService {
                 .orElseThrow(() -> new NotFoundException("SESSION_NOT_FOUND", "Session not found"));
         repository.deleteById(session.getId());
         audits.record(AuditEvent.sessionsRevoked(actorId, actorId, 1, "SELECTED", clock.instant()));
+        return session.getId().equals(currentSessionId);
     }
 
     @Transactional
