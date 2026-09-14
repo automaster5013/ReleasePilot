@@ -64,5 +64,16 @@ Control Plane은 Kubernetes token이나 Prometheus token을 데이터베이스�
 
 공개 데모 대상은 `https://releasepilot.kr`입니다. EKS Auto Mode, ECR, Route 53, ingress-nginx,
 external-dns, cert-manager, Argo CD와 digest 기반 GitOps 정의는 `infra/aws`와 `deploy`에 있습니다.
-계정 배포 절차와 검증/복구/종료 방법은 `docs/runbooks/public-demo.md`를 따릅니다. 현재 저장소에는
-AWS 및 GitHub 인증 정보가 없으므로 실제 DNS와 클라우드 리소스는 아직 연결하지 않았습니다.
+계정 배포 절차와 검증/복구/종료 방법은 `docs/runbooks/public-demo.md`를 따릅니다. 공개 데모는
+서울 리전의 EKS에서 HTTPS로 운영 중이며, 방문자에게는 상태 변경 권한이 없는 VIEWER 세션만 발급합니다.
+
+## 설계 선택
+
+- 실행 엔진은 Argo Rollouts에 맡기고 ReleasePilot은 승인, 정책 판정, 실행 명령과 감사 증거를 소유합니다.
+- Canary 트래픽은 10→30→60→100 단계로 진행하며 FAIL은 abort, 불확실한 관측은 자동 승격하지 않습니다.
+- 애플리케이션 이미지는 Git 태그에서 빌드하고 digest를 Git에 기록해 Argo CD가 동일 산출물을 재현합니다.
+- 초기 데모는 비용과 운영 복잡도를 낮추기 위해 EKS 내부 단일 MySQL을 사용합니다. 프로덕션 전환 시 RDS와
+  전용 secret manager, WAF, 인증된 관측성 엔드포인트가 필요합니다.
+
+3~5분 제품 시연 순서는 `docs/runbooks/demo-script.md`, 현재 운영 제약과 비용·보안 점검은
+`docs/runbooks/public-demo.md`에 정리되어 있습니다.

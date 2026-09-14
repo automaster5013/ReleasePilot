@@ -25,8 +25,6 @@ spec:
             - { name: SESSION_COOKIE_SECURE, value: "true" }
             - { name: DEMO_SESSION_ENABLED, value: "true" }
             - { name: ANALYSIS_WORKER_URL, value: "http://analysis-worker:8090" }
-            - { name: OTEL_TRACING_ENABLED, value: "true" }
-            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector.monitoring:4318/v1/traces" }
           readinessProbe: { httpGet: { path: /actuator/health/readiness, port: 8080 }, initialDelaySeconds: 20 }
           livenessProbe: { httpGet: { path: /actuator/health/liveness, port: 8080 }, initialDelaySeconds: 40 }
           resources: { requests: { cpu: 250m, memory: 384Mi }, limits: { memory: 768Mi } }

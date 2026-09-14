@@ -44,6 +44,7 @@ const demoEvidence: Evidence[] = [
   { metric_key: "HTTP_P95_LATENCY_MS", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: 251, canary_value: 284, threshold: 500, query_template_id: "otel-http-server-v1:HTTP_P95_LATENCY_MS", canary_query_hash: "840b9a38a30f7eca53a108968ad1f0de" },
   { metric_key: "REQUEST_COUNT", verdict: "PASS", reason_code: "ALL_RULES_PASSED", baseline_value: null, canary_value: 1842, threshold: 1000, query_template_id: "otel-http-server-v1:REQUEST_COUNT", canary_query_hash: "2ca7105ec53b7e222a1b7e4f665fe984" },
 ];
+const grafanaUrl = process.env.NEXT_PUBLIC_GRAFANA_URL;
 
 export default function Home() {
   const [releaseId, setReleaseId] = useState("");
@@ -126,7 +127,7 @@ export default function Home() {
             <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
             <div className={styles.stages}>{live.steps.map((step) => <div className={styles.stage} data-status={step.status} key={step.index}><i /><span>{step.weight}%</span><small>{step.status}</small></div>)}</div>
-            <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate}>Pause</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate}>Abort</button><a href="http://localhost:3001/d/releasepilot-control-plane" target="_blank">Grafana에서 조사 ↗</a></footer>
+            <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate}>Pause</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>

@@ -132,6 +132,8 @@ outbox command로 복사되어 비동기 경계를 넘어 유지된다.
 
 예상: 2주
 
+상태: 완료 (2026-09-14)
+
 - AWS 실행 환경과 트래픽 라우터 결정 및 구축
 - GitHub Actions 이미지 빌드
 - GitOps 저장소와 Argo CD 동기화
@@ -151,12 +153,15 @@ Argo CD GitOps, digest 이미지 workflow, 클러스터 내 데모 MySQL과 VIEW
 Control Plane 통합 테스트는 공개 세션의 Abort 요청이 403임을 검증하며 k6 읽기 부하 시나리오와
 운영 runbook을 추가했다. 로컬 컨테이너 대상 k6 검증은 10 VU/60초, 8,851회 반복에서 실패율 0%,
 p95 43ms로 통과했다. Terraform validate, Kustomize render와 전체 애플리케이션 테스트도 통과했다.
-AWS/GitHub 인증 및 유료 리소스 생성 승인이 없어 실제 HTTPS 주소 배포는 대기 중이며, 따라서 M6의
-완료 조건은 아직 충족되지 않았다.
+GitHub OIDC로 ECR push와 digest 기반 main 갱신을 수행하고 Argo CD가 새 digest를 동기화한다.
+`releasepilot.kr` DNS, Let's Encrypt TLS와 세 Rollout의 정상 승격을 실제 EKS에서 확인했다. 공개
+VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으로 검증한다.
 
 ### M7 — 포트폴리오 마감
 
 예상: 1주
+
+상태: 완료 (2026-09-14)
 
 - README와 아키텍처 다이어그램
 - 의사결정과 트레이드오프 설명
