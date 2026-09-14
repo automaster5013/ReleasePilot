@@ -23,4 +23,8 @@ public class ClusterConnection {
     public List<String> getAllowedNamespaces(){return List.of(allowedNamespaces.split(","));}
     public String getSecretRef(){return secretRef;} public ConnectionStatus getStatus(){return status;}
     public Instant getLastValidatedAt(){return lastValidatedAt;} public Instant getCreatedAt(){return createdAt;}
+    public void validated(ConnectionStatus status,Instant now){
+        if(status!=ConnectionStatus.ACTIVE&&status!=ConnectionStatus.INVALID)throw new IllegalArgumentException("Validation status must be ACTIVE or INVALID");
+        this.status=status;this.lastValidatedAt=now;
+    }
 }

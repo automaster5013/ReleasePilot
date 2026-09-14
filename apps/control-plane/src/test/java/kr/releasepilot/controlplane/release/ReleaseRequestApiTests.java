@@ -14,6 +14,9 @@ import java.time.Instant;import java.util.*;import static org.springframework.se
   String body="""
    {"serviceId":"%s","environmentId":"%s","version":"1.2.3","imageRepository":"ghcr.io/acme/checkout","imageDigest":"sha256:%s","changeSummary":"Safer checkout","commitSha":"%s","pipelineUrl":"https://ci.example/runs/1"}
    """.formatted(app.getId(),env.getId(),"a".repeat(64),"b".repeat(40));
+  mvc.perform(post("/api/v1/releases").with(authentication(authToken(user,"ROLE_DEVELOPER"))).with(csrf()).header("Idempotency-Key","release-inactive-cluster").contentType(MediaType.APPLICATION_JSON).content(body))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CLUSTER_CONNECTION_NOT_ACTIVE"));
+  cluster.validated(ConnectionStatus.ACTIVE,now);clusters.save(cluster);
   String approvalKeyPrefix=String.join("-","approval","decision","");
   String response=mvc.perform(post("/api/v1/releases").with(authentication(authToken(user,"ROLE_DEVELOPER"))).with(csrf()).header("Idempotency-Key","release-request-0001").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING_APPROVAL")).andExpect(jsonPath("$.imageDigest").value("sha256:"+"a".repeat(64))).andReturn().getResponse().getContentAsString();
   String releaseId=response.substring(response.indexOf("\"id\":\"")+6,response.indexOf("\"",response.indexOf("\"id\":\"")+6));

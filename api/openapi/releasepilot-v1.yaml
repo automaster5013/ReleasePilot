@@ -319,6 +319,39 @@ paths:
               schema:
                 type: array
                 items: {$ref: '#/components/schemas/ClusterConnection'}
+  /connections/clusters/validate:
+    post:
+      tags: [Catalog]
+      summary: 등록된 모든 Kubernetes 클러스터 연결 검증
+      description: 각 클러스터의 버전 endpoint와 허용 namespace별 Argo Rollouts get, watch, patch 권한을 fail-closed 방식으로 검증한다.
+      operationId: validateAllClusterConnections
+      responses:
+        '200':
+          description: 이름순 클러스터 검증 결과
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/ClusterValidation'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /connections/clusters/{clusterId}/validate:
+    post:
+      tags: [Catalog]
+      summary: Kubernetes 클러스터 연결 검증
+      operationId: validateClusterConnection
+      parameters:
+        - name: clusterId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: 클러스터와 namespace별 권한 검증 결과
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClusterValidation'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /connections/prometheus:
     post:
       tags: [Catalog]
@@ -1040,6 +1073,30 @@ components:
             status: {type: string, enum: [UNVERIFIED, ACTIVE, INVALID, DISABLED]}
             lastValidatedAt: {type: [string, 'null'], format: date-time}
             createdAt: {type: string, format: date-time}
+    ClusterNamespaceAccess:
+      type: object
+      additionalProperties: false
+      required: [namespace, allowed, missingVerbs]
+      properties:
+        namespace: {type: string}
+        allowed: {type: boolean}
+        missingVerbs:
+          type: array
+          items: {type: string, enum: [get, watch, patch]}
+    ClusterValidation:
+      type: object
+      additionalProperties: false
+      required: [clusterId, status, serverVersion, failureCode, namespaces]
+      properties:
+        clusterId: {type: string, format: uuid}
+        status: {type: string, enum: [ACTIVE, INVALID]}
+        serverVersion: {type: string}
+        failureCode:
+          type: string
+          enum: ['', SECRET_UNAVAILABLE, AUTHENTICATION_FAILED, CLUSTER_UNREACHABLE, KUBERNETES_VERSION_UNAVAILABLE, NAMESPACE_ACCESS_DENIED]
+        namespaces:
+          type: array
+          items: {$ref: '#/components/schemas/ClusterNamespaceAccess'}
     CreatePrometheusConnectionRequest:
       type: object
       additionalProperties: false

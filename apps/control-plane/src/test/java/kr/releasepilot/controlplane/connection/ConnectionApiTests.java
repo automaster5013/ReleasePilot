@@ -20,10 +20,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest @Transactional
 class ConnectionApiTests {
     @Autowired WebApplicationContext context; private MockMvc mvc;
+    @Autowired ObjectMapper json;
     @BeforeEach void setUp(){mvc=MockMvcBuilders.webAppContextSetup(context).apply(SecurityMockMvcConfigurers.springSecurity()).build();}
     @Test void operatorRegistersSecretReferencesWithoutCredentials() throws Exception {
         mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())
@@ -44,6 +46,20 @@ class ConnectionApiTests {
                 {"name":"blocked","apiServer":"https://kubernetes.example","allowedNamespaces":["default"],"secretRef":"vault:kubernetes/blocked"}
                 """))
             .andExpect(status().isForbidden());
+    }
+    @Test void operatorCanValidateOneOrAllClustersAndMissingSecretFailsClosed()throws Exception{
+        var created=mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"name":"validation-cluster","apiServer":"https://kubernetes.example","allowedNamespaces":["east","west"],"secretRef":"env:DEFINITELY_MISSING_TEST_TOKEN"}
+                """)).andExpect(status().isCreated()).andReturn();
+        String id=json.readTree(created.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(post("/api/v1/connections/clusters/"+id+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INVALID"))
+                .andExpect(jsonPath("$.failureCode").value("SECRET_UNAVAILABLE"));
+        mvc.perform(post("/api/v1/connections/clusters/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].clusterId").value(id));
+        mvc.perform(post("/api/v1/connections/clusters/"+id+"/validate").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
+                .andExpect(status().isForbidden());
     }
     private UsernamePasswordAuthenticationToken auth(String role){
         var p=new UserAccountPrincipal(UUID.randomUUID(),"test","unused","Test",true,List.of(new SimpleGrantedAuthority(role)));

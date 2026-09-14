@@ -23,6 +23,14 @@ public class ConnectionController {
         return ClusterResponse.from(service.createCluster(request.name(),request.apiServer(),request.allowedNamespaces(),request.secretRef(),principal.id()));
     }
     @GetMapping("/clusters") List<ClusterResponse> clusters(){return service.listClusters().stream().map(ClusterResponse::from).toList();}
+    @PostMapping("/clusters/{clusterId}/validate") @PreAuthorize("hasRole('OPERATOR')")
+    ClusterValidationResponse validateCluster(@PathVariable UUID clusterId,@AuthenticationPrincipal UserAccountPrincipal principal){
+        return ClusterValidationResponse.from(clusterId,service.validateCluster(clusterId,principal.id()));
+    }
+    @PostMapping("/clusters/validate") @PreAuthorize("hasRole('OPERATOR')")
+    List<ClusterValidationResponse> validateClusters(@AuthenticationPrincipal UserAccountPrincipal principal){
+        return service.validateAllClusters(principal.id()).stream().map(v->ClusterValidationResponse.from(v.cluster().getId(),v.result())).toList();
+    }
     @PostMapping("/prometheus") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasRole('OPERATOR')")
     PrometheusResponse createPrometheus(@Valid @RequestBody CreatePrometheusRequest request,@AuthenticationPrincipal UserAccountPrincipal principal){
         return PrometheusResponse.from(service.createPrometheus(request.name(),request.baseUrl(),request.secretRef(),request.queryTimeoutSeconds(),principal.id()));
@@ -40,6 +48,11 @@ public class ConnectionController {
     public record ClusterResponse(UUID id,String name,String apiServer,List<String> allowedNamespaces,
         String secretRef,String status,Instant lastValidatedAt,Instant createdAt){
         static ClusterResponse from(ClusterConnection v){return new ClusterResponse(v.getId(),v.getName(),v.getApiServer(),v.getAllowedNamespaces(),v.getSecretRef(),v.getStatus().name(),v.getLastValidatedAt(),v.getCreatedAt());}}
+    public record ClusterValidationResponse(UUID clusterId,String status,String serverVersion,String failureCode,
+                                            List<ClusterValidationGateway.NamespaceAccess> namespaces){
+        static ClusterValidationResponse from(UUID clusterId,ClusterValidationGateway.Result result){
+            return new ClusterValidationResponse(clusterId,result.status().name(),result.serverVersion(),result.failureCode(),result.namespaces());
+        }}
     public record PrometheusResponse(UUID id,String name,String baseUrl,String secretRef,int queryTimeoutSeconds,
         String status,Instant lastValidatedAt,Instant createdAt){
         static PrometheusResponse from(PrometheusConnection v){return new PrometheusResponse(v.getId(),v.getName(),v.getBaseUrl(),v.getSecretRef(),v.getQueryTimeoutSeconds(),v.getStatus().name(),v.getLastValidatedAt(),v.getCreatedAt());}}

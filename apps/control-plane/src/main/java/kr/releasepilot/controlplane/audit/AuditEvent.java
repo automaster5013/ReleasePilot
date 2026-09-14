@@ -46,6 +46,12 @@ public class AuditEvent {
         return created(type, connectionId, type + "_CREATED", actorId, occurredAt);
     }
 
+    public static AuditEvent clusterConnectionValidated(UUID connectionId,UUID actorId,String status,String failureCode,Instant occurredAt){
+        var event=created("CLUSTER_CONNECTION",connectionId,"CLUSTER_CONNECTION_VALIDATED",actorId,occurredAt);
+        event.payloadJson="{\"status\":\""+status+"\",\"failureCode\":\""+failureCode+"\"}";
+        return event;
+    }
+
     public static AuditEvent releaseRequested(UUID releaseId, UUID actorId, Instant occurredAt) {
         return created("RELEASE", releaseId, "RELEASE_REQUESTED", actorId, occurredAt);
     }
