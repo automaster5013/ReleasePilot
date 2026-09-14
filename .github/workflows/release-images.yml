@@ -23,6 +23,13 @@ jobs:
             context: apps/web-console
     steps:
       - uses: actions/checkout@v4
+      - name: Inspect OIDC subject
+        shell: bash
+        run: |
+          token="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r .value)"
+          TOKEN="$token" python -c 'import base64,json,os; payload=os.environ["TOKEN"].split(".")[1]; payload += "=" * (-len(payload) % 4); print("OIDC subject:", json.loads(base64.urlsafe_b64decode(payload))["sub"])'
       - uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
