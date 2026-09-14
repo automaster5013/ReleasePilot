@@ -17,6 +17,10 @@ import java.time.Instant;import java.util.*;import static org.springframework.se
   mvc.perform(post("/api/v1/releases").with(authentication(authToken(user,"ROLE_DEVELOPER"))).with(csrf()).header("Idempotency-Key","release-inactive-cluster").contentType(MediaType.APPLICATION_JSON).content(body))
    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CLUSTER_CONNECTION_NOT_ACTIVE"));
   cluster.validated(ConnectionStatus.ACTIVE,now);clusters.save(cluster);
+  env.complete(false,false,now.minusSeconds(25_200));environments.save(env);
+  mvc.perform(post("/api/v1/releases").with(authentication(authToken(user,"ROLE_DEVELOPER"))).with(csrf()).header("Idempotency-Key","release-stale-environment").contentType(MediaType.APPLICATION_JSON).content(body))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ENVIRONMENT_VALIDATION_STALE"));
+  env.complete(false,false,Instant.now());environments.save(env);
   String approvalKeyPrefix=String.join("-","approval","decision","");
   String response=mvc.perform(post("/api/v1/releases").with(authentication(authToken(user,"ROLE_DEVELOPER"))).with(csrf()).header("Idempotency-Key","release-request-0001").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING_APPROVAL")).andExpect(jsonPath("$.imageDigest").value("sha256:"+"a".repeat(64))).andReturn().getResponse().getContentAsString();
   String releaseId=response.substring(response.indexOf("\"id\":\"")+6,response.indexOf("\"",response.indexOf("\"id\":\"")+6));

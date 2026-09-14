@@ -1366,40 +1366,37 @@ components:
           format: date-time
     EnvironmentValidation:
       type: object
-      required: [id, environmentId, status, checks, startedAt]
+      required: [environmentId, status, checkedAt, validUntil, checks]
       properties:
-        id:
-          type: string
-          format: uuid
         environmentId:
           type: string
           format: uuid
         status:
           type: string
-          enum: [RUNNING, PASSED, PASSED_WITH_WARNINGS, FAILED]
+          enum: [DRAFT, VALIDATING, ACTIVE, ACTIVE_WITH_WARNINGS, INVALID, DISABLED]
+        checkedAt:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
         checks:
           type: array
           items:
             $ref: '#/components/schemas/ValidationCheck'
-        startedAt:
-          type: string
-          format: date-time
-        finishedAt:
-          type: [string, 'null']
-          format: date-time
     ValidationCheck:
       type: object
-      required: [key, result, message]
+      required: [code, outcome, message, detailsJson]
       properties:
-        key:
+        code:
           type: string
-        result:
+        outcome:
           type: string
           enum: [PASS, WARNING, FAIL]
         message:
           type: string
-        details:
-          type: object
+        detailsJson:
+          type: string
     CreateReleaseRequest:
       type: object
       additionalProperties: false

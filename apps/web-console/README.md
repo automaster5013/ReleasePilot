@@ -4,8 +4,9 @@ Next.js 기반 ReleasePilot 웹 콘솔입니다.
 
 조직 사용자는 권한 범위의 Project → Service → 검증된 Environment를 선택해 릴리스를 요청할 수 있습니다.
 카탈로그 조회 실패나 선택 가능한 환경이 없는 경우에는 요청 전 화면에서 확인할 수 있습니다.
-Environment를 선택하면 최신 Kubernetes·Prometheus 점검 결과, 검증 시각과 실패·경고 요약을 요청 전에 확인할 수 있습니다.
+Environment를 선택하면 최신 Kubernetes·Prometheus 점검 결과, 검증 시각·유효 기한과 실패·경고 요약을 요청 전에 확인할 수 있습니다.
 OPERATOR는 같은 화면에서 환경을 즉시 재검증할 수 있고, 재검증 중 중복 요청과 실패 상태의 릴리스 요청은 차단됩니다.
+검증 유효 기한이 지나면 Web Console과 Control Plane이 모두 릴리스 요청을 차단하고 운영자 재검증을 안내합니다.
 수동 재검증은 실행자를 포함한 감사 이벤트로 기록되며 OPERATOR 화면에 발생 시각과 chain sequence가 표시됩니다.
 릴리스 상세를 열면 Approver가 대상, 요청자, artifact와 Pipeline, 고정된 정책 단계와 지표 임계값을
 확인한 뒤 승인 또는 거부할 수 있습니다.

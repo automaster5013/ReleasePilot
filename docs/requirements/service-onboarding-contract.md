@@ -146,6 +146,9 @@ ReleasePilot이 모든 Prometheus 시계열을 검색하지 않도록 Environmen
 - 활성 Environment는 기본 6시간마다 자동 재검증한다. 다중 Control Plane Replica는 DB lease로 중복 실행을
   방지하며 실패 결과는 15분 뒤 재시도하고 10분 이상 멈춘 lease는 회수한다. 주기와 batch 크기는
   `ENVIRONMENT_REVALIDATION_*` 환경 변수로 조정할 수 있다.
+- 최신 검증의 유효 기간도 같은 기본 6시간이며 `ENVIRONMENT_REVALIDATION_MAX_AGE`로 조정한다. 조회 API는
+  `validUntil`을 반환하고 Web Console은 기한이 지난 Environment의 요청을 사전 차단한다. 서버는 스케줄러
+  지연과 무관하게 릴리스 요청 시 다시 기한을 검사하고 `ENVIRONMENT_VALIDATION_STALE`로 거부한다.
 - 릴리스 직전 Rollout UID가 마지막 등록 검증 시점과 다르면 자동 실행하지 않는다.
 - 변경 결과는 이전 설정 전체를 덮어쓴 감사 payload가 아니라 변경된 필드 목록과 검증 결과로 기록한다.
 

@@ -22,9 +22,9 @@ class EnvironmentApiTests {
   mvc.perform(get("/api/v1/services/{id}/environments",app.getId()).with(authentication(operator())))
    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(id)).andExpect(jsonPath("$.items[0].name").value("production"));
   mvc.perform(post("/api/v1/environments/{id}/validate",id).with(authentication(operator())).with(csrf()))
-   .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("INVALID")).andExpect(jsonPath("$.checks.length()").value(11)).andExpect(jsonPath("$.checks[6].code").value("ROLLOUT_RBAC"));
+   .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("INVALID")).andExpect(jsonPath("$.validUntil").isString()).andExpect(jsonPath("$.checks.length()").value(11)).andExpect(jsonPath("$.checks[6].code").value("ROLLOUT_RBAC"));
   mvc.perform(get("/api/v1/environments/{id}/validation-results/latest",id).with(authentication(operator())))
-   .andExpect(status().isOk()).andExpect(jsonPath("$.checks.length()").value(11));
+   .andExpect(status().isOk()).andExpect(jsonPath("$.validUntil").isString()).andExpect(jsonPath("$.checks.length()").value(11));
   mvc.perform(get("/api/v1/audit-events").param("aggregateType","ENVIRONMENT").param("aggregateId",id).with(authentication(operator())))
    .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.items[0].actorType").value("USER")).andExpect(jsonPath("$.items[0].payloadJson").value(org.hamcrest.Matchers.containsString("MANUAL")));
   mvc.perform(get("/api/v1/environments/{id}/validation-results/latest",id).with(authentication(viewer())))

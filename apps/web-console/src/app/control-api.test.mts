@@ -61,7 +61,7 @@ test("audit integrity verification is operator-only and has stable labels", () =
 });
 
 test("environment validation summaries prioritize failures and warnings", () => {
-  const base = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z" };
+  const base = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z", validUntil: "2099-01-01T00:00:00Z" };
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "PASS", message: "ok" }] }), "1 checks passed");
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "WARNING", message: "slow" }] }), "1 warnings");
   assert.equal(environmentValidationSummary({ ...base, checks: [{ code: "A", outcome: "FAIL", message: "denied" }, { code: "B", outcome: "WARNING", message: "slow" }] }), "1 failed checks");
@@ -71,8 +71,12 @@ test("environment revalidation is operator-only and failed readiness blocks rele
   assert.equal(canRevalidateEnvironment(["DEVELOPER"]), false);
   assert.equal(canRevalidateEnvironment(["OPERATOR"]), true);
   assert.equal(environmentAllowsRelease(null), false);
-  assert.equal(environmentAllowsRelease({ environmentId: "env", status: "INVALID", checkedAt: "now", checks: [] }), false);
-  assert.equal(environmentAllowsRelease({ environmentId: "env", status: "ACTIVE_WITH_WARNINGS", checkedAt: "now", checks: [] }), true);
+  const base = { environmentId: "env", checkedAt: "2026-09-15T00:00:00Z", checks: [] };
+  assert.equal(environmentAllowsRelease({ ...base, status: "INVALID", validUntil: "2099-01-01T00:00:00Z" }), false);
+  assert.equal(environmentAllowsRelease({ ...base, status: "ACTIVE_WITH_WARNINGS", validUntil: "2099-01-01T00:00:00Z" }), true);
+  assert.equal(environmentAllowsRelease({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), false);
+  assert.equal(environmentAllowsRelease({ ...base, status: "ACTIVE", validUntil: "invalid" }), false);
+  assert.equal(environmentValidationSummary({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), "Validation expired");
 });
 
 test("release draft validation fails closed before mutation", () => {

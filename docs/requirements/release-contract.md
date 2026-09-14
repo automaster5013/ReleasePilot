@@ -246,6 +246,10 @@ Web Console은 `PENDING_APPROVAL` 상태에서 APPROVER에게만 Approve/Reject�
 멱등 키를 포함해 결정을 제출한 뒤 응답 상태를 즉시 화면에 반영한다. Production 요청자의 자기 승인은
 `SELF_APPROVAL_NOT_ALLOWED` 안내로 표시한다.
 
+릴리스 요청은 Environment가 활성 상태이더라도 최신 검증의 유효 기한이 지났으면 생성되지 않는다.
+Control Plane은 이 경우 HTTP 409와 `ENVIRONMENT_VALIDATION_STALE`을 반환하며, 운영자가 재검증한 뒤
+새 요청을 제출해야 한다.
+
 ### 시나리오 E: 제어 서버 재시작
 
 Canary 진행 중 ReleasePilot이 재시작된다. 재시작 후 실제 Rollout 상태를 조회하여 중복 명령 없이 진행 상태를 복구한다.
