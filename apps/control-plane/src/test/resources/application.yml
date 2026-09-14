@@ -13,6 +13,8 @@ spring:
       ddl-auto: create-drop
 
 releasepilot:
+  environment-revalidation:
+    enabled: false
   analysis:
     enabled: false
   rollout:

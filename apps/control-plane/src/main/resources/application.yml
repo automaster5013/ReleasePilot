@@ -57,6 +57,14 @@ management:
         enabled: true
 
 releasepilot:
+  environment-revalidation:
+    enabled: ${ENVIRONMENT_REVALIDATION_ENABLED:true}
+    poll-interval: ${ENVIRONMENT_REVALIDATION_POLL_INTERVAL:PT5M}
+    initial-delay: ${ENVIRONMENT_REVALIDATION_INITIAL_DELAY:PT1M}
+    max-age: ${ENVIRONMENT_REVALIDATION_MAX_AGE:PT6H}
+    failure-retry: ${ENVIRONMENT_REVALIDATION_FAILURE_RETRY:PT15M}
+    lease-timeout: ${ENVIRONMENT_REVALIDATION_LEASE_TIMEOUT:PT10M}
+    batch-size: ${ENVIRONMENT_REVALIDATION_BATCH_SIZE:20}
   security:
     rate-limit:
       enabled: ${AUTH_RATE_LIMIT_ENABLED:true}

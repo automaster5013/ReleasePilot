@@ -133,7 +133,9 @@ ReleasePilot이 모든 Prometheus 시계열을 검색하지 않도록 Environmen
 ## 8. 변경과 재검증
 
 - 외부 연결 또는 대상 리소스가 바뀌면 Environment를 다시 검증한다.
-- 정기 검증은 후속 운영 기능이며 MVP에서는 수동 `validate` 명령과 릴리스 직전 검증을 제공한다.
+- 활성 Environment는 기본 6시간마다 자동 재검증한다. 다중 Control Plane Replica는 DB lease로 중복 실행을
+  방지하며 실패 결과는 15분 뒤 재시도하고 10분 이상 멈춘 lease는 회수한다. 주기와 batch 크기는
+  `ENVIRONMENT_REVALIDATION_*` 환경 변수로 조정할 수 있다.
 - 릴리스 직전 Rollout UID가 마지막 등록 검증 시점과 다르면 자동 실행하지 않는다.
 - 변경 결과는 이전 설정 전체를 덮어쓴 감사 payload가 아니라 변경된 필드 목록과 검증 결과로 기록한다.
 

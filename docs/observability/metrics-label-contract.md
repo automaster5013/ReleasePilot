@@ -140,3 +140,7 @@ Environment 등록 시 최근 데이터로 다음을 확인한다.
 - 결과가 스칼라로 변환 가능
 
 Canary가 아직 없는 최초 등록에서는 canary 시계열 누락을 WARNING으로 허용할 수 있다. 릴리스 실행 후 관찰 단계에서는 같은 누락을 INCONCLUSIVE로 처리한다.
+
+Control Plane은 정기 재검증 결과를 `releasepilot_environment_revalidations_total` counter로 노출한다.
+`outcome` label은 `ACTIVE`, `ACTIVE_WITH_WARNINGS`, `INVALID`, `ERROR`의 고정 집합만 사용하며
+Environment ID나 외부 endpoint를 metric label에 포함하지 않는다.
