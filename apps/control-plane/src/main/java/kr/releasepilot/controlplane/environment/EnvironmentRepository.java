@@ -3,6 +3,7 @@ import org.springframework.data.domain.Pageable; import org.springframework.data
 import java.time.Instant; import java.util.*;
 public interface EnvironmentRepository extends JpaRepository<Environment,UUID>{
  boolean existsByServiceIdAndName(UUID serviceId,String name);
+ List<Environment> findAllByServiceIdOrderByCreatedAtDesc(UUID serviceId,Pageable pageable);
  @Query("""
   select e.id from Environment e where e.status <> :disabled and (
    (e.status = :validating and coalesce(e.validationStartedAt,e.createdAt) <= :staleBefore) or

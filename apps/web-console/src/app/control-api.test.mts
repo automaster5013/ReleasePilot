@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDecideRelease, canRequestRelease, mutationHeaders, validateReleaseDraft } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, mutationHeaders, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -29,6 +29,16 @@ test("developer-capable roles can request a release", () => {
   assert.equal(canRequestRelease(["DEVELOPER"]), true);
   assert.equal(canRequestRelease(["APPROVER"]), true);
   assert.equal(canRequestRelease(["OPERATOR"]), true);
+});
+
+test("release catalog only offers active and validated choices", () => {
+  const items = [
+    { id: "1", name: "Production", status: "ACTIVE" },
+    { id: "2", name: "Staging", status: "ACTIVE_WITH_WARNINGS" },
+    { id: "3", name: "Broken", status: "INVALID" },
+  ];
+  assert.deepEqual(selectableCatalogItems(items).map((item) => item.id), ["1"]);
+  assert.deepEqual(selectableCatalogItems(items, ["ACTIVE", "ACTIVE_WITH_WARNINGS"]).map((item) => item.id), ["1", "2"]);
 });
 
 test("release draft validation fails closed before mutation", () => {

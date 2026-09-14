@@ -34,6 +34,11 @@
 
 이미지 태그만으로 배포 대상을 식별하지 않는다. 요청 시점에 검증된 digest를 저장하며, 실제 실행 대상도 같은 digest여야 한다.
 
+Web Console은 로그인 사용자가 접근 가능한 활성 Project와 Service만 선택지로 제공하고, 선택한 Service의
+`ACTIVE` 또는 `ACTIVE_WITH_WARNINGS` Environment만 릴리스 대상으로 제공한다. 프로젝트 접근 권한이 없는
+Service의 Environment 목록은 존재 여부를 노출하지 않고 `404`로 응답한다. 직접 UUID를 복사하는 절차 없이
+Project → Service → Environment를 선택한 뒤 동일한 서버 측 요청 검증을 통과해야 한다.
+
 ## 4. 요청 접수 조건
 
 ReleasePilot은 다음 조건을 만족할 때만 요청을 `PENDING_APPROVAL`로 전환한다.

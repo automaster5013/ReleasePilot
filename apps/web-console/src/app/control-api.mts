@@ -1,5 +1,11 @@
 export type CsrfToken = { headerName: string; token: string };
 
+export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
+
+export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
+  return items.filter((item) => activeStatuses.includes(item.status));
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;

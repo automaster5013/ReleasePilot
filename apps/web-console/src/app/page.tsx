@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { canDecideRelease, canRequestRelease, CsrfToken, mutationHeaders, ReleaseDraft, validateReleaseDraft } from "./control-api.mts";
+import { canDecideRelease, canRequestRelease, CatalogItem, CsrfToken, mutationHeaders, ReleaseDraft, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -71,6 +71,11 @@ export default function Home() {
   const [operationBusy, setOperationBusy] = useState(false);
   const [operationNotice, setOperationNotice] = useState("");
   const [releaseDraft, setReleaseDraft] = useState<ReleaseDraft>(emptyReleaseDraft);
+  const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<CatalogItem[]>([]);
+  const [services, setServices] = useState<CatalogItem[]>([]);
+  const [environments, setEnvironments] = useState<CatalogItem[]>([]);
+  const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestNotice, setRequestNotice] = useState("");
   const operationInFlight = useRef(false);
@@ -90,6 +95,34 @@ export default function Home() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!canRequestRelease(sessionUser?.roles ?? [])) return;
+    fetch("/control-api/projects?limit=100", { credentials: "include" })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((page: { items: CatalogItem[] }) => setProjects(selectableCatalogItems(page.items)))
+      .catch(() => setCatalogNotice("접근 가능한 프로젝트를 불러올 수 없습니다."));
+  }, [sessionUser]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const controller = new AbortController();
+    fetch(`/control-api/projects/${projectId}/services?limit=100`, { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((page: { items: CatalogItem[] }) => setServices(selectableCatalogItems(page.items)))
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setCatalogNotice("프로젝트의 서비스를 불러올 수 없습니다."); });
+    return () => controller.abort();
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!releaseDraft.serviceId) return;
+    const controller = new AbortController();
+    fetch(`/control-api/services/${releaseDraft.serviceId}/environments?limit=100`, { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((page: { items: CatalogItem[] }) => setEnvironments(selectableCatalogItems(page.items, ["ACTIVE", "ACTIVE_WITH_WARNINGS"])))
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setCatalogNotice("서비스의 환경을 불러올 수 없습니다."); });
+    return () => controller.abort();
+  }, [releaseDraft.serviceId]);
 
   async function startDemo() {
     const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
@@ -198,6 +231,16 @@ export default function Home() {
 
   function updateDraft(field: keyof ReleaseDraft, value: string) {
     setReleaseDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function selectProject(value: string) {
+    setCatalogNotice(""); setProjectId(value); setServices([]); setEnvironments([]);
+    setReleaseDraft((current) => ({ ...current, serviceId: "", environmentId: "" }));
+  }
+
+  function selectService(value: string) {
+    setCatalogNotice(""); setEnvironments([]);
+    setReleaseDraft((current) => ({ ...current, serviceId: value, environmentId: "" }));
   }
 
   async function requestRelease(event: FormEvent) {
@@ -316,8 +359,9 @@ export default function Home() {
         {canRequestRelease(sessionUser?.roles ?? []) && <details className={sessionStyles.releaseRequest}>
           <summary>NEW RELEASE REQUEST <span>Developer workflow</span></summary>
           <form onSubmit={(event) => void requestRelease(event)}>
-            <label>Service ID<input required value={releaseDraft.serviceId} onChange={(event) => updateDraft("serviceId", event.target.value)} placeholder="UUID" /></label>
-            <label>Environment ID<input required value={releaseDraft.environmentId} onChange={(event) => updateDraft("environmentId", event.target.value)} placeholder="UUID" /></label>
+            <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
+            <label>Service<select required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
+            <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => updateDraft("environmentId", event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
             <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>
@@ -327,6 +371,7 @@ export default function Home() {
             <label className={sessionStyles.wide}>Policy Version ID <small>선택 사항 · 비우면 Environment 기본 정책</small><input value={releaseDraft.requestedPolicyVersionId} onChange={(event) => updateDraft("requestedPolicyVersionId", event.target.value)} placeholder="UUID" /></label>
             <button disabled={requestBusy}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
           </form>
+          {catalogNotice && <p role="alert">{catalogNotice}</p>}
           {requestNotice && <p role="status">{requestNotice}</p>}
         </details>}
         <section className={styles.grid}>

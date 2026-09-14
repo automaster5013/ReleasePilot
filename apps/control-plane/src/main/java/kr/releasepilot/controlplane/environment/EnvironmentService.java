@@ -15,6 +15,9 @@ public class EnvironmentService {
   if(!prometheus.existsById(prometheusId))throw new NotFoundException("PROMETHEUS_CONNECTION_NOT_FOUND","Prometheus connection not found");
   if(environments.existsByServiceIdAndName(serviceId,name))throw new ConflictException("ENVIRONMENT_NAME_ALREADY_EXISTS","Environment name already exists in service");
   return environments.save(Environment.create(serviceId,name,clusterId,namespace,rollout,containerName,strategy,stable,canary,prometheusId,selector,policyId,clock.instant()));}
+ @Transactional(readOnly=true) public List<Environment> list(UUID serviceId,int limit){
+  if(!services.existsById(serviceId))throw new NotFoundException("SERVICE_NOT_FOUND","Service not found");
+  return environments.findAllByServiceIdOrderByCreatedAtDesc(serviceId,PageRequest.of(0,Math.clamp(limit,1,100)));}
  @Transactional public ValidationReport validate(UUID id){
   var env=environments.findById(id).orElseThrow(()->new NotFoundException("ENVIRONMENT_NOT_FOUND","Environment not found")); var now=clock.instant(); env.validating(now); return inspect(env,now);}
  @Transactional public boolean claimDue(UUID id,Instant now,Instant activeCutoff,Instant failureCutoff,Instant staleBefore){return environments.claimDue(id,now,activeCutoff,failureCutoff,staleBefore,EnvironmentStatus.VALIDATING,EnvironmentStatus.INVALID,EnvironmentStatus.DISABLED)==1;}

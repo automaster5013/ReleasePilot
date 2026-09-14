@@ -1,15 +1,21 @@
 package kr.releasepilot.controlplane.environment;
-import jakarta.validation.Valid; import jakarta.validation.constraints.*;
+import jakarta.validation.Valid; import jakarta.validation.constraints.*; import kr.releasepilot.controlplane.catalog.CatalogServiceRepository; import kr.releasepilot.controlplane.identity.ProjectAccess; import kr.releasepilot.controlplane.shared.error.NotFoundException;
 import org.springframework.http.*; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 import java.time.Instant; import java.util.*;
 @RestController
 public class EnvironmentController {
- private final EnvironmentService service;
- public EnvironmentController(EnvironmentService service){this.service=service;}
+ private final EnvironmentService service; private final CatalogServiceRepository services; private final ProjectAccess projectAccess;
+ public EnvironmentController(EnvironmentService service,CatalogServiceRepository services,ProjectAccess projectAccess){this.service=service;this.services=services;this.projectAccess=projectAccess;}
  @PostMapping("/api/v1/services/{serviceId}/environments") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasRole('OPERATOR')")
  EnvironmentResponse create(@PathVariable UUID serviceId,@Valid @RequestBody CreateEnvironmentRequest r) {
   String selector=r.workloadLabelSelector().entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e->e.getKey()+"="+e.getValue()).reduce((a,b)->a+","+b).orElseThrow();
   return EnvironmentResponse.from(service.create(serviceId,r.name(),r.clusterId(),r.namespace(),r.rolloutName(),r.containerName(),r.strategy()==null?RolloutStrategy.CANARY:r.strategy(),r.stableServiceName(),r.canaryServiceName(),r.prometheusConnectionId(),selector,r.defaultPolicyVersionId()));}
+ @GetMapping("/api/v1/services/{serviceId}/environments")
+ EnvironmentPage list(@PathVariable UUID serviceId,@RequestParam(defaultValue="20") int limit,Authentication authentication){
+  var catalogService=services.findById(serviceId).orElseThrow(()->new NotFoundException("SERVICE_NOT_FOUND","Service not found"));
+  if(!projectAccess.canView(catalogService.getProjectId(),authentication))throw new NotFoundException("SERVICE_NOT_FOUND","Service not found");
+  return new EnvironmentPage(service.list(serviceId,limit).stream().map(EnvironmentResponse::from).toList(),null);}
  @PostMapping("/api/v1/environments/{id}/validate") @ResponseStatus(HttpStatus.ACCEPTED) @PreAuthorize("hasRole('OPERATOR')")
  ValidationResponse validate(@PathVariable UUID id){var report=service.validate(id);return new ValidationResponse(report.environment().getId(),report.environment().getStatus().name(),report.checkedAt(),report.checks());}
  @GetMapping("/api/v1/environments/{id}/validation-results/latest")
@@ -21,5 +27,6 @@ public class EnvironmentController {
   @NotEmpty Map<@Pattern(regexp="^(service_namespace|service_name)$") String,@NotBlank @Size(max=100) String> workloadLabelSelector,
   @NotNull UUID defaultPolicyVersionId){}
  public record EnvironmentResponse(UUID id,UUID serviceId,String name,UUID clusterId,String namespace,String rolloutName,String containerName,String strategy,String status,Instant createdAt){static EnvironmentResponse from(Environment e){return new EnvironmentResponse(e.getId(),e.getServiceId(),e.getName(),e.getClusterId(),e.getNamespace(),e.getRolloutName(),e.getContainerName(),e.getRolloutStrategy().name(),e.getStatus().name(),e.getCreatedAt());}}
+ public record EnvironmentPage(List<EnvironmentResponse> items,String nextCursor){}
  public record ValidationResponse(UUID environmentId,String status,Instant checkedAt,List<EnvironmentInspector.Check> checks){}
 }

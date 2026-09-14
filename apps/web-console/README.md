@@ -2,6 +2,9 @@
 
 Next.js 기반 ReleasePilot 웹 콘솔입니다.
 
+조직 사용자는 권한 범위의 Project → Service → 검증된 Environment를 선택해 릴리스를 요청할 수 있습니다.
+카탈로그 조회 실패나 선택 가능한 환경이 없는 경우에는 요청 전 화면에서 확인할 수 있습니다.
+
 ## 실행
 
 ```powershell

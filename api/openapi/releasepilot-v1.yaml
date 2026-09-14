@@ -330,6 +330,28 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
   /services/{serviceId}/environments:
+    get:
+      tags: [Catalog]
+      summary: 접근 가능한 서비스 환경 목록
+      operationId: listEnvironments
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      responses:
+        '200':
+          description: 환경 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Environment'}
+                  nextCursor:
+                    type: [string, 'null']
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
       tags: [Catalog]
       summary: 서비스 환경 등록

@@ -23,7 +23,8 @@
 .releaseRequest form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 4px 24px 24px; }
 .releaseRequest label { display: grid; gap: 7px; color: #9eb0a9; font-size: 12px; }
 .releaseRequest label small { color: #71847c; }
-.releaseRequest input, .releaseRequest textarea { min-width: 0; border: 1px solid #344740; background: #0b1210; color: #e2eee9; padding: 11px 12px; font: inherit; }
+.releaseRequest input, .releaseRequest textarea, .releaseRequest select { min-width: 0; border: 1px solid #344740; background: #0b1210; color: #e2eee9; padding: 11px 12px; font: inherit; }
+.releaseRequest select:disabled { opacity: .45; }
 .releaseRequest textarea { min-height: 88px; resize: vertical; }
 .releaseRequest .wide { grid-column: 1 / -1; }
 .releaseRequest form > button { justify-self: start; border: 0; background: #3adea3; color: #07100d; padding: 11px 18px; font-weight: 800; cursor: pointer; }
