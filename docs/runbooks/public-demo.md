@@ -51,8 +51,8 @@ GitOps 동기화를 중지하고 `infra/aws/terraform`에서 destroy 계획의 �
 ## 알려진 제한
 
 - 데모 MySQL은 단일 StatefulSet/PVC이므로 다중 AZ 복구와 관리형 백업을 보장하지 않는다.
-- Grafana, Prometheus 서버와 Kubernetes API는 공개하지 않는다. 다만 Control Plane의
-  Control Plane의 `/actuator/prometheus`는 내부 서비스에서 인증 없이 접근 가능하지만 AWS Ingress는
+- Grafana, Prometheus 서버와 Kubernetes API는 공개하지 않는다. Control Plane의
+  `/actuator/prometheus`는 내부 서비스에서 인증 없이 접근 가능하지만 AWS Ingress는
   `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`만 Exact 경로로 전달한다.
   공개 `/actuator/prometheus`와 `/actuator/info`는 Web Console의 404로 차단된다. 운영 전환 시에는
   내부 모니터링의 네트워크 범위와 인증도 별도로 검토한다.

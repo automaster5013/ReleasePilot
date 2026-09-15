@@ -5,7 +5,6 @@ import static org.mockito.Mockito.*;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import kr.releasepilot.controlplane.catalog.*;
@@ -14,6 +13,9 @@ import kr.releasepilot.controlplane.environment.*;
 import kr.releasepilot.controlplane.release.*;
 import kr.releasepilot.controlplane.rollout.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,11 +38,13 @@ class AnalysisJobProcessorTests {
         verifyNoInteractions(fixture.worker, fixture.commands);
     }
 
-    @Test
-    void blankConfiguredSecretDoesNotCallWorker() {
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"  ", "\t\n"})
+    void blankConfiguredSecretDoesNotCallWorker(String token) {
         var fixture = new Fixture(3);
         when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
-        when(fixture.secrets.resolve(anyString())).thenReturn(Optional.of(new SecretResolver.SecretMaterial("  ")));
+        when(fixture.secrets.resolve(anyString())).thenReturn(Optional.of(new SecretResolver.SecretMaterial(token)));
         fixture.processor.processOne();
         assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
         assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("SECRET_UNAVAILABLE");
@@ -97,6 +101,34 @@ class AnalysisJobProcessorTests {
     }
 
     @Test
+    void restoredCredentialIsResolvedAgainOnNextScheduledAttempt() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        when(fixture.secrets.resolve(anyString())).thenReturn(Optional.empty(),
+                Optional.of(new SecretResolver.SecretMaterial("test-only-restored-token")));
+        when(fixture.worker.evaluate(any())).thenReturn(
+                new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS, "ALL_RULES_PASSED", "[]"));
+
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        verifyNoInteractions(fixture.worker, fixture.commands);
+        when(fixture.clock.instant()).thenReturn(NOW.plusSeconds(120));
+        fixture.processor.processOne();
+
+        assertThat(fixture.job.getAttempts()).isEqualTo(2);
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.PASS);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isNull();
+        verify(fixture.secrets, times(2)).resolve("env:TEST_ONLY_TOKEN");
+        var request = ArgumentCaptor.forClass(AnalysisWorkerGateway.Request.class);
+        verify(fixture.worker).evaluate(request.capture());
+        assertThat(request.getValue().bearerToken()).isEqualTo("test-only-restored-token");
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PROMOTE_ROLLOUT");
+    }
+
+    @Test
     void retryStoresStableCodeInsteadOfSensitiveExceptionMessage() {
         var fixture = new Fixture(3);
         when(fixture.worker.evaluate(any())).thenThrow(new IllegalStateException(
@@ -149,6 +181,7 @@ class AnalysisJobProcessorTests {
         final AnalysisJobProcessor processor;
         final SecretResolver secrets = mock(SecretResolver.class);
         final PrometheusConnection connection = mock(PrometheusConnection.class);
+        final Clock clock = mock(Clock.class);
 
         Fixture(int maxAttempts) {
             var jobs = mock(AnalysisJobRepository.class);
@@ -172,7 +205,7 @@ class AnalysisJobProcessorTests {
             var serviceId = UUID.randomUUID();
             var connectionId = UUID.randomUUID();
             job = AnalysisJob.pending(stepId, UUID.randomUUID(), maxAttempts, NOW.minusSeconds(60), NOW);
-            when(jobs.findFirstByStatusInAndAvailableAtLessThanEqualOrderByCreatedAtAsc(anyList(), eq(NOW)))
+            when(jobs.findFirstByStatusInAndAvailableAtLessThanEqualOrderByCreatedAtAsc(anyList(), any(Instant.class)))
                     .thenReturn(Optional.of(job));
             when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
             when(steps.findById(stepId)).thenReturn(Optional.of(step));
@@ -195,9 +228,10 @@ class AnalysisJobProcessorTests {
                     "{\"metrics\":[],\"inconclusivePolicy\":{\"additionalObservationSeconds\":120}}");
             var manager = mock(PlatformTransactionManager.class);
             when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+            when(clock.instant()).thenReturn(NOW);
             processor = new AnalysisJobProcessor(jobs, steps, executions, releases, environments,
                     services, connections, snapshots, secrets, worker, commands, new ObjectMapper(),
-                    new TransactionTemplate(manager), Clock.fixed(NOW, ZoneOffset.UTC));
+                    new TransactionTemplate(manager), clock);
         }
     }
 }
