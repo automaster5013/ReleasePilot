@@ -24,6 +24,67 @@ class AuditStorageIntegrationTests {
     @Autowired AuditEventRepository events;
     @Autowired AuditArchiveDeliveryRepository deliveries;
     @Autowired EntityManager entityManager;
+    @Autowired AuditChainHeadRepository heads;
+
+    @org.junit.jupiter.api.BeforeEach
+    void ensureHead() {
+        if (!heads.existsById(1)) heads.saveAndFlush(AuditChainHead.genesis());
+    }
+
+    @Test
+    void deletedTailDoesNotPassHeadVerification() {
+        var event=record("{}");
+        events.flush();
+        deliveries.deleteAll(deliveries.findAll().stream()
+                .filter(delivery -> delivery.auditEventId().equals(event.getId())).toList());
+        deliveries.flush();
+        events.delete(event);events.flush();entityManager.clear();
+        var result=verifier.verify();
+        assertThat(result.valid()).isFalse();
+        assertThat(result.failedEventId()).isNull();
+    }
+
+    @Test
+    void missingHeadIsNotReportedAsValid() {
+        heads.deleteById(1);heads.flush();entityManager.clear();
+        assertThat(verifier.verify().valid()).isFalse();
+    }
+
+    @Test
+    void changedHeadHashIsDetected() {
+        record("{}");events.flush();
+        ReflectionTestUtils.setField(heads.findById(1).orElseThrow(),"lastHash","f".repeat(64));
+        heads.flush();entityManager.clear();
+        assertThat(verifier.verify().valid()).isFalse();
+    }
+
+    @Test
+    void changedHeadSequenceIsDetected() {
+        record("{}");events.flush();
+        var head=heads.findById(1).orElseThrow();
+        ReflectionTestUtils.setField(head,"lastSequence",head.lastSequence()+1);
+        heads.flush();entityManager.clear();
+        assertThat(verifier.verify().valid()).isFalse();
+    }
+
+    @Test
+    void clearedEventHashIsNotSilentlyExcluded() {
+        var event=record("{}");
+        rewrite(event,"eventHash",null);
+        var result=verifier.verify();
+        assertThat(result.valid()).isFalse();
+        assertThat(result.failedEventId()).isEqualTo(event.getId());
+    }
+
+    @Test
+    void fullyUnsealedLegacyEventRemainsOutsideChain() {
+        var before=verifier.verify();
+        events.saveAndFlush(AuditEvent.projectCreated(UUID.randomUUID(),UUID.randomUUID(),Instant.now()));
+        entityManager.clear();
+        var result=verifier.verify();
+        assertThat(result.valid()).isTrue();
+        assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents());
+    }
 
     @Test
     void unicodeNestedJsonAndMicrosecondTimeSurviveDatabaseRoundTrip() {

@@ -1926,9 +1926,11 @@ components:
         verifiedEvents:
           type: integer
           format: int64
+          description: Number of events successfully verified before the first mismatch.
         failedEventId:
           type: [string, 'null']
           format: uuid
+          description: First mismatching event; null for a missing or inconsistent chain head.
         headHash:
           type: string
           pattern: '^[a-f0-9]{64}$'
