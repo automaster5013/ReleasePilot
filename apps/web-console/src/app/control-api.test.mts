@@ -41,6 +41,20 @@ test("release mutation gate blocks same-tick submissions and recovers after fail
   assert.equal(gate.tryAcquire(), true);
 });
 
+test("revalidation and release requests share one gate and failed validation stays fail-closed", () => {
+  const gate = createMutationGate();
+  const previous = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z", validUntil: "2099-01-01T00:00:00Z", checks: [] };
+  assert.equal(environmentAllowsRelease(previous), true);
+  assert.equal(gate.tryAcquire(), true); // revalidation starts
+  assert.equal(gate.tryAcquire(), false); // release cannot race it
+  assert.equal(environmentAllowsRelease(null), false); // old result cleared
+  gate.release(); // failure releases only the lock, not the old result
+  assert.equal(environmentAllowsRelease(null), false);
+  assert.equal(gate.tryAcquire(), true); // retry remains possible
+  assert.equal(gate.tryAcquire(), false); // release blocks revalidation too
+  gate.release();
+});
+
 test("mutation readiness is checked again after CSRF waits and rejection stays available", async () => {
   const originalNow = Date.now;
   let now = Date.parse("2026-09-15T05:59:59Z");
