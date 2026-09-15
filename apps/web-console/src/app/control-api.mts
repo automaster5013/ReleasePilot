@@ -115,14 +115,15 @@ export function validatePrometheusConnectionDraft(draft: PrometheusConnectionDra
   return null;
 }
 
-export function environmentAllowsRelease(result: EnvironmentValidation | null, now = Date.now()) {
+export function environmentAllowsRelease(result: EnvironmentValidation | null, now = Date.now(), environmentId?: string) {
+  if (environmentId !== undefined && result?.environmentId !== environmentId) return false;
   if (result === null || !["ACTIVE", "ACTIVE_WITH_WARNINGS"].includes(result.status)) return false;
   const validUntil = Date.parse(result.validUntil);
   return Number.isFinite(validUntil) && validUntil > now;
 }
 
-export async function readinessMutationHeaders(result: EnvironmentValidation | null, csrfProvider: () => Promise<CsrfToken>, options: { idempotencyKey?: string; json?: boolean }, requireReady = true) {
-  const check = () => { if (requireReady && !environmentAllowsRelease(result)) throw new Error("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 다시 시도하세요."); };
+export async function readinessMutationHeaders(result: EnvironmentValidation | null, csrfProvider: () => Promise<CsrfToken>, options: { idempotencyKey?: string; json?: boolean }, requireReady = true, environmentId?: string) {
+  const check = () => { if (requireReady && !environmentAllowsRelease(result, Date.now(), environmentId)) throw new Error("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 다시 시도하세요."); };
   check();
   const csrf = await csrfProvider();
   check();

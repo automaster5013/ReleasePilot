@@ -53,6 +53,17 @@ test("request and approval readiness expire together on the display clock", () =
   assert.equal(environmentAllowsRelease({ ...result, validUntil: "invalid" }, expiry), false);
 });
 
+test("fresh validation from a different environment cannot authorize a release", async () => {
+  const result = { environmentId: "old-environment", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z", validUntil: "2099-01-01T00:00:00Z", checks: [] };
+  assert.equal(environmentAllowsRelease(result, Date.now(), "old-environment"), true);
+  assert.equal(environmentAllowsRelease(result, Date.now(), "new-environment"), false);
+  assert.equal(environmentAllowsRelease(null, Date.now(), "new-environment"), false);
+  let csrfCalls = 0;
+  const csrf = async () => { csrfCalls++; return { headerName: "X-CSRF-TOKEN", token: "test" }; };
+  await assert.rejects(readinessMutationHeaders(result, csrf, {}, true, "new-environment"), /환경 검증/);
+  assert.equal(csrfCalls, 0);
+});
+
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
     "X-CSRF-TOKEN": "token",
