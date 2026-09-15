@@ -3,6 +3,36 @@ import { expect, Page, test } from "@playwright/test";
 const origin = "http://127.0.0.1:3100";
 const createdAt = "2026-09-15T00:00:00Z";
 
+for (const failure of ["connection", "invalid-json"]) {
+  test(`demo login recovers after POST ${failure}`, async ({ page }) => {
+    const unexpected = await isolateApi(page);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let requests = 0;
+    await page.route("**/control-api/session/demo", async (route) => {
+      requests++;
+      if (requests > 1) return route.fallback();
+      if (failure === "connection") return route.abort("connectionfailed");
+      return route.fulfill({ status: 200, contentType: "application/json", body: "{broken" });
+    });
+    await page.goto("/");
+    const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+    await button.click();
+    const error = page.getByRole("alert").filter({ hasText: failure === "connection" ? "Failed to fetch" : /JSON/ });
+    await expect(error).toBeVisible();
+    await expect(button).toBeEnabled();
+    await expect(page.getByRole("navigation")).not.toContainText("DEMO · VIEW ONLY");
+    expect(requests).toBe(1);
+    await button.click();
+    await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    await expect(button).toBeEnabled();
+    await expect(error).toHaveCount(0);
+    expect(requests).toBe(2);
+    expect(errors).toEqual([]);
+    expect(unexpected).toEqual([]);
+  });
+}
+
 for (const rejected of [false, true]) {
   for (const stage of ["demo", "csrf"]) {
   test(`demo login locks controls while awaiting ${stage} ${rejected ? "rejection" : "success"}`, async ({ page }) => {
