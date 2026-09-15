@@ -232,3 +232,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 27. Rollout 시작 직전 readiness preflight — 완료 (2026-09-15, Environment·검증 기한·Cluster 재확인·외부 mutation 차단)
 28. ClusterConnection 검증 만료 차단 — 완료 (2026-09-15, 요청·승인·Rollout 시작에서 6시간 유효 기한 강제·외부 mutation 차단)
 29. ClusterConnection readiness 복구 안내 — 완료 (2026-09-15, 요청·승인 실패 원인별 Web Console 안내·운영자 재검증 경로)
+30. PrometheusConnection 검증 lifecycle — 완료 (2026-09-15, ready·query 검사·상태/시각 전이·안정 failure code·감사 기록)

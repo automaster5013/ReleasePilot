@@ -58,6 +58,12 @@ public class AuditEvent {
         return event;
     }
 
+    public static AuditEvent prometheusConnectionValidated(UUID connectionId,UUID actorId,String status,String failureCode,Instant occurredAt){
+        var event=created("PROMETHEUS_CONNECTION",connectionId,"PROMETHEUS_CONNECTION_VALIDATED",actorId,occurredAt);
+        event.payloadJson="{\"status\":\""+status+"\",\"failureCode\":\""+failureCode+"\"}";
+        return event;
+    }
+
     public static AuditEvent releaseRequested(UUID releaseId, UUID actorId, Instant occurredAt) {
         return created("RELEASE", releaseId, "RELEASE_REQUESTED", actorId, occurredAt);
     }

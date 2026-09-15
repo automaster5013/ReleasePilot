@@ -476,6 +476,24 @@ paths:
               schema:
                 type: array
                 items: {$ref: '#/components/schemas/PrometheusConnection'}
+  /connections/prometheus/{connectionId}/validate:
+    post:
+      tags: [Catalog]
+      summary: Prometheus ready·query 연결 검증
+      operationId: validatePrometheusConnection
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Prometheus 연결 검증 결과
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrometheusConnectionValidation'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /environments/{environmentId}/validate:
     post:
       tags: [Catalog]
@@ -1259,6 +1277,16 @@ components:
             status: {type: string, enum: [UNVERIFIED, ACTIVE, INVALID, DISABLED]}
             lastValidatedAt: {type: [string, 'null'], format: date-time}
             createdAt: {type: string, format: date-time}
+    PrometheusConnectionValidation:
+      type: object
+      additionalProperties: false
+      required: [connectionId, status, failureCode]
+      properties:
+        connectionId: {type: string, format: uuid}
+        status: {type: string, enum: [ACTIVE, INVALID]}
+        failureCode:
+          type: string
+          enum: ['', SECRET_UNAVAILABLE, PROMETHEUS_NOT_READY, PROMETHEUS_QUERY_FAILED, PROMETHEUS_UNREACHABLE]
     CreateEnvironmentRequest:
       type: object
       additionalProperties: false

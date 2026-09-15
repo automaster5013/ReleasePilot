@@ -18,10 +18,11 @@ public class ConnectionService {
     private final PrometheusConnectionRepository prometheus;
     private final AuditTrail auditEvents;
     private final ClusterValidationGateway clusterValidation;
+    private final PrometheusConnectionValidationGateway prometheusValidation;
     private final Clock clock;
     public ConnectionService(ClusterConnectionRepository clusters, PrometheusConnectionRepository prometheus,
-                             AuditTrail auditEvents,ClusterValidationGateway clusterValidation,Clock clock) {
-        this.clusters=clusters; this.prometheus=prometheus; this.auditEvents=auditEvents; this.clusterValidation=clusterValidation;this.clock=clock;
+                             AuditTrail auditEvents,ClusterValidationGateway clusterValidation,PrometheusConnectionValidationGateway prometheusValidation,Clock clock) {
+        this.clusters=clusters; this.prometheus=prometheus; this.auditEvents=auditEvents; this.clusterValidation=clusterValidation;this.prometheusValidation=prometheusValidation;this.clock=clock;
     }
     @Transactional
     public ClusterConnection createCluster(String name,String apiServer,List<String> namespaces,String secretRef,UUID actorId){
@@ -47,6 +48,11 @@ public class ConnectionService {
     private ClusterValidationGateway.Result validate(ClusterConnection cluster,UUID actorId){
         var result=clusterValidation.validate(cluster);var now=clock.instant();cluster.validated(result.status(),now);
         auditEvents.record(AuditEvent.clusterConnectionValidated(cluster.getId(),actorId,result.status().name(),result.failureCode(),now));return result;
+    }
+    @Transactional public PrometheusConnectionValidationGateway.Result validatePrometheus(UUID connectionId,UUID actorId){
+        var connection=prometheus.findById(connectionId).orElseThrow(()->new NotFoundException("PROMETHEUS_CONNECTION_NOT_FOUND","Prometheus connection not found"));
+        var result=prometheusValidation.validate(connection);var now=clock.instant();connection.validated(result.status(),now);
+        auditEvents.record(AuditEvent.prometheusConnectionValidated(connection.getId(),actorId,result.status().name(),result.failureCode(),now));return result;
     }
     public record ClusterValidation(ClusterConnection cluster,ClusterValidationGateway.Result result) {}
 }

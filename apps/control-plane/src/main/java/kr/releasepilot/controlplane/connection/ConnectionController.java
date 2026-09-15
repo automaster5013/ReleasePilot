@@ -36,6 +36,8 @@ public class ConnectionController {
         return PrometheusResponse.from(service.createPrometheus(request.name(),request.baseUrl(),request.secretRef(),request.queryTimeoutSeconds(),principal.id()));
     }
     @GetMapping("/prometheus") List<PrometheusResponse> prometheus(){return service.listPrometheus().stream().map(PrometheusResponse::from).toList();}
+    @PostMapping("/prometheus/{connectionId}/validate") @PreAuthorize("hasRole('OPERATOR')")
+    PrometheusValidationResponse validatePrometheus(@PathVariable UUID connectionId,@AuthenticationPrincipal UserAccountPrincipal principal){return PrometheusValidationResponse.from(connectionId,service.validatePrometheus(connectionId,principal.id()));}
 
     public record CreateClusterRequest(@NotBlank @Size(max=100) String name,
         @NotBlank @URL(protocol="https") @Size(max=500) String apiServer,
@@ -56,4 +58,5 @@ public class ConnectionController {
     public record PrometheusResponse(UUID id,String name,String baseUrl,String secretRef,int queryTimeoutSeconds,
         String status,Instant lastValidatedAt,Instant createdAt){
         static PrometheusResponse from(PrometheusConnection v){return new PrometheusResponse(v.getId(),v.getName(),v.getBaseUrl(),v.getSecretRef(),v.getQueryTimeoutSeconds(),v.getStatus().name(),v.getLastValidatedAt(),v.getCreatedAt());}}
+    public record PrometheusValidationResponse(UUID connectionId,String status,String failureCode){static PrometheusValidationResponse from(UUID id,PrometheusConnectionValidationGateway.Result result){return new PrometheusValidationResponse(id,result.status().name(),result.failureCode());}}
 }

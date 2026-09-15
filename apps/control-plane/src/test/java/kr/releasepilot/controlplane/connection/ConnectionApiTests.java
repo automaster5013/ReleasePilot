@@ -26,6 +26,7 @@ import tools.jackson.databind.ObjectMapper;
 class ConnectionApiTests {
     @Autowired WebApplicationContext context; private MockMvc mvc;
     @Autowired ObjectMapper json;
+    @Autowired PrometheusConnectionRepository prometheus;
     @BeforeEach void setUp(){mvc=MockMvcBuilders.webAppContextSetup(context).apply(SecurityMockMvcConfigurers.springSecurity()).build();}
     @Test void operatorRegistersSecretReferencesWithoutCredentials() throws Exception {
         mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())
@@ -34,11 +35,16 @@ class ConnectionApiTests {
                 """))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("UNVERIFIED"))
             .andExpect(jsonPath("$.allowedNamespaces[0]").value("releasepilot-demo"));
-        mvc.perform(post("/api/v1/connections/prometheus").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())
+        var createdPrometheus=mvc.perform(post("/api/v1/connections/prometheus").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                {"name":"demo-prometheus","baseUrl":"http://prometheus:9090","secretRef":"vault:prometheus/demo","queryTimeoutSeconds":15}
+                {"name":"demo-prometheus","baseUrl":"http://prometheus:9090","secretRef":"env:DEFINITELY_MISSING_PROMETHEUS_TOKEN","queryTimeoutSeconds":15}
                 """))
-            .andExpect(status().isCreated()).andExpect(jsonPath("$.queryTimeoutSeconds").value(15));
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.queryTimeoutSeconds").value(15)).andReturn();
+        String prometheusId=json.readTree(createdPrometheus.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(post("/api/v1/connections/prometheus/"+prometheusId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INVALID")).andExpect(jsonPath("$.failureCode").value("SECRET_UNAVAILABLE"));
+        org.assertj.core.api.Assertions.assertThat(prometheus.findById(UUID.fromString(prometheusId)).orElseThrow().getLastValidatedAt()).isNotNull();
+        mvc.perform(post("/api/v1/connections/prometheus/"+prometheusId+"/validate").with(authentication(auth("ROLE_VIEWER"))).with(csrf())).andExpect(status().isForbidden());
     }
     @Test void viewerCannotRegisterConnection() throws Exception {
         mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_VIEWER"))).with(csrf())
