@@ -20,6 +20,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DemoSessionApiTests {
     @Autowired WebApplicationContext context; MockMvc mvc;
     @BeforeEach void setUp(){mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
+    @Test void missingCsrfCannotCreateDemoSession() throws Exception {
+        var result = mvc.perform(post("/api/v1/session/demo"))
+                .andExpect(status().isForbidden()).andReturn();
+        var session = (MockHttpSession) result.getRequest().getSession(false);
+        mvc.perform(session == null ? get("/api/v1/session") : get("/api/v1/session").session(session))
+                .andExpect(status().isForbidden());
+    }
+    @Test void realCsrfTokenIsBoundToItsSessionAndAcceptsOnlyMatchingHeader() throws Exception {
+        var issued = mvc.perform(get("/api/v1/session/csrf"))
+                .andExpect(status().isOk()).andReturn();
+        var body = new tools.jackson.databind.ObjectMapper().readTree(issued.getResponse().getContentAsString());
+        String header = body.get("headerName").asText();
+        String token = body.get("token").asText();
+        var session = (MockHttpSession) issued.getRequest().getSession(false);
+        org.junit.jupiter.api.Assertions.assertNotNull(session);
+        mvc.perform(post("/api/v1/session/demo").session(session).header(header, "invalid-csrf-token"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/session/demo").session(new MockHttpSession()).header(header, token))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/session").session(session)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/session/demo").session(session).header(header, token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.demo").value(true));
+        mvc.perform(get("/api/v1/session").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.roles[0]").value("VIEWER"));
+    }
     @Test void createsViewerSessionAndRejectsMutation() throws Exception {
         var result=mvc.perform(post("/api/v1/session/demo").with(csrf()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.demo").value(true))
