@@ -92,6 +92,38 @@ class AuditArchiveWorkerTests {
     }
 
     @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void failedFirstItemDoesNotPreventFollowingDelivery(boolean missingEvent) {
+        var second=AuditEvent.serviceCreated(UUID.randomUUID(),UUID.randomUUID(),NOW);
+        var next=AuditArchiveDelivery.pending(second.getId(),NOW);
+        when(deliveries.findByStatusAndAvailableAtLessThanEqualOrderByAvailableAtAsc(
+                eq(AuditArchiveDelivery.Status.PENDING),eq(NOW),any())).thenReturn(List.of(delivery,next));
+        when(events.findById(second.getId())).thenReturn(Optional.of(second));
+        if(missingEvent) when(events.findById(event.getId())).thenReturn(Optional.empty());
+        else doThrow(new IllegalStateException("synthetic-secret")).when(sink).archive(event);
+        worker.tick();
+        assertThat(field("status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+        assertThat(field("lastError")).isEqualTo("AUDIT_ARCHIVE_UNAVAILABLE");
+        assertThat(field("attempts")).isEqualTo(1);
+        assertThat(ReflectionTestUtils.getField(next,"status")).isEqualTo(AuditArchiveDelivery.Status.DELIVERED);
+        assertThat(ReflectionTestUtils.getField(next,"lastError")).isNull();
+        assertThat(ReflectionTestUtils.getField(next,"attempts")).isEqualTo(0);
+        assertThat(ReflectionTestUtils.getField(next,"deliveredAt")).isEqualTo(NOW);
+        verify(sink).archive(second);
+        if(missingEvent) verify(sink,never()).archive(event);
+    }
+
+    @Test
+    void emptyDueBatchDoesNotLookupEventsOrTransmit() {
+        when(deliveries.findByStatusAndAvailableAtLessThanEqualOrderByAvailableAtAsc(
+                eq(AuditArchiveDelivery.Status.PENDING),eq(NOW),any())).thenReturn(List.of());
+        worker.tick();
+        verifyNoInteractions(events,sink);
+        assertThat(field("attempts")).isEqualTo(0);
+        assertThat(field("status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+    }
+
+    @ParameterizedTest
     @CsvSource({"1,2","2,4","7,128","8,256","9,300","10,300","30,300"})
     void exponentialDelayStopsAtFiveMinutes(int attempt,long seconds) {
         ReflectionTestUtils.setField(delivery,"attempts",attempt-1);

@@ -29,3 +29,11 @@ cd apps/control-plane
 이후 [실제 loopback HTTP 장애·복구](audit-http-recovery.md) 검증을 추가했다. 운영 외부 저장소 검증과 구분한다.
 
 후속 [S3 SDK 경계 실패·복구](audit-s3-recovery.md)는 실제 AWS 호출 없이 조건부 쓰기와 충돌 시 미완료 상태 유지를 검사한다.
+
+## 배치 실패 격리 후속 검증
+
+Worker의 배치 첫 항목에서 sink 예외 또는 이벤트 누락이 발생해도 다음 정상 항목을 DELIVERED로 처리하는지 검사한다. 실패 항목은 고정 오류/PENDING/1회 재시도를 유지하고 정상 항목은 오류 없이 완료 시각을 기록한다. 빈 due batch에서는 이벤트 조회나 sink 호출을 하지 않는지도 확인한다.
+
+추가 3개는 repository/sink mock을 쓰는 제어 흐름 검증이다. DB 예외에 따른 transaction rollback-only, 프로세스 중단, 복수 Worker의 중복 전송을 격리·복구하는 검증은 아니다. 운영 코드는 변경하지 않는다.
+
+로컬 결과: Worker 테스트 15개 및 서버 전체 verify 183개가 실패·오류·건너뜀 없이 통과했다.
