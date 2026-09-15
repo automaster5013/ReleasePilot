@@ -5,7 +5,7 @@ import styles from "./page.module.css";
 import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
-import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
+import { ActiveSession, canManageSessions, formatSessionTime, sessionConnectionLabel, SessionUser } from "./session-management.mts";
 import { createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
@@ -289,7 +289,6 @@ export default function Home() {
     setActiveSessions([]);
     setAuditIntegrity(null);
     setCanOperate(session.user.roles.includes("OPERATOR"));
-    setConnection("DEMO · VIEW ONLY");
     await refreshReleases();
   }
 
@@ -776,7 +775,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <span className={styles.live}><i />{connection}{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></span>
+        <span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></span>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>
