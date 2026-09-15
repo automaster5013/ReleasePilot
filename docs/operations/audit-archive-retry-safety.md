@@ -14,7 +14,7 @@ cd apps/control-plane
 ./mvnw.cmd --batch-mode verify
 ```
 
-운영 전달 상태나 기존 last_error를 변경·정리하지 않았다. 공개 이미지 v0.54.0에는 이 후속 변경을 아직 배포하지 않았다.
+운영 전달 상태나 기존 last_error를 변경·정리하지 않았다. 이후 [v0.55.0 배포 검증](audit-archive-v0.55.0.md)을 완료했다.
 
 로컬 검증 결과: 추가한 12개 및 서버 전체 verify 169개가 실패·오류·건너뜀 없이 통과했다.
 

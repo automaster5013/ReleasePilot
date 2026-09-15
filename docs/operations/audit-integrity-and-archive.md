@@ -4,7 +4,7 @@ ReleasePilot은 새 감사 이벤트마다 단조 증가하는 `chainSequence`, 
 
 `audit_chain_head` 행을 비관적 잠금으로 획득하므로 동시에 생성되는 이벤트도 하나의 전역 체인에 정확히 한 번 연결된다. 감사 이벤트와 `audit_archive_deliveries` 레코드는 업무 변경과 동일한 DB 트랜잭션에 기록된다. 외부 저장소 장애는 업무 트랜잭션을 되돌리지 않고 전달 상태를 `PENDING`으로 유지하며 최대 5분까지 지수 백오프로 재시도한다.
 
-후속 [아카이브 실패 안전성 보강](audit-archive-retry-safety.md)은 예외 메시지 대신 `AUDIT_ARCHIVE_UNAVAILABLE` 코드를 저장하고 9번째 실패부터 300초 지연을 적용한다. 이 변경은 v0.54.0 이후 소스 변경이며 공개 배포는 별도다.
+후속 [아카이브 실패 안전성 보강](audit-archive-retry-safety.md)은 예외 메시지 대신 `AUDIT_ARCHIVE_UNAVAILABLE` 코드를 저장하고 9번째 실패부터 300초 지연을 적용한다. 이 변경은 [v0.55.0 공개 배포](audit-archive-v0.55.0.md)에 반영했다.
 
 ## 검증
 

@@ -276,3 +276,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 71. 감사 verifier v0.54.0 공개 배포 — 완료 (2026-09-15, 소스 CI 6job/이미지 workflow 성공·임시 Karpenter taint 해제 후 배치·Canary 검증/수동 승격·세 Rollout Healthy 2/2·새 Pod 6개 digest 일치/재시작 0·공개 헬스/보안 헤더/VIEWER 정상; 웹 잘못된 Server Reference 오류 표본 1건 기록, 운영 기존 감사 복구/실제 릴리스 E2E는 별도)
 72. 감사 아카이브 실패·재시도 안전성 — 완료 (2026-09-15, 예외 메시지 저장 제거/고정 코드·PENDING 유지/복구 오류 제거·9번째 실패부터 300초 상한·회귀 12개/서버 전체 169개 통과; 기존 오류 정리/실제 외부 전달/복수 Worker 중복 전송/공개 배포는 별도)
 73. 감사 아카이브 재시도 DB 왕복 검증 — 완료 (2026-09-15, 실제 Worker/repository·외부 sink만 mock·실패 코드/시도/시각/PENDING 재조회·복구 DELIVERED/오류 제거/감사 체인 유지·미래 재시도 제외 2개·H2 전체 171개/MySQL 통합 21개 통과·소유권 cleanup·CI helper 유지; 외부 전달/재시작 내구성/공개 배포는 별도)
+74. 아카이브 안전성 v0.55.0 공개 배포 — 완료 (2026-09-15, 소스 CI/이미지 workflow 성공·자동 taint 해제 후 Canary 검증·수동 승격·세 Rollout Healthy 2/2·새 Pod 6개 digest 일치/재시작 0/오류 표본 0·공개 헬스/보안 헤더/세션/VIEWER 정상; 실제 외부 실패 복구/운영 기존 감사/전체 릴리스 E2E는 별도)
