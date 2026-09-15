@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:e2e": "playwright test",
     "test": "node --test --experimental-strip-types src/app/session-management.test.mts src/app/control-api.test.mts src/security-policy.test.mts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
@@ -16,6 +17,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
