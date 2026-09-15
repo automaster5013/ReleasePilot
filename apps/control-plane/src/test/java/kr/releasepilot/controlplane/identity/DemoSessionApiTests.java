@@ -20,6 +20,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DemoSessionApiTests {
     @Autowired WebApplicationContext context; MockMvc mvc;
     @BeforeEach void setUp(){mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
+    @Test void logoutRequiresCsrfAndInvalidatesAuthenticatedSession() throws Exception {
+        var login = mvc.perform(post("/api/v1/session/demo").with(csrf()))
+                .andExpect(status().isOk()).andReturn();
+        var session = (MockHttpSession) login.getRequest().getSession(false);
+        mvc.perform(post("/api/v1/session/logout").session(session))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/session").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.user.roles[0]").value("VIEWER"));
+        mvc.perform(post("/api/v1/session/logout").session(session).with(csrf().useInvalidToken()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/session").session(session)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/session/logout").session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+        org.junit.jupiter.api.Assertions.assertTrue(session.isInvalid());
+        mvc.perform(get("/api/v1/session")).andExpect(status().isForbidden());
+    }
     @Test void missingCsrfCannotCreateDemoSession() throws Exception {
         var result = mvc.perform(post("/api/v1/session/demo"))
                 .andExpect(status().isForbidden()).andReturn();
