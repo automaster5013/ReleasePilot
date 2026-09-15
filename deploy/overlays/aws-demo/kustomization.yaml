@@ -17,7 +17,7 @@ patches:
     patch: |-
       - op: add
         path: /spec/template/metadata/annotations
-        value: { releasepilot.kr/release: v0.50.0 }
+        value: { releasepilot.kr/release: v0.51.0 }
   - target: { kind: Rollout, name: control-plane }
     patch: |-
       - op: add
