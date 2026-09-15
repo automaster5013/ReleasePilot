@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+CSRF 조회 실패 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort에서 `/session/csrf` GET만 `connectionfailed`로 중단한다. 오류 표시 후 버튼 복구, 변경 요청 0개 및 성공 안내 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 57개와 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 토큰 HTTP 거부·잘못된 응답 형식·실제 backend CSRF enforcement는 별도 검증이다.
+
 연결 실패 후 수동 재시도 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort의 첫 POST만 `connectionfailed`로 중단하고 두 번째 요청은 fixture 성공 응답을 제공한다. 첫 오류와 버튼 복구를 기다린 뒤 사용자 클릭으로 재시도해 성공 안내/생성 상세·이전 오류 제거·동일 endpoint와 본문 2회·성공 감사 `chain #1`·예상하지 않은 요청 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 54개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 첫 요청은 fixture에서 처리되지 않으므로 실제 서버 처리 후 응답 유실의 중복 방지나 멱등 키 재사용을 증명하지 않는다.
 
 네트워크 실패 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort POST를 Playwright `connectionfailed`로 중단한다. Chromium의 `Failed to fetch` 오류 표시·버튼 재활성화·성공 안내 없음·생성 상세 또는 성공 감사 표시 없음·mutation 1개·예상하지 않은 요청 및 pageerror 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 51개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 전송 후 서버 처리 여부가 불명확한 실제 응답 유실, 서버 멱등성 및 재시도 정책은 별도다. 브라우저별 오류 문구는 검증 범위에 포함하지 않는다.

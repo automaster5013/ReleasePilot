@@ -35,6 +35,23 @@ for (const width of [320, 390]) {
 type Mutation = { path: string; body: Record<string, string | null> };
 
 for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
+  test(`${role} does not mutate when CSRF retrieval fails`, async ({ page }) => {
+    const state = await fixture(page, role, { csrfFailure: true });
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const button = page.getByRole("button", { name: role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Abort", exact: true });
+    await expect(button).toBeEnabled();
+    if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("CSRF failure fixture"));
+    await button.click();
+    await expect(page.getByRole("alert").filter({ hasText: "Failed to fetch" })).toBeVisible();
+    await expect(button).toBeEnabled();
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+    await expect(page.getByText(/승인 결정이 기록되었습니다\.|abort 요청이 접수되었습니다\.|요청이 생성되었습니다/)).toHaveCount(0);
+  });
+}
+
+for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
   test(`${role} can retry successfully after the first connection failure`, async ({ page }) => {
     const state = await fixture(page, role, { disconnectOnce: true });
     if (role === "DEVELOPER") await fillRequest(page);
@@ -185,7 +202,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -222,7 +239,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     }
     if (path === "/session/providers") return json({ oidc: false, loginUrl: null });
     if (path === "/session") return json({ user: { id: "role-user", displayName: "Role fixture", roles: [role], demo: false }, csrfToken: "role-fixture-csrf", expiresAt: "2099-01-01T00:00:00Z" });
-    if (path === "/session/csrf") return json({ headerName: "X-CSRF-TOKEN", token: "role-fixture-csrf" });
+    if (path === "/session/csrf") return options.csrfFailure ? route.abort("connectionfailed") : json({ headerName: "X-CSRF-TOKEN", token: "role-fixture-csrf" });
     if (path === "/session/active") return json({ items: [] });
     if (path === "/audit-events/verify") return json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
     if (path === "/audit-events") return json({ items: audit });
