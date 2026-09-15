@@ -30,6 +30,21 @@ test("environment A-B-A navigation and manual validation invalidate older reques
   assert.equal(manual(), false);
 });
 
+test("operation snapshots preserve a load until selection changes, including the same release", () => {
+  const guard = createLatestRequestGuard();
+  const loaded = guard.begin();
+  const approve = guard.snapshot();
+  const audit = guard.snapshot();
+  assert.equal(loaded(), true);
+  assert.equal(approve(), true);
+  assert.equal(audit(), true);
+  const next = guard.begin();
+  assert.equal(approve(), false);
+  assert.equal(audit(), false);
+  assert.equal(next(), true);
+  assert.equal(guard.snapshot()(), true);
+});
+
 test("release mutation gate blocks same-tick submissions and recovers after failure", async () => {
   const gate = createMutationGate();
   assert.equal(gate.tryAcquire(), true);

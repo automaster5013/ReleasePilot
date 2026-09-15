@@ -354,6 +354,7 @@ export default function Home() {
   async function load(id: string) {
     const isCurrent = latestReleaseLoad.current.begin();
     setError("");
+    setOperationNotice("");
     setActiveId("");
     setRelease(null);
     setAnalyses([]);
@@ -689,6 +690,8 @@ export default function Home() {
 
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
+    const targetId = activeId;
+    const isCurrent = latestReleaseLoad.current.snapshot();
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
     if (reason === undefined) return;
     if (reason.length === 0 || reason.length > 1000) {
@@ -701,16 +704,19 @@ export default function Home() {
     setError("");
     try {
       const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
-      const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
+      const headers = mutationHeaders(await csrfToken(), { idempotencyKey, json: true });
+      if (!isCurrent()) return;
+      const response = await fetch(`/control-api/releases/${targetId}/${action}`, {
         method: "POST", credentials: "include",
-        headers: mutationHeaders(await csrfToken(), { idempotencyKey, json: true }),
+        headers,
         body: JSON.stringify({ reason }),
       });
+      if (!isCurrent()) return;
       if (!response.ok) throw new Error(`${action} 요청이 거부되었습니다.`);
       setOperationNotice(`${action} 요청이 접수되었습니다.`);
-      await refreshAudit(activeId);
+      await refreshAudit(targetId, isCurrent);
     } catch (failure) {
-      setError((failure as Error).message);
+      if (isCurrent()) setError((failure as Error).message);
     } finally {
       operationInFlight.current = false;
       setOperationBusy(false);
@@ -723,6 +729,8 @@ export default function Home() {
       setError("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 승인하세요.");
       return;
     }
+    const targetId = activeId;
+    const isCurrent = latestReleaseLoad.current.snapshot();
     const reason = window.prompt(`${action === "approve" ? "승인" : "거부"} 사유를 입력하세요.`)?.trim();
     if (reason === undefined) return;
     if (reason.length === 0 || reason.length > 1000) {
@@ -735,11 +743,14 @@ export default function Home() {
     setError("");
     try {
       const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
-      const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
+      const headers = await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve");
+      if (!isCurrent()) return;
+      const response = await fetch(`/control-api/releases/${targetId}/${action}`, {
         method: "POST", credentials: "include",
-        headers: await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve"),
+        headers,
         body: JSON.stringify({ reason }),
       });
+      if (!isCurrent()) return;
       if (!response.ok) {
         const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
         if (problem?.code === "SELF_APPROVAL_NOT_ALLOWED") throw new Error("요청자는 자신의 릴리스를 승인할 수 없습니다.");
@@ -748,12 +759,13 @@ export default function Home() {
         throw new Error(problem?.detail ?? `${action} 요청이 거부되었습니다.`);
       }
       const decided = await response.json() as { status: string };
-      setRelease((current) => current ? { ...current, status: decided.status } : current);
+      if (!isCurrent()) return;
+      setRelease((current) => current?.id === targetId ? { ...current, status: decided.status } : current);
       setLive((current) => ({ ...current, releaseStatus: decided.status }));
       setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
-      await refreshAudit(activeId);
+      await refreshAudit(targetId, isCurrent);
     } catch (failure) {
-      setError((failure as Error).message);
+      if (isCurrent()) setError((failure as Error).message);
     } finally {
       operationInFlight.current = false;
       setOperationBusy(false);

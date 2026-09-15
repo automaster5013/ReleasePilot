@@ -140,7 +140,8 @@ export function createMutationGate() {
 
 export function createLatestRequestGuard() {
   let generation = 0;
-  return { begin() { const request = ++generation; return () => request === generation; } };
+  const snapshot = () => { const request = generation; return () => request === generation; };
+  return { begin() { generation++; return snapshot(); }, snapshot };
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
