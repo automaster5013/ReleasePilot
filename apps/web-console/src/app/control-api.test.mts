@@ -114,6 +114,13 @@ test("mutation headers include the server-selected CSRF header", () => {
   });
 });
 
+test("malformed CSRF responses are rejected before constructing mutation headers", () => {
+  const invalid = [null, {}, { headerName: "", token: "token" }, { headerName: "bad header", token: "token" },
+    { headerName: "X-CSRF-TOKEN", token: " " }, { headerName: "X-CSRF-TOKEN", token: 42 },
+    { headerName: "X-CSRF-TOKEN", token: "token\r\nInjected: value" }];
+  for (const csrf of invalid) assert.throws(() => mutationHeaders(csrf as Parameters<typeof mutationHeaders>[0]), /보안 토큰 응답/);
+});
+
 test("only approvers can decide a pending release", () => {
   assert.equal(canDecideRelease(["APPROVER"], "PENDING_APPROVAL"), true);
   assert.equal(canDecideRelease(["OPERATOR"], "PENDING_APPROVAL"), false);

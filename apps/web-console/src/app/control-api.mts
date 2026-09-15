@@ -145,6 +145,10 @@ export function createLatestRequestGuard() {
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
+  if (!csrf || typeof csrf.headerName !== "string" || !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(csrf.headerName) ||
+      typeof csrf.token !== "string" || !csrf.token.trim() || /[\r\n]/.test(csrf.token)) {
+    throw new Error("보안 토큰 응답이 올바르지 않습니다.");
+  }
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
   if (options.json) headers["Content-Type"] = "application/json";
