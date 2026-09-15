@@ -11,4 +11,4 @@ docker pull mysql:8.4
 python scripts/analysis_mysql_integration.py
 ```
 
-기존 임시 DB helper와 CI 실행 단계가 분석 6개 및 감사 5개를 함께 실행한다. 로컬 MySQL 8.4.11에서 총 11개 통과, Flyway migration 22개 및 JSON 타입 5개 검사 통과, 소유권 확인 후 임시 컨테이너와 익명 볼륨 정리를 확인했다. 기본 H2 서버 전체 `verify`도 149개 모두 통과했다. 운영 이미지 v0.52.0에는 아직 반영하지 않았다.
+기존 임시 DB helper와 CI 실행 단계가 분석 6개 및 감사 5개를 함께 실행한다. 로컬 MySQL 8.4.11에서 총 11개 통과, Flyway migration 22개 및 JSON 타입 5개 검사 통과, 소유권 확인 후 임시 컨테이너와 익명 볼륨 정리를 확인했다. 기본 H2 서버 전체 `verify`도 149개 모두 통과했다. 이후 [v0.53.0 배포 검증](storage-hardening-v0.53.0.md)을 완료했다.

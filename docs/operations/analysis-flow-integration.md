@@ -31,7 +31,7 @@ cd apps/control-plane
 ./mvnw.cmd --batch-mode verify
 ```
 
-이 검증은 backend 서비스/DB/Outbox 통합 테스트이며 전체 운영 E2E가 아니다. 실제 Prometheus 판정, Kubernetes 네트워크 mutation, 브라우저 전체 흐름은 이 테스트에서 검증하지 않는다. 공개 배포는 기존 v0.52.0이며 이번 매핑 보강은 아직 배포하지 않았다.
+이 검증은 backend 서비스/DB/Outbox 통합 테스트이며 전체 운영 E2E가 아니다. 실제 Prometheus 판정, Kubernetes 네트워크 mutation, 브라우저 전체 흐름은 이 테스트에서 검증하지 않는다. 이후 매핑 보강을 포함한 [v0.53.0 배포 검증](storage-hardening-v0.53.0.md)을 완료했다.
 
 ## 실제 MySQL 후속 검증
 

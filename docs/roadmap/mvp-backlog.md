@@ -270,3 +270,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 65. 분석 DB/Outbox/제어/감사 통합 검증 — 완료 (2026-09-15, 별도 H2 DB·실제 Spring 서비스/JPA·외부 gateway만 mock·판정별 제어/감사·예약 후 비활성화/비밀 누락/예외 검증 6개·JSON JDBC 매핑 누락 수정·서버 전체 144개 테스트 통과; 실제 MySQL/운영 E2E와 공개 이미지 배포는 별도)
 66. 실제 MySQL 분석 통합 검증 자동화 — 완료 (2026-09-15, 임시 MySQL 8.4·loopback 임의 포트·Flyway 22개/Hibernate validate·기존 통합 시나리오 6개·JSON_TYPE 5컬럼·소유권 cleanup·CI 단계 연결·H2 전체 verify 유지; 실제 외부 gateway/운영 E2E와 공개 배포는 별도)
 67. 감사 해시 체인 DB 저장 검증 — 완료 (2026-09-15, 한글/중첩 JSON/시각 왕복·동일 JSON 재정렬·내용/이전 해시/순번 변조 탐지 5개·시각 마이크로초 정규화 수정·MySQL 통합 11개/H2 전체 149개 통과·임시 자원 정리; 기존 기록 복구/내구성/외부 아카이브/공개 배포는 별도)
+68. 저장 매핑·감사 정밀도 v0.53.0 배포 — 완료 (2026-09-15, 소스 CI/이미지 workflow 성공·GitOps Synced/Healthy·Canary 검증과 수동 승격·세 Rollout 2/2 Healthy·새 Pod 6개 digest 일치/재시작 0·공개 헬스/보안 헤더/VIEWER 재검증; 운영 기존 감사 복구와 실제 릴리스 E2E는 별도)
