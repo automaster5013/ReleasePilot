@@ -281,8 +281,9 @@ export default function Home() {
   }, [releaseDraft.environmentId, sessionUser]);
 
   async function startDemo() {
-    const csrf = await fetch("/control-api/session/csrf", { credentials: "include" }).then((response) => response.json());
-    const response = await fetch("/control-api/session/demo", { method: "POST", credentials: "include", headers: { [csrf.headerName]: csrf.token } });
+    setError("");
+    try {
+    const response = await fetch("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
     if (!response.ok) { setError("공개 데모 세션을 시작할 수 없습니다."); return; }
     const session = await response.json() as SessionResponse;
     setSessionUser(session.user);
@@ -290,6 +291,9 @@ export default function Home() {
     setAuditIntegrity(null);
     setCanOperate(session.user.roles.includes("OPERATOR"));
     await refreshReleases();
+    } catch (failure) {
+      setError((failure as Error).message);
+    }
   }
 
   async function csrfToken() {

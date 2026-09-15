@@ -2,6 +2,36 @@ import { expect, Page, test } from "@playwright/test";
 
 const origin = "http://127.0.0.1:3100";
 const createdAt = "2026-09-15T00:00:00Z";
+
+for (const failure of ["null", "empty", "forbidden", "connection"]) {
+  test(`demo login blocks ${failure} CSRF and recovers on retry`, async ({ page }) => {
+    const unexpected = await isolateApi(page);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let csrfRequests = 0;
+    let demoRequests = 0;
+    await page.route("**/control-api/session/demo", async (route) => { demoRequests++; await route.fallback(); });
+    await page.route("**/control-api/session/csrf", async (route) => {
+      csrfRequests++;
+      if (csrfRequests > 1) return route.fallback();
+      if (failure === "connection") return route.abort("connectionfailed");
+      return route.fulfill({ status: failure === "forbidden" ? 403 : 200, contentType: "application/json", body: failure === "null" ? "null" : "{}" });
+    });
+    await page.goto("/");
+    const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+    await button.click();
+    const message = failure === "connection" ? "Failed to fetch" : failure === "forbidden" ? "보안 토큰을 갱신할 수 없습니다." : "보안 토큰 응답이 올바르지 않습니다.";
+    await expect(page.getByRole("alert").filter({ hasText: message })).toBeVisible();
+    expect(demoRequests).toBe(0);
+    await expect(page.getByRole("navigation")).not.toContainText("DEMO · VIEW ONLY");
+    await button.click();
+    await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    await expect(page.getByRole("alert").filter({ hasText: message })).toHaveCount(0);
+    expect(demoRequests).toBe(1);
+    expect(errors).toEqual([]);
+    expect(unexpected).toEqual([]);
+  });
+}
 const fixtures = [
   { id: "release-a", version: "v-e2e-a", serviceName: "checkout-e2e", hash: "aaaaaaaaaaaa1111", eventType: "RELEASE_APPROVED", sequence: 101 },
   { id: "release-b", version: "v-e2e-b", serviceName: "billing-e2e", hash: "bbbbbbbbbbbb2222", eventType: "RELEASE_ABORTED", sequence: 102 },

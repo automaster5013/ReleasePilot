@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+데모 로그인 CSRF 보호 연결: startDemo도 공통 csrfToken()/mutationHeaders()를 사용해 HTTP 성공 여부와 토큰 형식을 검사한다. 시작 시 이전 오류를 제거하고 fetch/토큰 실패를 alert로 처리해 unhandled rejection을 방지한다. null·빈 객체·403·연결 실패의 첫 토큰 응답에서 로그인 POST 0개·미인증 유지, 정상 응답으로 재시도 후 POST 1개·DEMO 상태·오류 제거·pageerror 없음이 검증됐다. 단위 35개·lint/typecheck·새 production build·전체 E2E 82개(신규 4개)가 통과했다. 실제 backend CSRF enforcement·로그인 중복 클릭·세션 성공 응답 형식 검증은 별도다. 운영 배포 없음.
+
 잘못된 CSRF 성공 응답 차단: 기존 mutationHeaders는 응답 값을 그대로 헤더로 만들었다. 이제 null/누락·잘못된 헤더 이름·문자열이 아닌 토큰·공백 토큰·CR/LF 토큰을 `보안 토큰 응답이 올바르지 않습니다.`로 거부한다. 기존 서버 선택 헤더 이름 지원은 유지한다. 세 역할에서 200/null·빈 객체·공백 토큰 응답의 버튼 복구와 mutation 0개를 검증했다. 단위 회귀 1개(여러 잘못된 입력), UI 9개 추가 후 단위 35개·lint/typecheck·새 production build·전체 E2E 78개가 통과했다. 실제 backend CSRF enforcement와 demo 로그인 토큰 처리 경로는 별도다.
 
 CSRF 오류 후 수동 재시도 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort에서 첫 토큰 조회만 403으로 응답한다. 오류 표시와 버튼 복구를 기다린 시점에 mutation은 0개이며, 두 번째 사용자 클릭에서 정상 토큰 응답으로 변경 요청 1개가 전송된다. 성공 상세/안내·이전 오류 제거·성공 감사 `chain #1`·예상하지 않은 요청 없음이 확인됐다. 신규 3개 포함 전체 fixture E2E 69개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없으며 실제 세션 만료 후 재인증·backend 권한 검증은 별도다.
