@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, PrometheusConnection, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -102,6 +102,9 @@ export default function Home() {
   const [requestNotice, setRequestNotice] = useState("");
   const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
+  const [prometheusConnections, setPrometheusConnections] = useState<PrometheusConnection[]>([]);
+  const [connectionBusyId, setConnectionBusyId] = useState("");
+  const [connectionNotice, setConnectionNotice] = useState("");
 
   const refreshAuditIntegrity = useCallback(async () => {
     setAuditIntegrityBusy(true);
@@ -159,6 +162,22 @@ export default function Home() {
       .then((response) => response.ok ? response.json() as Promise<AuditChainVerification> : Promise.reject())
       .then(setAuditIntegrity)
       .catch((failure: Error) => { if (failure.name !== "AbortError") setAuditIntegrity(null); });
+    return () => controller.abort();
+  }, [sessionUser]);
+
+  const refreshPrometheusConnections = useCallback(async () => {
+    const response = await fetch("/control-api/connections/prometheus", { credentials: "include" });
+    if (!response.ok) throw new Error("Prometheus 연결 목록을 불러올 수 없습니다.");
+    setPrometheusConnections(await response.json() as PrometheusConnection[]);
+  }, []);
+
+  useEffect(() => {
+    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    const controller = new AbortController();
+    fetch("/control-api/connections/prometheus", { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<PrometheusConnection[]> : Promise.reject())
+      .then(setPrometheusConnections)
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setConnectionNotice("Prometheus 연결 목록을 불러올 수 없습니다."); });
     return () => controller.abort();
   }, [sessionUser]);
 
@@ -417,6 +436,25 @@ export default function Home() {
     }
   }
 
+  async function validatePrometheusConnection(connectionId: string) {
+    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId) return;
+    setConnectionBusyId(connectionId);
+    setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/connections/prometheus/${connectionId}/validate`, {
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      });
+      const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
+      if (!response.ok) throw new Error("Prometheus 연결 검증 요청이 거부되었습니다.");
+      await refreshPrometheusConnections();
+      setConnectionNotice(result?.status === "ACTIVE" ? "Prometheus 연결 검증을 통과했습니다." : `Prometheus 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
+    } catch (failure) {
+      setConnectionNotice((failure as Error).message);
+    } finally {
+      setConnectionBusyId("");
+    }
+  }
+
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
@@ -517,6 +555,11 @@ export default function Home() {
           {catalogNotice && <p role="alert">{catalogNotice}</p>}
           {requestNotice && <p role="status">{requestNotice}</p>}
         </details>}
+        {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
+          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">Prometheus 연결</h2></div><button type="button" onClick={() => void refreshPrometheusConnections()} disabled={Boolean(connectionBusyId)}>새로고침</button></header>
+          {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
+          {connectionNotice && <p className={sessionStyles.sessionNotice} role="status">{connectionNotice}</p>}
+        </section>}
         <section className={styles.grid}>
           <article className={styles.releaseCard}>
             <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>

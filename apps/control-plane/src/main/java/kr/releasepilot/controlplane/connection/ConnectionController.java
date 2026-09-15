@@ -35,7 +35,7 @@ public class ConnectionController {
     PrometheusResponse createPrometheus(@Valid @RequestBody CreatePrometheusRequest request,@AuthenticationPrincipal UserAccountPrincipal principal){
         return PrometheusResponse.from(service.createPrometheus(request.name(),request.baseUrl(),request.secretRef(),request.queryTimeoutSeconds(),principal.id()));
     }
-    @GetMapping("/prometheus") List<PrometheusResponse> prometheus(){return service.listPrometheus().stream().map(PrometheusResponse::from).toList();}
+    @GetMapping("/prometheus") @PreAuthorize("hasRole('OPERATOR')") List<PrometheusResponse> prometheus(){return service.listPrometheus().stream().map(PrometheusResponse::from).toList();}
     @PostMapping("/prometheus/{connectionId}/validate") @PreAuthorize("hasRole('OPERATOR')")
     PrometheusValidationResponse validatePrometheus(@PathVariable UUID connectionId,@AuthenticationPrincipal UserAccountPrincipal principal){return PrometheusValidationResponse.from(connectionId,service.validatePrometheus(connectionId,principal.id()));}
 

@@ -1,4 +1,16 @@
 .sessions { margin-top: 18px; background: #111a18; border: 1px solid #2b3b36; }
+.connections { margin: 18px 0; background: #111a18; border: 1px solid #2b3b36; }
+.connections > header { display: flex; justify-content: space-between; align-items: end; padding: 20px 26px; border-bottom: 1px solid #293730; }
+.connections header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
+.connections h2 { margin-top: 7px; }
+.connections button { border: 1px solid #496158; background: transparent; color: #d8e8e1; padding: 9px 12px; font-weight: 700; cursor: pointer; }
+.connections button:disabled { opacity: .35; cursor: wait; }
+.connectionList article { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 26px; border-top: 1px solid #293730; }
+.connectionList article:first-child { border-top: 0; }
+.connectionList article div { display: grid; gap: 4px; min-width: 0; }
+.connectionList code { color: #8fa39b; overflow-wrap: anywhere; }
+.connectionList small { color: #67d6a3; }
+.connectionList small[data-status="INVALID"], .connectionList small[data-status="UNVERIFIED"] { color: #ffacb0; }
 .sessions > header { display: flex; justify-content: space-between; align-items: end; padding: 24px 26px; border-bottom: 1px solid #293730; }
 .sessions header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
 .sessions h2 { margin-top: 7px; }
@@ -61,6 +73,8 @@
 .releaseRequest form > button:disabled { opacity: .4; cursor: wait; }
 .releaseRequest > p { margin: 0; padding: 14px 24px; border-top: 1px solid #293730; color: #c9e8dc; }
 @media(max-width: 600px) {
+  .connections > header, .connectionList article { align-items: flex-start; }
+  .connectionList article { flex-direction: column; }
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }
   .sessionList article div { grid-template-columns: 1fr; }

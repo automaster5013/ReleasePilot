@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import tools.jackson.databind.ObjectMapper;
@@ -51,6 +52,8 @@ class ConnectionApiTests {
                 .contentType(MediaType.APPLICATION_JSON).content("""
                 {"name":"blocked","apiServer":"https://kubernetes.example","allowedNamespaces":["default"],"secretRef":"vault:kubernetes/blocked"}
                 """))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/connections/prometheus").with(authentication(auth("ROLE_VIEWER"))))
             .andExpect(status().isForbidden());
     }
     @Test void operatorCanValidateOneOrAllClustersAndMissingSecretFailsClosed()throws Exception{

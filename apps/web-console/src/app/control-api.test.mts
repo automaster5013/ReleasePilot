@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -102,6 +102,15 @@ test("environment revalidation is operator-only and failed readiness blocks rele
   assert.equal(environmentAllowsRelease({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), false);
   assert.equal(environmentAllowsRelease({ ...base, status: "ACTIVE", validUntil: "invalid" }), false);
   assert.equal(environmentValidationSummary({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), "Validation expired");
+});
+
+test("Prometheus connection management is operator-only and surfaces stale validation", () => {
+  assert.equal(canManageConnections(["VIEWER"]), false);
+  assert.equal(canManageConnections(["OPERATOR"]), true);
+  const base = { id: "1", name: "production", baseUrl: "https://prometheus.example", queryTimeoutSeconds: 10 };
+  assert.equal(connectionValidationLabel({ ...base, status: "INVALID", lastValidatedAt: null }, Date.parse("2026-09-15T12:00:00Z")), "INVALID · validation required");
+  assert.equal(connectionValidationLabel({ ...base, status: "ACTIVE", lastValidatedAt: "2026-09-15T05:59:59Z" }, Date.parse("2026-09-15T12:00:00Z")), "ACTIVE · validation expired");
+  assert.match(connectionValidationLabel({ ...base, status: "ACTIVE", lastValidatedAt: "2026-09-15T11:00:00Z" }, Date.parse("2026-09-15T12:00:00Z")), /^ACTIVE · validated /);
 });
 
 test("release draft validation fails closed before mutation", () => {

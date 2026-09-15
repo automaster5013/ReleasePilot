@@ -5,6 +5,7 @@ export type ReleaseSummary = { id: string; version: string; status: string; crea
 export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null };
 export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
 export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; validUntil: string; checks: { code: string; outcome: string; message: string }[] };
+export type PrometheusConnection = { id: string; name: string; baseUrl: string; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -41,6 +42,17 @@ export function environmentValidationSummary(result: EnvironmentValidation) {
 
 export function canRevalidateEnvironment(roles: string[]) {
   return roles.includes("OPERATOR");
+}
+
+export function canManageConnections(roles: string[]) {
+  return roles.includes("OPERATOR");
+}
+
+export function connectionValidationLabel(connection: PrometheusConnection, now = Date.now()) {
+  if (connection.status !== "ACTIVE") return `${connection.status} · validation required`;
+  const validatedAt = connection.lastValidatedAt ? Date.parse(connection.lastValidatedAt) : Number.NaN;
+  if (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000) return "ACTIVE · validation expired";
+  return `ACTIVE · validated ${new Date(validatedAt).toLocaleString("ko-KR")}`;
 }
 
 export function environmentAllowsRelease(result: EnvironmentValidation | null) {
