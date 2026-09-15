@@ -28,7 +28,10 @@ public class ClusterConnection {
         this.status=status;this.lastValidatedAt=now;
     }
     public void update(String name,String apiServer,List<String> namespaces,String secretRef){
+        boolean disabled=status==ConnectionStatus.DISABLED;
         this.name=name;this.apiServer=apiServer;this.allowedNamespaces=String.join(",",namespaces);this.secretRef=secretRef;
-        this.status=ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
+        this.status=disabled?ConnectionStatus.DISABLED:ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
     }
+    public boolean disable(){if(status==ConnectionStatus.DISABLED)return false;status=ConnectionStatus.DISABLED;lastValidatedAt=null;return true;}
+    public boolean enable(){if(status!=ConnectionStatus.DISABLED)return false;status=ConnectionStatus.UNVERIFIED;lastValidatedAt=null;return true;}
 }

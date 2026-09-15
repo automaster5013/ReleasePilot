@@ -56,6 +56,11 @@ public class AuditEvent {
         return created(type, connectionId, type + "_UPDATED", actorId, occurredAt);
     }
 
+    public static AuditEvent connectionStatusChanged(String type, UUID connectionId, UUID actorId, String status, Instant occurredAt) {
+        var event=created(type,connectionId,type+"_"+("DISABLED".equals(status)?"DISABLED":"ENABLED"),actorId,occurredAt);
+        event.payloadJson="{\"status\":\""+status+"\"}";return event;
+    }
+
     public static AuditEvent clusterConnectionValidated(UUID connectionId,UUID actorId,String status,String failureCode,Instant occurredAt){
         var event=created("CLUSTER_CONNECTION",connectionId,"CLUSTER_CONNECTION_VALIDATED",actorId,occurredAt);
         event.payloadJson="{\"status\":\""+status+"\",\"failureCode\":\""+failureCode+"\"}";

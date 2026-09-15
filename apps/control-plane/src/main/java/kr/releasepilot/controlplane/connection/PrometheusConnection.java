@@ -26,7 +26,10 @@ public class PrometheusConnection {
         this.status=status;this.lastValidatedAt=now;
     }
     public void update(String name,String baseUrl,String secretRef,int timeout){
+        boolean disabled=status==ConnectionStatus.DISABLED;
         this.name=name;this.baseUrl=baseUrl;this.secretRef=secretRef;this.queryTimeoutSeconds=timeout;
-        this.status=ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
+        this.status=disabled?ConnectionStatus.DISABLED:ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
     }
+    public boolean disable(){if(status==ConnectionStatus.DISABLED)return false;status=ConnectionStatus.DISABLED;lastValidatedAt=null;return true;}
+    public boolean enable(){if(status!=ConnectionStatus.DISABLED)return false;status=ConnectionStatus.UNVERIFIED;lastValidatedAt=null;return true;}
 }

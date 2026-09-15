@@ -239,3 +239,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 34. 외부 연결 등록 Web Console — 완료 (2026-09-15, Kubernetes·Prometheus 입력 사전 검증·secret reference·CSRF 생성·생성 후 목록 갱신)
 35. 외부 연결 감사 이력 Web Console — 완료 (2026-09-15, OPERATOR aggregate 조회·actor·시각·체인 sequence·검증 상태/failure code 표시)
 36. 외부 연결 설정·자격 증명 교체 — 완료 (2026-09-15, OPERATOR Kubernetes·Prometheus 편집·검증 상태 fail-closed 초기화·감사 기록·Web Console 재검증 안내)
+37. 외부 연결 비활성화 lifecycle — 완료 (2026-09-15, OPERATOR disable·enable·재검증 전 admission 차단·감사 기록·Web Console 상태 제어)

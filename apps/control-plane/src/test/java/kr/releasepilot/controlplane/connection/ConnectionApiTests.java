@@ -97,6 +97,34 @@ class ConnectionApiTests {
         mvc.perform(post("/api/v1/connections/clusters/"+id+"/validate").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
                 .andExpect(status().isForbidden());
     }
+    @Test void operatorDisablesAndReenablesConnectionsFailClosedAndViewerIsForbidden() throws Exception {
+        var cluster=mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"lifecycle-cluster","apiServer":"https://kubernetes.example","allowedNamespaces":["default"],"secretRef":"env:MISSING_TOKEN"}
+            """)).andExpect(status().isCreated()).andReturn();
+        String clusterId=json.readTree(cluster.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/disable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISABLED")).andExpect(jsonPath("$.lastValidatedAt").doesNotExist());
+        mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/disable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISABLED"));
+        mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CLUSTER_CONNECTION_DISABLED"));
+        mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/enable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNVERIFIED"));
+        mvc.perform(get("/api/v1/audit-events").param("aggregateType","CLUSTER_CONNECTION").param("aggregateId",clusterId).with(authentication(auth("ROLE_OPERATOR"))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[1].eventType").value("CLUSTER_CONNECTION_DISABLED"))
+            .andExpect(jsonPath("$.items[2].eventType").value("CLUSTER_CONNECTION_ENABLED")).andExpect(jsonPath("$.items.length()").value(3));
+
+        var metrics=mvc.perform(post("/api/v1/connections/prometheus").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"lifecycle-metrics","baseUrl":"http://prometheus:9090","secretRef":null,"queryTimeoutSeconds":15}
+            """)).andExpect(status().isCreated()).andReturn();
+        String metricsId=json.readTree(metrics.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/disable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISABLED"));
+        mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROMETHEUS_CONNECTION_DISABLED"));
+        mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/enable").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
+            .andExpect(status().isForbidden());
+    }
     private UsernamePasswordAuthenticationToken auth(String role){
         var p=new UserAccountPrincipal(UUID.randomUUID(),"test","unused","Test",true,List.of(new SimpleGrantedAuthority(role)));
         return UsernamePasswordAuthenticationToken.authenticated(p,p.getPassword(),p.getAuthorities());

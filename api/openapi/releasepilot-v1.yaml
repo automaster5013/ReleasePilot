@@ -453,6 +453,29 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /connections/clusters/{clusterId}/{action}:
+    post:
+      tags: [Catalog]
+      summary: Kubernetes 클러스터 연결 비활성화 또는 재활성화
+      description: disable은 즉시 admission에서 제외하고, enable은 UNVERIFIED로 전환해 명시적 재검증을 요구한다.
+      operationId: setClusterConnectionEnabled
+      parameters:
+        - name: clusterId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: action
+          in: path
+          required: true
+          schema: {type: string, enum: [disable, enable]}
+      responses:
+        '200':
+          description: 변경된 클러스터 연결 상태
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClusterConnection'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /connections/clusters/{clusterId}/validate:
     post:
       tags: [Catalog]
@@ -546,6 +569,29 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /connections/prometheus/{connectionId}/{action}:
+    post:
+      tags: [Catalog]
+      summary: Prometheus 연결 비활성화 또는 재활성화
+      description: disable은 즉시 admission에서 제외하고, enable은 UNVERIFIED로 전환해 명시적 재검증을 요구한다.
+      operationId: setPrometheusConnectionEnabled
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: action
+          in: path
+          required: true
+          schema: {type: string, enum: [disable, enable]}
+      responses:
+        '200':
+          description: 변경된 Prometheus 연결 상태
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrometheusConnection'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /environments/{environmentId}/validate:
     post:
       tags: [Catalog]

@@ -50,14 +50,25 @@ public class ConnectionService {
         value.update(name,baseUrl,secretRef,timeout);var now=clock.instant();
         auditEvents.record(AuditEvent.connectionUpdated("PROMETHEUS_CONNECTION",id,actorId,now));return value;
     }
+    @Transactional public ClusterConnection setClusterEnabled(UUID id,boolean enabled,UUID actorId){
+        var value=clusters.findById(id).orElseThrow(()->new NotFoundException("CLUSTER_CONNECTION_NOT_FOUND","Cluster connection not found"));
+        boolean changed=enabled?value.enable():value.disable();
+        if(changed)auditEvents.record(AuditEvent.connectionStatusChanged("CLUSTER_CONNECTION",id,actorId,value.getStatus().name(),clock.instant()));return value;
+    }
+    @Transactional public PrometheusConnection setPrometheusEnabled(UUID id,boolean enabled,UUID actorId){
+        var value=prometheus.findById(id).orElseThrow(()->new NotFoundException("PROMETHEUS_CONNECTION_NOT_FOUND","Prometheus connection not found"));
+        boolean changed=enabled?value.enable():value.disable();
+        if(changed)auditEvents.record(AuditEvent.connectionStatusChanged("PROMETHEUS_CONNECTION",id,actorId,value.getStatus().name(),clock.instant()));return value;
+    }
     @Transactional(readOnly=true) public List<ClusterConnection> listClusters(){return clusters.findAll(Sort.by("name"));}
     @Transactional(readOnly=true) public List<PrometheusConnection> listPrometheus(){return prometheus.findAll(Sort.by("name"));}
     @Transactional public ClusterValidationGateway.Result validateCluster(UUID clusterId,UUID actorId){
         var cluster=clusters.findById(clusterId).orElseThrow(()->new NotFoundException("CLUSTER_CONNECTION_NOT_FOUND","Cluster connection not found"));
+        if(cluster.getStatus()==ConnectionStatus.DISABLED)throw new ConflictException("CLUSTER_CONNECTION_DISABLED","Disabled cluster connection must be enabled before validation");
         return validate(cluster,actorId);
     }
     @Transactional public List<ClusterValidation> validateAllClusters(UUID actorId){
-        return clusters.findAll(Sort.by("name")).stream().map(cluster->new ClusterValidation(cluster,validate(cluster,actorId))).toList();
+        return clusters.findAll(Sort.by("name")).stream().filter(cluster->cluster.getStatus()!=ConnectionStatus.DISABLED).map(cluster->new ClusterValidation(cluster,validate(cluster,actorId))).toList();
     }
     private ClusterValidationGateway.Result validate(ClusterConnection cluster,UUID actorId){
         var result=clusterValidation.validate(cluster);var now=clock.instant();cluster.validated(result.status(),now);
@@ -65,6 +76,7 @@ public class ConnectionService {
     }
     @Transactional public PrometheusConnectionValidationGateway.Result validatePrometheus(UUID connectionId,UUID actorId){
         var connection=prometheus.findById(connectionId).orElseThrow(()->new NotFoundException("PROMETHEUS_CONNECTION_NOT_FOUND","Prometheus connection not found"));
+        if(connection.getStatus()==ConnectionStatus.DISABLED)throw new ConflictException("PROMETHEUS_CONNECTION_DISABLED","Disabled Prometheus connection must be enabled before validation");
         var result=prometheusValidation.validate(connection);var now=clock.instant();connection.validated(result.status(),now);
         auditEvents.record(AuditEvent.prometheusConnectionValidated(connection.getId(),actorId,result.status().name(),result.failureCode(),now));return result;
     }
