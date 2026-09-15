@@ -79,6 +79,8 @@ MVP에서 ClusterConnection과 PrometheusConnection은 Operator만 생성·변�
 Operator는 PrometheusConnection의 ready endpoint와 `vector(1)` query를 독립적으로 검증할 수 있다. 결과는
 `ACTIVE` 또는 `INVALID`와 마지막 검증 시각으로 저장하고 감사 이벤트를 남긴다. secret 누락, ready 실패,
 query 실패와 네트워크 실패는 각각 안정 failure code로 구분하며 인증 값은 응답·로그·감사 payload에 남기지 않는다.
+릴리스 요청, 승인과 비동기 Rollout 시작은 PrometheusConnection의 ACTIVE 상태와 검증 신선도를 재확인하고,
+비활성 또는 만료된 분석 소스에서는 외부 변경을 시작하지 않는다.
 
 ## 5. 등록 시 사전 검사
 

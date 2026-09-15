@@ -19,6 +19,8 @@ test("approval readiness failures tell approvers how to recover", () => {
   assert.match(approvalReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /점검/);
   assert.match(approvalReadinessMessage("CLUSTER_CONNECTION_NOT_ACTIVE") ?? "", /Kubernetes 연결/);
   assert.match(approvalReadinessMessage("CLUSTER_CONNECTION_VALIDATION_STALE") ?? "", /연결 재검증/);
+  assert.match(approvalReadinessMessage("PROMETHEUS_CONNECTION_NOT_ACTIVE") ?? "", /Prometheus 연결/);
+  assert.match(approvalReadinessMessage("PROMETHEUS_CONNECTION_VALIDATION_STALE") ?? "", /Prometheus 연결.*재검증/);
   assert.equal(approvalReadinessMessage("UNKNOWN"), null);
   assert.equal(approvalReadinessLabel(null), "Readiness unavailable");
   const base = { environmentId: "env", checkedAt: "2026-09-15T00:00:00Z", checks: [] };
@@ -32,6 +34,8 @@ test("release readiness failures tell developers how to recover", () => {
   assert.match(releaseRequestReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /운영자 점검/);
   assert.match(releaseRequestReadinessMessage("CLUSTER_CONNECTION_NOT_ACTIVE") ?? "", /연결 검증/);
   assert.match(releaseRequestReadinessMessage("CLUSTER_CONNECTION_VALIDATION_STALE") ?? "", /연결 재검증/);
+  assert.match(releaseRequestReadinessMessage("PROMETHEUS_CONNECTION_NOT_ACTIVE") ?? "", /Prometheus 연결/);
+  assert.match(releaseRequestReadinessMessage("PROMETHEUS_CONNECTION_VALIDATION_STALE") ?? "", /Prometheus 연결.*재검증/);
   assert.equal(releaseRequestReadinessMessage("UNKNOWN"), null);
 });
 
