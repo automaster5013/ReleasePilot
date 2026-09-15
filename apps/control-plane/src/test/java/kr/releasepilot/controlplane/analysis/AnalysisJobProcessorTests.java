@@ -26,6 +26,65 @@ import tools.jackson.databind.ObjectMapper;
 class AnalysisJobProcessorTests {
     private static final Instant NOW = Instant.parse("2026-09-15T00:00:00Z");
 
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"{", "null", "{}", "[]", "{\"metrics\":\"test-only-sensitive-token\"}"})
+    void invalidPolicyRetriesInsteadOfLeavingJobProcessing(String definition) {
+        var fixture = new Fixture(3);
+        when(fixture.snapshot.getDefinition()).thenReturn(definition);
+        assertThat(fixture.processor.processOne()).isTrue();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(fixture.job.getAttempts()).isEqualTo(1);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("ANALYSIS_CONTEXT_UNAVAILABLE");
+        assertThat(ReflectionTestUtils.getField(fixture.job, "availableAt")).isEqualTo(NOW.plusSeconds(300));
+        verifyNoInteractions(fixture.worker, fixture.commands, fixture.secrets);
+    }
+
+    @Test
+    void missingSnapshotRetriesWithoutCallingWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.snapshots.findByReleaseId(any())).thenReturn(Optional.empty());
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("ANALYSIS_CONTEXT_UNAVAILABLE");
+        verifyNoInteractions(fixture.worker, fixture.commands, fixture.secrets);
+    }
+
+    @Test
+    void invalidPolicyAtMaxAttemptsPausesWithStableReason() {
+        var fixture = new Fixture(1);
+        when(fixture.snapshot.getDefinition()).thenReturn("test-only-sensitive-token");
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.INCONCLUSIVE);
+        assertThat(fixture.job.getReasonCode()).isEqualTo("ANALYSIS_CONTEXT_UNAVAILABLE");
+        assertThat(fixture.job.getEvidenceJson()).isEqualTo("[]");
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PAUSE_ROLLOUT");
+        assertThat(saved.getValue().getPayloadJson()).contains("ANALYSIS_CONTEXT_UNAVAILABLE")
+                .doesNotContain("test-only-sensitive-token");
+        verifyNoInteractions(fixture.worker, fixture.secrets);
+    }
+
+    @Test
+    void repairedPolicyIsReadAgainAndCanRecoverOnNextAttempt() {
+        var fixture = new Fixture(3);
+        when(fixture.snapshot.getDefinition()).thenReturn("{", "{\"metrics\":[]}");
+        when(fixture.worker.evaluate(any())).thenReturn(
+                new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS, "ALL_RULES_PASSED", "[]"));
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        verifyNoInteractions(fixture.worker, fixture.commands);
+        when(fixture.clock.instant()).thenReturn(NOW.plusSeconds(300));
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.PASS);
+        assertThat(fixture.job.getAttempts()).isEqualTo(2);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isNull();
+        verify(fixture.worker).evaluate(any());
+    }
+
     @Test
     void missingConfiguredSecretRetriesWithoutCallingWorker() {
         var fixture = new Fixture(3);
@@ -182,6 +241,8 @@ class AnalysisJobProcessorTests {
         final SecretResolver secrets = mock(SecretResolver.class);
         final PrometheusConnection connection = mock(PrometheusConnection.class);
         final Clock clock = mock(Clock.class);
+        final PolicySnapshot snapshot = mock(PolicySnapshot.class);
+        final PolicySnapshotRepository snapshots = mock(PolicySnapshotRepository.class);
 
         Fixture(int maxAttempts) {
             var jobs = mock(AnalysisJobRepository.class);
@@ -191,13 +252,11 @@ class AnalysisJobProcessorTests {
             var environments = mock(EnvironmentRepository.class);
             var services = mock(CatalogServiceRepository.class);
             var connections = mock(PrometheusConnectionRepository.class);
-            var snapshots = mock(PolicySnapshotRepository.class);
             var step = mock(RolloutStep.class);
             var execution = mock(RolloutExecution.class);
             var release = mock(Release.class);
             var environment = mock(Environment.class);
             var service = mock(CatalogService.class);
-            var snapshot = mock(PolicySnapshot.class);
             var stepId = UUID.randomUUID();
             var executionId = UUID.randomUUID();
             var releaseId = UUID.randomUUID();
