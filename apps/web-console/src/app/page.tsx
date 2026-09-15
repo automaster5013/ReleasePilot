@@ -871,6 +871,7 @@ export default function Home() {
         <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
           <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={() => void revokeOtherSessions()} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}
+          {sessionUser && !sessionUser.demo && authenticationProviders.oidc && <p className={sessionStyles.sessionEmpty}>로그아웃하면 ReleasePilot 세션이 종료됩니다. Cognito 로그인 상태는 유지될 수 있어 조직 SSO를 다시 선택하면 비밀번호 입력 없이 로그인될 수 있습니다.</p>}
           {sessionUser?.demo && <p className={sessionStyles.sessionEmpty}>공유 데모에서는 다른 방문자의 연결을 보호하기 위해 세션 관리가 비활성화됩니다.</p>}
           {canManageSessions(sessionUser) && <div className={sessionStyles.sessionList}>{activeSessions.map((item) => <article key={item.reference}><div><strong>{item.current ? "현재 세션" : "활성 세션"}</strong><code>{item.reference}</code><small>최근 사용 {formatSessionTime(item.lastAccessedAt)} · 만료 {formatSessionTime(item.expiresAt)}</small></div><button onClick={() => void revokeSession(item)} disabled={sessionBusy}>{item.current ? "로그아웃" : "종료"}</button></article>)}</div>}
           {sessionNotice && <p className={sessionStyles.sessionNotice} role="status">{sessionNotice}</p>}
