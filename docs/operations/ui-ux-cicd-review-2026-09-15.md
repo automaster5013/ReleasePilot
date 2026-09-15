@@ -6,6 +6,8 @@
 
 후속 [샘플 표시·모바일 상단 개선](ui-sample-mobile-refinement.md)에서 샘플 카드의 production 표시와 모바일 상단·조회 컨트롤을 수정했다. 로컬 production/fixture 검증이며 공개 서비스 배포는 아직 하지 않았다. 역할별 화면 검수·운영 E2E와 다른 CI/CD 과제는 남아 있다.
 
+후속 [역할별 UI 인수 검증](role-ui-acceptance.md)에서 Developer 요청, Approver 승인·거부·만료·자기 승인 오류, Operator 네 가지 조작·사유 취소 fixture E2E 11개를 추가했다. 역할 세션은 fixture이며 실제 SSO/backend/운영 전체 E2E 및 전체 접근성 검수를 대신하지 않는다.
+
 ## 확인 결과
 
 - 공개 UI: 데모 로그인, 새로고침 후 VIEWER 세션 복원, 변경 버튼 비활성화, 빈 최근 릴리스 목록을 브라우저에서 확인했다.
