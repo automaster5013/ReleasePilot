@@ -4,14 +4,14 @@ namespace: releasepilot
 resources: [../../base, ingress.yaml, issuer.yaml, network-policy.yaml, storage-class.yaml]
 images:
   - name: control-plane
-    newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/control-plane
-    digest: sha256:406f61764e472d9b40516e12023a717123c1353156f74952da21ce5339f7cc34
+    newName: automaster5013/releasepilot-control-plane
+    digest: sha256:2ba9a877ff2af8f09590c40845d15a8cb262d0a386a904cacde61e2225907a50
   - name: analysis-worker
-    newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/analysis-worker
-    digest: sha256:1d92d8bc9f4faaa19e08750449810775dbf1602c31ecae9de1972dc544f38021
+    newName: automaster5013/releasepilot-analysis-worker
+    digest: sha256:f638b5621afaa381910627147d0b0dda22a6647fea5eedccac1c7d4bd4bf8ad7
   - name: web-console
-    newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/web-console
-    digest: sha256:c5e957e53831bbb88b873c616c4e4fa9fd279526a99e996da4fc13919906f27c
+    newName: automaster5013/releasepilot-web-console
+    digest: sha256:26cdda658373753b7bfbdc2c7664964d8db83afaa7bdc06d1258d20280d63586
 patches:
   - target: { kind: Rollout }
     patch: |-
