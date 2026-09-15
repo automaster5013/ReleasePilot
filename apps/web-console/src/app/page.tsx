@@ -118,8 +118,18 @@ export default function Home() {
   const [clusterFilter, setClusterFilter] = useState<ConnectionFilter>("ALL");
   const [prometheusQuery, setPrometheusQuery] = useState("");
   const [prometheusFilter, setPrometheusFilter] = useState<ConnectionFilter>("ALL");
-  const filteredClusterConnections = useMemo(() => filterConnections(clusterConnections, clusterQuery, clusterFilter), [clusterConnections, clusterQuery, clusterFilter]);
-  const filteredPrometheusConnections = useMemo(() => filterConnections(prometheusConnections, prometheusQuery, prometheusFilter), [prometheusConnections, prometheusQuery, prometheusFilter]);
+  const [connectionClock, setConnectionClock] = useState(() => Date.now());
+  const filteredClusterConnections = useMemo(() => filterConnections(clusterConnections, clusterQuery, clusterFilter, connectionClock), [clusterConnections, clusterQuery, clusterFilter, connectionClock]);
+  const filteredPrometheusConnections = useMemo(() => filterConnections(prometheusConnections, prometheusQuery, prometheusFilter, connectionClock), [prometheusConnections, prometheusQuery, prometheusFilter, connectionClock]);
+
+  useEffect(() => {
+    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    const tick = () => setConnectionClock(Date.now());
+    const timer = window.setInterval(tick, 30_000);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); document.removeEventListener("visibilitychange", tick); };
+  }, [sessionUser]);
 
   const refreshAuditIntegrity = useCallback(async () => {
     setAuditIntegrityBusy(true);

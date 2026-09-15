@@ -137,7 +137,20 @@ test("connection search and status filters surface stale or failed targets", () 
   ];
   assert.deepEqual(filterConnections(items, "production", "ALL", now).map((item) => item.name), ["Production East", "Production West"]);
   assert.deepEqual(filterConnections(items, "", "NEEDS_ATTENTION", now).map((item) => item.name), ["Production West", "Staging"]);
+  assert.deepEqual(filterConnections(items, "", "ACTIVE", now).map((item) => item.name), ["Production East"]);
   assert.deepEqual(filterConnections(items, "ret", "DISABLED", now).map((item) => item.name), ["Retired"]);
+});
+
+test("connection freshness moves healthy targets to attention at the expiry boundary", () => {
+  const checkedAt = Date.parse("2026-09-15T06:00:00Z");
+  const items = [{ name: "boundary", status: "ACTIVE", lastValidatedAt: new Date(checkedAt).toISOString() }];
+  assert.equal(filterConnections(items, "", "ACTIVE", checkedAt + 21_599_999).length, 1);
+  assert.equal(filterConnections(items, "", "ACTIVE", checkedAt + 21_600_000).length, 0);
+  assert.equal(filterConnections(items, "", "NEEDS_ATTENTION", checkedAt + 21_600_000).length, 1);
+  for (const lastValidatedAt of [null, "invalid"]) {
+    assert.equal(filterConnections([{ ...items[0], lastValidatedAt }], "", "ACTIVE", checkedAt).length, 0);
+    assert.equal(filterConnections([{ ...items[0], lastValidatedAt }], "", "NEEDS_ATTENTION", checkedAt).length, 1);
+  }
 });
 
 test("connection drafts are validated before operator mutations", () => {

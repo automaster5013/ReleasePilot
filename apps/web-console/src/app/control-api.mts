@@ -61,10 +61,15 @@ export function canManageConnections(roles: string[]) {
   return roles.includes("OPERATOR");
 }
 
+export function connectionValidationFresh(connection: Pick<PrometheusConnection, "status" | "lastValidatedAt">, now = Date.now()) {
+  const validatedAt = connection.lastValidatedAt ? Date.parse(connection.lastValidatedAt) : Number.NaN;
+  return connection.status === "ACTIVE" && Number.isFinite(validatedAt) && validatedAt > now - 6 * 60 * 60 * 1000;
+}
+
 export function connectionValidationLabel(connection: Pick<PrometheusConnection, "status" | "lastValidatedAt">, now = Date.now()) {
   if (connection.status !== "ACTIVE") return `${connection.status} · validation required`;
   const validatedAt = connection.lastValidatedAt ? Date.parse(connection.lastValidatedAt) : Number.NaN;
-  if (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000) return "ACTIVE · validation expired";
+  if (!connectionValidationFresh(connection, now)) return "ACTIVE · validation expired";
   return `ACTIVE · validated ${new Date(validatedAt).toLocaleString("ko-KR")}`;
 }
 
@@ -76,9 +81,9 @@ export function filterConnections<T extends { name: string; status: string; last
     if (term && !item.name.toLocaleLowerCase().includes(term)) return false;
     if (filter === "ALL") return true;
     if (filter === "NEEDS_ATTENTION") {
-      const validatedAt = item.lastValidatedAt ? Date.parse(item.lastValidatedAt) : Number.NaN;
-      return item.status === "INVALID" || item.status === "UNVERIFIED" || (item.status === "ACTIVE" && (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000));
+      return item.status === "INVALID" || item.status === "UNVERIFIED" || (item.status === "ACTIVE" && !connectionValidationFresh(item, now));
     }
+    if (filter === "ACTIVE") return connectionValidationFresh(item, now);
     return item.status === filter;
   });
 }

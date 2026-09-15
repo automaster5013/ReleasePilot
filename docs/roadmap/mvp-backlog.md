@@ -242,3 +242,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 37. 외부 연결 비활성화 lifecycle — 완료 (2026-09-15, OPERATOR disable·enable·재검증 전 admission 차단·감사 기록·Web Console 상태 제어)
 38. 외부 연결 일괄 재검증 — 완료 (2026-09-15, Kubernetes·Prometheus 일괄 실행·DISABLED 제외·개별 감사 결과·Web Console 요약)
 39. 외부 연결 검색·상태 필터 — 완료 (2026-09-15, 이름 검색·attention/active/disabled 필터·검증 만료 fail-closed 분류·빈 결과 안내)
+40. 외부 연결 신선도 실시간 분류 — 완료 (2026-09-15, 정상 필터 신선도 강제·30초/화면 복귀 갱신·6시간 만료 경계 테스트)
