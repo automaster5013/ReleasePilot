@@ -12,6 +12,16 @@
 .connectionList code { color: #8fa39b; overflow-wrap: anywhere; }
 .connectionList small { color: #67d6a3; }
 .connectionList small[data-status="INVALID"], .connectionList small[data-status="UNVERIFIED"] { color: #ffacb0; }
+.connectionCreate { border-bottom: 1px solid #293730; }
+.connectionCreate summary { padding: 14px 26px; cursor: pointer; color: #3adea3; font: 650 10px monospace; letter-spacing: .1em; }
+.connectionCreate summary span { margin-left: 9px; color: #71847c; letter-spacing: normal; }
+.connectionForms { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 0 26px 22px; }
+.connectionForms form { display: grid; gap: 10px; padding: 14px; border: 1px solid #293730; background: #0b1210; }
+.connectionForms form > strong { color: #67b997; }
+.connectionForms label { display: grid; gap: 5px; color: #9eb0a9; font-size: 11px; }
+.connectionForms label small { color: #71847c; }
+.connectionForms input { min-width: 0; border: 1px solid #344740; background: #111a18; color: #e2eee9; padding: 9px 10px; }
+.connectionForms form > button { justify-self: start; background: #3adea3; color: #07100d; border: 0; }
 .sessions > header { display: flex; justify-content: space-between; align-items: end; padding: 24px 26px; border-bottom: 1px solid #293730; }
 .sessions header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
 .sessions h2 { margin-top: 7px; }
@@ -76,6 +86,7 @@
 @media(max-width: 600px) {
   .connections > header, .connectionList article { align-items: flex-start; }
   .connectionList article { flex-direction: column; }
+  .connectionForms { grid-template-columns: 1fr; }
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }
   .sessionList article div { grid-template-columns: 1fr; }

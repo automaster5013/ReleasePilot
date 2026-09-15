@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, PrometheusConnection, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -65,6 +65,8 @@ const demoEvidence: Evidence[] = [
 ];
 const grafanaUrl = process.env.NEXT_PUBLIC_GRAFANA_URL;
 const emptyReleaseDraft: ReleaseDraft = { serviceId: "", environmentId: "", version: "", imageRepository: "", imageDigest: "", changeSummary: "", commitSha: "", pipelineUrl: "", requestedPolicyVersionId: "" };
+const emptyClusterDraft: ClusterConnectionDraft = { name: "", apiServer: "", namespaces: "", secretRef: "" };
+const emptyPrometheusDraft: PrometheusConnectionDraft = { name: "", baseUrl: "", secretRef: "", queryTimeoutSeconds: "15" };
 
 export default function Home() {
   const [releaseId, setReleaseId] = useState("");
@@ -106,6 +108,9 @@ export default function Home() {
   const [clusterConnections, setClusterConnections] = useState<ClusterConnection[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState("");
   const [connectionNotice, setConnectionNotice] = useState("");
+  const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
+  const [prometheusDraft, setPrometheusDraft] = useState<PrometheusConnectionDraft>(emptyPrometheusDraft);
+  const [connectionCreateBusy, setConnectionCreateBusy] = useState(false);
 
   const refreshAuditIntegrity = useCallback(async () => {
     setAuditIntegrityBusy(true);
@@ -491,6 +496,40 @@ export default function Home() {
     }
   }
 
+  async function createClusterConnection(event: FormEvent) {
+    event.preventDefault();
+    const validation = validateClusterConnectionDraft(clusterDraft);
+    if (validation) { setConnectionNotice(validation); return; }
+    setConnectionCreateBusy(true); setConnectionNotice("");
+    try {
+      const response = await fetch("/control-api/connections/clusters", {
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
+        body: JSON.stringify({ name: clusterDraft.name.trim(), apiServer: clusterDraft.apiServer.trim(), allowedNamespaces: parseNamespaces(clusterDraft.namespaces), secretRef: clusterDraft.secretRef.trim() }),
+      });
+      const problem = await response.json().catch(() => null) as { detail?: string } | null;
+      if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 등록이 거부되었습니다.");
+      setClusterDraft(emptyClusterDraft); await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionCreateBusy(false); }
+  }
+
+  async function createPrometheusConnection(event: FormEvent) {
+    event.preventDefault();
+    const validation = validatePrometheusConnectionDraft(prometheusDraft);
+    if (validation) { setConnectionNotice(validation); return; }
+    setConnectionCreateBusy(true); setConnectionNotice("");
+    try {
+      const response = await fetch("/control-api/connections/prometheus", {
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
+        body: JSON.stringify({ name: prometheusDraft.name.trim(), baseUrl: prometheusDraft.baseUrl.trim(), secretRef: prometheusDraft.secretRef.trim() || null, queryTimeoutSeconds: Number(prometheusDraft.queryTimeoutSeconds) }),
+      });
+      const problem = await response.json().catch(() => null) as { detail?: string } | null;
+      if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 등록이 거부되었습니다.");
+      setPrometheusDraft(emptyPrometheusDraft); await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionCreateBusy(false); }
+  }
+
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
@@ -593,6 +632,10 @@ export default function Home() {
         </details>}
         {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
           <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></header>
+          <details className={sessionStyles.connectionCreate}><summary>NEW CONNECTION <span>Operator workflow</span></summary><div className={sessionStyles.connectionForms}>
+            <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input required maxLength={100} value={clusterDraft.name} onChange={(event) => setClusterDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>API server<input required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => setClusterDraft((current) => ({ ...current, apiServer: event.target.value }))} /></label><label>Allowed namespaces<input required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => setClusterDraft((current) => ({ ...current, namespaces: event.target.value }))} /></label><label>Secret reference<input required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => setClusterDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
+            <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input required maxLength={100} value={prometheusDraft.name} onChange={(event) => setPrometheusDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Base URL<input required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => setPrometheusDraft((current) => ({ ...current, baseUrl: event.target.value }))} /></label><label>Secret reference <small>선택 사항</small><input maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => setPrometheusDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><label>Query timeout seconds<input required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => setPrometheusDraft((current) => ({ ...current, queryTimeoutSeconds: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>
+          </div></details>
           <h3>Kubernetes clusters</h3>
           {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
           <h3>Prometheus</h3>

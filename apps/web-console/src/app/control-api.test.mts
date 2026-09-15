@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -117,6 +117,19 @@ test("Kubernetes connections share the same fail-closed freshness label", () => 
   const cluster = { status: "ACTIVE", lastValidatedAt: "2026-09-15T03:00:00Z" };
   assert.equal(connectionValidationLabel(cluster, Date.parse("2026-09-15T10:00:00Z")), "ACTIVE · validation expired");
   assert.match(connectionValidationLabel(cluster, Date.parse("2026-09-15T04:00:00Z")), /^ACTIVE · validated /);
+});
+
+test("connection drafts are validated before operator mutations", () => {
+  const cluster = { name: "production", apiServer: "https://kubernetes.example", namespaces: "releasepilot, releasepilot, monitoring", secretRef: "env:KUBERNETES_TOKEN" };
+  assert.equal(validateClusterConnectionDraft(cluster), null);
+  assert.deepEqual(parseNamespaces(cluster.namespaces), ["releasepilot", "monitoring"]);
+  assert.match(validateClusterConnectionDraft({ ...cluster, apiServer: "http://kubernetes.example" }) ?? "", /HTTPS/);
+  assert.match(validateClusterConnectionDraft({ ...cluster, namespaces: "UPPER_CASE" }) ?? "", /Namespace/);
+  const prometheus = { name: "metrics", baseUrl: "http://prometheus:9090", secretRef: "", queryTimeoutSeconds: "15" };
+  assert.equal(validatePrometheusConnectionDraft(prometheus), null);
+  assert.match(validatePrometheusConnectionDraft({ ...prometheus, baseUrl: "ftp://prometheus" }) ?? "", /HTTP/);
+  assert.match(validatePrometheusConnectionDraft({ ...prometheus, queryTimeoutSeconds: "121" }) ?? "", /120/);
+  assert.match(validatePrometheusConnectionDraft({ ...prometheus, secretRef: "bad secret" }) ?? "", /Secret/);
 });
 
 test("release draft validation fails closed before mutation", () => {

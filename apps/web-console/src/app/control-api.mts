@@ -7,6 +7,8 @@ export type AuditChainVerification = { valid: boolean; verifiedEvents: number; f
 export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; validUntil: string; checks: { code: string; outcome: string; message: string }[] };
 export type PrometheusConnection = { id: string; name: string; baseUrl: string; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
 export type ClusterConnection = { id: string; name: string; apiServer: string; allowedNamespaces: string[]; status: string; lastValidatedAt: string | null };
+export type ClusterConnectionDraft = { name: string; apiServer: string; namespaces: string; secretRef: string };
+export type PrometheusConnectionDraft = { name: string; baseUrl: string; secretRef: string; queryTimeoutSeconds: string };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -54,6 +56,33 @@ export function connectionValidationLabel(connection: Pick<PrometheusConnection,
   const validatedAt = connection.lastValidatedAt ? Date.parse(connection.lastValidatedAt) : Number.NaN;
   if (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000) return "ACTIVE · validation expired";
   return `ACTIVE · validated ${new Date(validatedAt).toLocaleString("ko-KR")}`;
+}
+
+const secretReference = /^[A-Za-z0-9._:/-]+$/;
+const namespaceName = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
+export function parseNamespaces(value: string) {
+  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+}
+
+export function validateClusterConnectionDraft(draft: ClusterConnectionDraft) {
+  if (!draft.name.trim() || draft.name.trim().length > 100) return "연결 이름은 1자 이상 100자 이하여야 합니다.";
+  try { const url = new URL(draft.apiServer); if (url.protocol !== "https:" || draft.apiServer.length > 500) throw new Error(); }
+  catch { return "Kubernetes API 주소는 유효한 HTTPS URL이어야 합니다."; }
+  const namespaces = parseNamespaces(draft.namespaces);
+  if (!namespaces.length || namespaces.length > 100 || namespaces.some((item) => !namespaceName.test(item))) return "Namespace는 쉼표로 구분한 유효한 Kubernetes 이름이어야 합니다.";
+  if (!draft.secretRef.trim() || draft.secretRef.length > 255 || !secretReference.test(draft.secretRef)) return "Secret reference 형식을 확인하세요.";
+  return null;
+}
+
+export function validatePrometheusConnectionDraft(draft: PrometheusConnectionDraft) {
+  if (!draft.name.trim() || draft.name.trim().length > 100) return "연결 이름은 1자 이상 100자 이하여야 합니다.";
+  try { const url = new URL(draft.baseUrl); if (!['http:', 'https:'].includes(url.protocol) || draft.baseUrl.length > 500) throw new Error(); }
+  catch { return "Prometheus 주소는 유효한 HTTP(S) URL이어야 합니다."; }
+  if (draft.secretRef && (draft.secretRef.length > 255 || !secretReference.test(draft.secretRef))) return "Secret reference 형식을 확인하세요.";
+  const timeout = Number(draft.queryTimeoutSeconds);
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 120) return "Query timeout은 1초 이상 120초 이하여야 합니다.";
+  return null;
 }
 
 export function environmentAllowsRelease(result: EnvironmentValidation | null) {
