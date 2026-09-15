@@ -9,6 +9,7 @@ OPERATOR는 같은 화면에서 환경을 즉시 재검증할 수 있고, 재검
 검증 유효 기한이 지나면 Web Console과 Control Plane이 모두 릴리스 요청을 차단하고 운영자 재검증을 안내합니다.
 승인 대기 중 환경이 만료되거나 무효화된 경우에도 승인을 차단하며, Approver에게 운영자 재검증 또는 점검을 안내합니다.
 승인 상세는 현재 Environment 상태와 검증 유효 기한을 미리 조회하며, readiness를 확인할 수 없는 경우에도 Approve를 fail-closed로 비활성화합니다. Reject는 안전한 종료를 위해 계속 허용합니다.
+승인 시 대상 Kubernetes 연결이 비활성화된 경우 서버가 Rollout 예약을 차단하고 Approver에게 운영자 연결 검증을 안내합니다.
 수동 재검증은 실행자를 포함한 감사 이벤트로 기록되며 OPERATOR 화면에 발생 시각과 chain sequence가 표시됩니다.
 릴리스 상세를 열면 Approver가 대상, 요청자, artifact와 Pipeline, 고정된 정책 단계와 지표 임계값을
 확인한 뒤 승인 또는 거부할 수 있습니다.

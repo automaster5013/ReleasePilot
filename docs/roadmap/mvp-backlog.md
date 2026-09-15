@@ -228,3 +228,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 23. Environment 검증 만료 릴리스 차단 — 완료 (2026-09-15, 6시간 유효 기한 서버 강제·Web Console 사전 차단·안정 오류 코드)
 24. 승인 시점 Environment readiness 재확인 — 완료 (2026-09-15, 승인 대기 중 만료·무효화 차단·Rollout 미예약 보장·복구 안내)
 25. 승인 전 Environment readiness 가시성 — 완료 (2026-09-15, 최신 상태·유효 기한 표시·조회 실패 fail-closed·Reject 유지)
+26. 승인 시점 Kubernetes 연결 재확인 — 완료 (2026-09-15, 비활성 연결 승인 차단·Rollout 미예약·운영자 복구 안내)

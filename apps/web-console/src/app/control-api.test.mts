@@ -17,6 +17,7 @@ test("only approvers can decide a pending release", () => {
 test("approval readiness failures tell approvers how to recover", () => {
   assert.match(approvalReadinessMessage("ENVIRONMENT_VALIDATION_STALE") ?? "", /재검증/);
   assert.match(approvalReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /점검/);
+  assert.match(approvalReadinessMessage("CLUSTER_CONNECTION_NOT_ACTIVE") ?? "", /Kubernetes 연결/);
   assert.equal(approvalReadinessMessage("UNKNOWN"), null);
   assert.equal(approvalReadinessLabel(null), "Readiness unavailable");
   const base = { environmentId: "env", checkedAt: "2026-09-15T00:00:00Z", checks: [] };
