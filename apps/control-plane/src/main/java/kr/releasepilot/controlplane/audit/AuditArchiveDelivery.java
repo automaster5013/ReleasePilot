@@ -19,5 +19,5 @@ class AuditArchiveDelivery {
     static AuditArchiveDelivery pending(UUID eventId,Instant now){var value=new AuditArchiveDelivery();value.id=UUID.randomUUID();value.auditEventId=eventId;value.status=Status.PENDING;value.availableAt=now;return value;}
     UUID auditEventId(){return auditEventId;}
     void delivered(Instant now){status=Status.DELIVERED;deliveredAt=now;lastError=null;}
-    void failed(String error,Instant now){attempts++;lastError=error.substring(0,Math.min(error.length(),500));availableAt=now.plusSeconds(Math.min(300,1L<<Math.min(attempts,8)));}
+    void failed(String error,Instant now){attempts++;lastError=error.substring(0,Math.min(error.length(),500));availableAt=now.plusSeconds(Math.min(300,1L<<Math.min(attempts,9)));}
 }
