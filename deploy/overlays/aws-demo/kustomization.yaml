@@ -5,13 +5,13 @@ resources: [../../base, ingress.yaml, issuer.yaml, network-policy.yaml, storage-
 images:
   - name: control-plane
     newName: automaster5013/releasepilot-control-plane
-    digest: sha256:2ba9a877ff2af8f09590c40845d15a8cb262d0a386a904cacde61e2225907a50
+    digest: sha256:e5d5dc954551e9e52268009d988b34dc46892daf7e197b8e93f8cc9e5fe31d7a
   - name: analysis-worker
     newName: automaster5013/releasepilot-analysis-worker
-    digest: sha256:f638b5621afaa381910627147d0b0dda22a6647fea5eedccac1c7d4bd4bf8ad7
+    digest: sha256:4d414f5132767e35a0501a867b6bfba3de01a413e9ae7fd4cf0783afee8237c1
   - name: web-console
     newName: automaster5013/releasepilot-web-console
-    digest: sha256:26cdda658373753b7bfbdc2c7664964d8db83afaa7bdc06d1258d20280d63586
+    digest: sha256:141f0c3ae867e6b924beb1b1439a5ef621d69e248ca263182b9b4fc98e6e2338
 patches:
   - target: { kind: Rollout }
     patch: |-
