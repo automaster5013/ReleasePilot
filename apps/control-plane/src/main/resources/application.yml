@@ -57,6 +57,8 @@ management:
         enabled: true
 
 releasepilot:
+  connection-validation:
+    max-age: ${CONNECTION_VALIDATION_MAX_AGE:PT6H}
   environment-revalidation:
     enabled: ${ENVIRONMENT_REVALIDATION_ENABLED:true}
     poll-interval: ${ENVIRONMENT_REVALIDATION_POLL_INTERVAL:PT5M}

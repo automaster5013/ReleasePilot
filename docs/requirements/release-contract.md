@@ -74,13 +74,14 @@ Web Console 승인 상세는 대상 Environment의 최신 상태와 검증 유�
 조회할 수 없거나 활성 상태가 아니거나 기한이 지났으면 Approve를 비활성화한다. 이 사전 차단은 서버 검사를
 대체하지 않으며 Reject는 영향받지 않는다.
 
-승인 시점에 대상 Kubernetes ClusterConnection도 `ACTIVE`여야 한다. 요청 접수 뒤 연결이 무효화되거나
-비활성화되면 Control Plane은 `CLUSTER_CONNECTION_NOT_ACTIVE`로 승인을 거부하고 Rollout execution과
-outbox 명령을 생성하지 않는다. Web Console은 운영자 연결 검증이 필요함을 안내한다.
+승인 시점에 대상 Kubernetes ClusterConnection도 `ACTIVE`이고 최근 검증이 기본 6시간 이내여야 한다.
+요청 접수 뒤 연결이 무효화·비활성화되면 `CLUSTER_CONNECTION_NOT_ACTIVE`, 검증 기한이 지나면
+`CLUSTER_CONNECTION_VALIDATION_STALE`로 승인을 거부하고 Rollout execution과 outbox 명령을 생성하지
+않는다. Web Console은 운영자 연결 재검증이 필요함을 안내한다.
 
 승인과 `START_ROLLOUT` outbox 처리 사이에도 상태가 바뀔 수 있으므로 실제 Kubernetes mutation 직전에
-Environment 활성 상태·검증 유효 기한·ClusterConnection 활성 상태를 다시 확인한다. 실패 시 외부 API와
-secret resolver를 호출하지 않고 안정 reason code로 명령을 재시도 대기시킨다.
+Environment 활성 상태·검증 유효 기한·ClusterConnection 활성 상태와 검증 유효 기한을 다시 확인한다.
+실패 시 외부 API와 secret resolver를 호출하지 않고 안정 reason code로 명령을 재시도 대기시킨다.
 
 릴리스 상세 API와 Web Console은 승인 검토를 위해 Service·Environment 이름, 요청자 표시명과 계정,
 이미지 repository/digest, 변경 요약·Commit SHA·Pipeline URL, 불변 PolicySnapshot의 전략·단계·지표 임계값을

@@ -230,3 +230,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 25. 승인 전 Environment readiness 가시성 — 완료 (2026-09-15, 최신 상태·유효 기한 표시·조회 실패 fail-closed·Reject 유지)
 26. 승인 시점 Kubernetes 연결 재확인 — 완료 (2026-09-15, 비활성 연결 승인 차단·Rollout 미예약·운영자 복구 안내)
 27. Rollout 시작 직전 readiness preflight — 완료 (2026-09-15, Environment·검증 기한·Cluster 재확인·외부 mutation 차단)
+28. ClusterConnection 검증 만료 차단 — 완료 (2026-09-15, 요청·승인·Rollout 시작에서 6시간 유효 기한 강제·외부 mutation 차단)

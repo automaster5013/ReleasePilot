@@ -150,10 +150,11 @@ ReleasePilot이 모든 Prometheus 시계열을 검색하지 않도록 Environmen
   `validUntil`을 반환하고 Web Console은 기한이 지난 Environment의 요청을 사전 차단한다. 서버는 스케줄러
   지연과 무관하게 릴리스 요청과 승인 시점에 다시 기한을 검사하고 `ENVIRONMENT_VALIDATION_STALE`로 거부한다.
 - 릴리스 직전 Rollout UID가 마지막 등록 검증 시점과 다르면 자동 실행하지 않는다.
-- 릴리스 요청과 승인 시점 모두 대상 ClusterConnection이 `ACTIVE`인지 다시 확인한다. 승인 대기 중 연결이
-  무효화되거나 비활성화되면 `CLUSTER_CONNECTION_NOT_ACTIVE`로 Rollout 예약을 차단한다.
+- 릴리스 요청과 승인 시점 모두 대상 ClusterConnection이 `ACTIVE`이고 최근 검증이 기본 6시간 이내인지
+  다시 확인한다. 기한은 `CONNECTION_VALIDATION_MAX_AGE`로 조정하며, 만료 시
+  `CLUSTER_CONNECTION_VALIDATION_STALE`로 Rollout 예약을 차단한다.
 - 비동기 Rollout 시작 명령도 Kubernetes를 변경하거나 secret을 읽기 직전에 Environment 상태·검증 기한과
-  ClusterConnection 상태를 재확인한다. 실패한 preflight는 외부 변경 없이 재시도 대기한다.
+  ClusterConnection 상태와 검증 기한을 재확인한다. 실패한 preflight는 외부 변경 없이 재시도 대기한다.
 - 변경 결과는 이전 설정 전체를 덮어쓴 감사 payload가 아니라 변경된 필드 목록과 검증 결과로 기록한다.
 
 ## 9. MVP 인수 시나리오
