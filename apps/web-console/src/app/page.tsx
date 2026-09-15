@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -443,13 +443,17 @@ export default function Home() {
     if (requestBusy || !canRequestRelease(sessionUser?.roles ?? [])) return;
     const validation = validateReleaseDraft(releaseDraft);
     if (validation) { setError(validation); return; }
+    if (!environmentAllowsRelease(environmentValidation)) {
+      setError("환경 검증이 만료되었거나 사용할 수 없습니다. 최신 검증 결과를 확인한 뒤 다시 요청하세요.");
+      return;
+    }
     setRequestBusy(true);
     setRequestNotice("");
     setError("");
     try {
       const response = await fetch("/control-api/releases", {
         method: "POST", credentials: "include",
-        headers: mutationHeaders(await csrfToken(), { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }),
+        headers: await readinessMutationHeaders(environmentValidation, csrfToken, { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }),
         body: JSON.stringify({
           ...releaseDraft,
           serviceId: releaseDraft.serviceId.trim(), environmentId: releaseDraft.environmentId.trim(),
@@ -658,6 +662,10 @@ export default function Home() {
 
   async function decide(action: "approve" | "reject") {
     if (!activeId || operationInFlight.current) return;
+    if (action === "approve" && !environmentAllowsRelease(approvalEnvironmentValidation)) {
+      setError("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 승인하세요.");
+      return;
+    }
     const reason = window.prompt(`${action === "approve" ? "승인" : "거부"} 사유를 입력하세요.`)?.trim();
     if (reason === undefined) return;
     if (reason.length === 0 || reason.length > 1000) {
@@ -672,7 +680,7 @@ export default function Home() {
       const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
       const response = await fetch(`/control-api/releases/${activeId}/${action}`, {
         method: "POST", credentials: "include",
-        headers: mutationHeaders(await csrfToken(), { idempotencyKey, json: true }),
+        headers: await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve"),
         body: JSON.stringify({ reason }),
       });
       if (!response.ok) {

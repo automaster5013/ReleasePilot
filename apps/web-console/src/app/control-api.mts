@@ -121,6 +121,14 @@ export function environmentAllowsRelease(result: EnvironmentValidation | null, n
   return Number.isFinite(validUntil) && validUntil > now;
 }
 
+export async function readinessMutationHeaders(result: EnvironmentValidation | null, csrfProvider: () => Promise<CsrfToken>, options: { idempotencyKey?: string; json?: boolean }, requireReady = true) {
+  const check = () => { if (requireReady && !environmentAllowsRelease(result)) throw new Error("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 다시 시도하세요."); };
+  check();
+  const csrf = await csrfProvider();
+  check();
+  return mutationHeaders(csrf, options);
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;

@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+
+test("mutation readiness is checked again after CSRF waits and rejection stays available", async () => {
+  const originalNow = Date.now;
+  let now = Date.parse("2026-09-15T05:59:59Z");
+  const result = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z", validUntil: "2026-09-15T06:00:00Z", checks: [] };
+  let calls = 0;
+  const csrf = async () => { calls++; now += 1000; return { headerName: "X-CSRF-TOKEN", token: "test" }; };
+  Date.now = () => now;
+  try {
+    await assert.rejects(readinessMutationHeaders(result, csrf, { json: true }), /환경 검증/);
+    assert.equal(calls, 1);
+    await assert.rejects(readinessMutationHeaders(null, csrf, {}), /환경 검증/);
+    assert.equal(calls, 1);
+    assert.deepEqual(await readinessMutationHeaders(null, csrf, { json: true }, false), { "X-CSRF-TOKEN": "test", "Content-Type": "application/json" });
+  } finally { Date.now = originalNow; }
+});
 
 test("request and approval readiness expire together on the display clock", () => {
   const expiry = Date.parse("2026-09-15T06:00:00Z");
