@@ -273,3 +273,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 68. 저장 매핑·감사 정밀도 v0.53.0 배포 — 완료 (2026-09-15, 소스 CI/이미지 workflow 성공·GitOps Synced/Healthy·Canary 검증과 수동 승격·세 Rollout 2/2 Healthy·새 Pod 6개 digest 일치/재시작 0·공개 헬스/보안 헤더/VIEWER 재검증; 운영 기존 감사 복구와 실제 릴리스 E2E는 별도)
 69. 감사 체인 끝값·부분 해시 누락 탐지 — 완료 (2026-09-15, head 잠금/끝값 비교·마지막 기록 삭제/head 부재/끝값 변조/해시 제거 거부·legacy 제외 유지·회귀 6개·H2 전체 155개/MySQL 통합 17개 통과·API 설명 동기화; 공개 배포/외부 보관본/동시성 부하는 별도)
 70. 감사 기록·검증 동시성 기능 검증 — 완료 (2026-09-15, 실제 서비스/트랜잭션·동시 기록 8건 연속 순번/체인/아카이브 대기 확인·기록 commit 전 verifier 대기/후 일치·H2 전체 157개/MySQL 통합 19개 2회 통과·소유권 cleanup·CI helper 연결; 대규모 부하/첫 head 생성 경쟁/공개 배포는 별도)
+71. 감사 verifier v0.54.0 공개 배포 — 완료 (2026-09-15, 소스 CI 6job/이미지 workflow 성공·임시 Karpenter taint 해제 후 배치·Canary 검증/수동 승격·세 Rollout Healthy 2/2·새 Pod 6개 digest 일치/재시작 0·공개 헬스/보안 헤더/VIEWER 정상; 웹 잘못된 Server Reference 오류 표본 1건 기록, 운영 기존 감사 복구/실제 릴리스 E2E는 별도)

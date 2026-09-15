@@ -8,7 +8,7 @@ ReleasePilot은 새 감사 이벤트마다 단조 증가하는 `chainSequence`, 
 
 OPERATOR는 `GET /api/v1/audit-events/verify`를 호출해 DB에 저장된 해시 체인을 다시 계산할 수 있다. `valid=false`이면 `failedEventId`가 최초 불일치 이벤트를 가리킨다. 끝값 불일치나 head 부재는 해당 이벤트를 식별할 수 없어 `failedEventId=null`이다. `verifiedEvents`는 불일치 이전에 검증을 완료한 이벤트 수다. V20 이전의 legacy 이벤트는 세 체인 필드가 모두 null이므로 제외되고, 일부 필드만 null인 기록은 실패한다. V20 이후 체인은 genesis hash부터 시작한다.
 
-검증은 기록 생성과 같은 head 비관적 잠금을 사용해 이벤트 목록과 끝값을 비교한다. 마지막 이벤트 삭제와 head 순번/해시 불일치도 거부한다. 전체 체인과 head를 함께 일관되게 재작성하는 공격, 모든 체인 필드가 지워져 legacy와 구분 불가능한 기록, 외부 보관본 무결성까지 증명하지 않는다. 전체 목록 검증 동안 감사 기록 생성이 대기할 수 있으므로 대규모 DB에서는 운영 부하를 고려해야 한다. 이 후속 보강은 v0.53.0 이후 소스 변경이며 아직 공개 이미지에 배포하지 않았다.
+검증은 기록 생성과 같은 head 비관적 잠금을 사용해 이벤트 목록과 끝값을 비교한다. 마지막 이벤트 삭제와 head 순번/해시 불일치도 거부한다. 전체 체인과 head를 함께 일관되게 재작성하는 공격, 모든 체인 필드가 지워져 legacy와 구분 불가능한 기록, 외부 보관본 무결성까지 증명하지 않는다. 전체 목록 검증 동안 감사 기록 생성이 대기할 수 있으므로 대규모 DB에서는 운영 부하를 고려해야 한다. 이 후속 보강은 [v0.54.0 공개 배포](audit-verifier-v0.54.0.md)에 반영했다.
 
 `aggregateType=ENVIRONMENT&aggregateId=<uuid>` 조회는 OPERATOR에게만 허용한다. 수동 Environment 재검증은
 USER actor와 `MANUAL` trigger로 기록되고, 정기 재검증은 SYSTEM actor와 `SCHEDULED` trigger를 유지한다.

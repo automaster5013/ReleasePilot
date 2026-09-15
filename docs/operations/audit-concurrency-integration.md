@@ -14,4 +14,4 @@ cd apps/control-plane
 
 실제 MySQL 실행은 저장소 루트에서 `docker pull mysql:8.4` 이후 `python scripts/analysis_mysql_integration.py`로 수행한다. 기존 분석/감사 검증과 함께 실행하며 CI에도 같은 helper가 연결돼 있다.
 
-2026-09-15 검증 결과: H2 서버 전체 verify 157개 통과. MySQL 8.4.11에서 전체 통합 19개(분석 6/감사 저장 11/동시성 2)가 서로 다른 임시 DB로 2회 모두 통과했다. 각 실행에서 Flyway 22개 및 JSON 타입 5개 검사와 소유권 확인 cleanup도 성공했다. 공개 서비스는 v0.53.0을 유지하며 감사 끝값 보강의 공개 배포는 별도다.
+2026-09-15 검증 결과: H2 서버 전체 verify 157개 통과. MySQL 8.4.11에서 전체 통합 19개(분석 6/감사 저장 11/동시성 2)가 서로 다른 임시 DB로 2회 모두 통과했다. 각 실행에서 Flyway 22개 및 JSON 타입 5개 검사와 소유권 확인 cleanup도 성공했다. 이후 [v0.54.0 배포 검증](audit-verifier-v0.54.0.md)을 완료했다.
