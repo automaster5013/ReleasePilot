@@ -54,3 +54,13 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 ```
 
 새 시나리오는 테스트 트랜잭션 내 SQL 저장·재조회 후 롤백한다. commit 이후 재시작 내구성, DB 장애로 인한 rollback-only 격리, 프로세스 중단, 복수 Worker 중복 전송은 미검증이다. 외래 키를 우회하는 이벤트 누락 재현은 하지 않았다. 기존 제어 흐름 mock/HTTP loopback/S3 SDK mock 검증과 이번 실제 DB 검증을 구분하며 실제 AWS/S3/외부 HTTP에는 전송하거나 장애를 주입하지 않았다. 운영 데이터·전달 상태·기존 last_error는 수정하지 않았고 새 운영 배포는 없다. 운영 실제 릴리스 데이터 부재로 전체 운영 E2E는 계속 미검증이다. SSO/GitHub Checks 보류를 유지한다.
+
+## commit 이후 별도 트랜잭션 복구 검증
+
+`AuditConcurrencyIntegrationTests.archiveBatchFailureCommitsAndNewWorkerRecoversInSeparateTransaction`를 추가했다. 실제 `TransactionTemplate`으로 합성 이벤트·due 순서를 commit한 뒤, mock sink가 첫 항목에만 예외를 발생시키는 Worker 배치를 별도 트랜잭션에서 실행하고 commit한다. 다음 트랜잭션에서 실패 항목의 PENDING/고정 오류/attempts=1/재시도 시각/완료 시각 없음과 성공 항목의 DELIVERED/attempts=0/오류 없음/완료 시각을 확인한다.
+
+새 Worker와 새 mock sink를 만들고 2초 뒤 재시도를 다른 트랜잭션에서 commit한다. 다시 별도 트랜잭션에서 실패 항목의 DELIVERED/오류 제거/attempts=1/새 완료 시각과 기존 성공 항목의 상태·완료 시각 유지를 확인한다. 복구 sink는 실패했던 이벤트만 정확히 한 번 받고 추가 호출이 없으며, 실패 commit 후와 복구 commit 후 모두 감사 체인 유효성·이벤트 수·head hash가 유지된다. 첫 이벤트 hash도 복구 후 원본과 일치한다.
+
+결과: H2 전체 verify 185개, MySQL 통합 23개(분석 6/감사 저장 14/트랜잭션·동시성 3)가 실패·오류·건너뜀 없이 통과했다. MySQL Flyway 22개·JSON 타입 5개 검사, helper의 UUID label/기록된 ID 기반 컨테이너·익명 볼륨 cleanup과 종료 후 잔여 컨테이너 없음 확인도 성공했다. 실행 중 소유 임시 컨테이너 `248cd2cc1ca3`는 loopback에만 바인딩됐다. 실행 명령은 위 실제 DB 검증과 동일하며 Ruff도 통과했다.
+
+이 후속 테스트는 롤백하지 않고 임시 DB에 commit하며, DB 자체가 검증 종료 후 폐기된다. 같은 JVM에서 새 Worker와 새 트랜잭션을 사용하는 검증이므로 실제 프로세스/DB 재시작·강제 종료 내구성, DB rollback-only 격리, 복수 Worker 중복 전송, 실제 외부 저장소 전달을 증명하지 않는다. scheduler Spring proxy 자동 실행도 검사하지 않는다. 운영 데이터·전달 상태·기존 last_error 수정, 외래 키 우회, 실제 AWS/S3/외부 HTTP 호출과 새 운영 배포는 없고, 운영 전체 릴리스 E2E 및 SSO/GitHub Checks 보류를 유지한다.

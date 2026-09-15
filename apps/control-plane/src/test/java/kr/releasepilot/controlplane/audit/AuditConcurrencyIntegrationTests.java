@@ -29,6 +29,7 @@ class AuditConcurrencyIntegrationTests {
     @Autowired AuditChainVerifier verifier;
     @Autowired AuditChainHeadRepository heads;
     @Autowired AuditArchiveDeliveryRepository deliveries;
+    @Autowired AuditEventRepository events;
     @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
@@ -63,6 +64,69 @@ class AuditConcurrencyIntegrationTests {
         assertThat(after.valid()).isTrue();
         assertThat(after.verifiedEvents()).isEqualTo(before.verifiedEvents()+8);
         assertThat(deliveries.count()).isEqualTo(archiveCount+8);
+    }
+
+    @Test
+    void archiveBatchFailureCommitsAndNewWorkerRecoversInSeparateTransaction() {
+        var transaction=new TransactionTemplate(transactionManager);
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var now=Instant.parse("2030-01-01T00:00:00Z");
+        var recorded=transaction.execute(status -> {
+            var first=trail.record(event());
+            var second=trail.record(event());
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(first),"availableAt",now.minusSeconds(2));
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(second),"availableAt",now.minusSeconds(1));
+            return java.util.List.of(first,second);
+        });
+        var first=recorded.get(0);
+        var second=recorded.get(1);
+        var sink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Bearer synthetic-commit-secret"))
+                .when(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick());
+
+        transaction.executeWithoutResult(status -> {
+            assertDelivery(first,AuditArchiveDelivery.Status.PENDING,1,"AUDIT_ARCHIVE_UNAVAILABLE",null);
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(first),"availableAt"))
+                    .isEqualTo(now.plusSeconds(2));
+            assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+            var result=verifier.verify();
+            assertThat(result.valid()).isTrue();
+            assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+            assertThat(result.headHash()).isEqualTo(second.getEventHash());
+        });
+
+        var recoveredSink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        var recoveredWorker=new AuditArchiveWorker(deliveries,events,recoveredSink,
+                java.time.Clock.fixed(now.plusSeconds(2),java.time.ZoneOffset.UTC));
+        transaction.executeWithoutResult(status -> recoveredWorker.tick());
+        transaction.executeWithoutResult(status -> {
+            assertDelivery(first,AuditArchiveDelivery.Status.DELIVERED,1,null,now.plusSeconds(2));
+            assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+            var result=verifier.verify();
+            assertThat(result.valid()).isTrue();
+            assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+            assertThat(result.headHash()).isEqualTo(second.getEventHash());
+            assertThat(events.findById(first.getId()).orElseThrow().getEventHash()).isEqualTo(first.getEventHash());
+        });
+        org.mockito.Mockito.verify(recoveredSink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        org.mockito.Mockito.verifyNoMoreInteractions(recoveredSink);
+    }
+
+    private AuditArchiveDelivery deliveryFor(AuditEvent event) {
+        return deliveries.findAll().stream().filter(value -> value.auditEventId().equals(event.getId()))
+                .findFirst().orElseThrow();
+    }
+
+    private void assertDelivery(AuditEvent event,AuditArchiveDelivery.Status expectedStatus,int attempts,
+            String error,Instant deliveredAt) {
+        var stored=deliveryFor(event);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(stored,"status")).isEqualTo(expectedStatus);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(stored,"attempts")).isEqualTo(attempts);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(stored,"lastError")).isEqualTo(error);
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(stored,"deliveredAt")).isEqualTo(deliveredAt);
     }
 
     @Test
