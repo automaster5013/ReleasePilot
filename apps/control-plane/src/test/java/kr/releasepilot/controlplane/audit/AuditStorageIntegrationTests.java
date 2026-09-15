@@ -32,6 +32,60 @@ class AuditStorageIntegrationTests {
     }
 
     @Test
+    void archiveFailureAndRecoverySurviveDatabaseRoundTrip() {
+        var event=record("{\"reason\":\"archive storage test\"}");
+        var now=Instant.parse("2026-09-15T12:00:00Z");
+        var sink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Bearer synthetic-secret private-url"))
+                .when(sink).archive(org.mockito.ArgumentMatchers.any());
+        new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+        deliveries.flush();entityManager.clear();
+        var failed=deliveryFor(event);
+        assertThat(ReflectionTestUtils.getField(failed,"lastError")).isEqualTo("AUDIT_ARCHIVE_UNAVAILABLE");
+        assertThat(ReflectionTestUtils.getField(failed,"status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+        assertThat(ReflectionTestUtils.getField(failed,"attempts")).isEqualTo(1);
+        assertThat(ReflectionTestUtils.getField(failed,"availableAt")).isEqualTo(now.plusSeconds(2));
+        assertThat(ReflectionTestUtils.getField(failed,"deliveredAt")).isNull();
+        assertThat(verifier.verify().valid()).isTrue();
+
+        org.mockito.Mockito.reset(sink);
+        new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now.plusSeconds(2),java.time.ZoneOffset.UTC)).tick();
+        deliveries.flush();entityManager.clear();
+        var recovered=deliveryFor(event);
+        assertThat(ReflectionTestUtils.getField(recovered,"status")).isEqualTo(AuditArchiveDelivery.Status.DELIVERED);
+        assertThat(ReflectionTestUtils.getField(recovered,"lastError")).isNull();
+        assertThat(ReflectionTestUtils.getField(recovered,"deliveredAt")).isEqualTo(now.plusSeconds(2));
+        assertThat(ReflectionTestUtils.getField(recovered,"attempts")).isEqualTo(1);
+        org.mockito.Mockito.verify(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(event.getId())));
+        assertThat(verifier.verify().valid()).isTrue();
+    }
+
+    @Test
+    void archiveRetryInFutureIsNotSelectedFromDatabase() {
+        var event=record("{}");
+        var now=Instant.parse("2026-09-15T12:00:00Z");
+        var pending=deliveryFor(event);
+        pending.failed("AUDIT_ARCHIVE_UNAVAILABLE",now);
+        deliveries.flush();entityManager.clear();
+        var sink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+        deliveries.flush();entityManager.clear();
+        var stored=deliveryFor(event);
+        assertThat(ReflectionTestUtils.getField(stored,"status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+        assertThat(ReflectionTestUtils.getField(stored,"attempts")).isEqualTo(1);
+        org.mockito.Mockito.verify(sink,org.mockito.Mockito.never()).archive(
+                org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(event.getId())));
+    }
+
+    private AuditArchiveDelivery deliveryFor(AuditEvent event) {
+        return deliveries.findAll().stream().filter(value -> value.auditEventId().equals(event.getId()))
+                .findFirst().orElseThrow();
+    }
+
+    @Test
     void deletedTailDoesNotPassHeadVerification() {
         var event=record("{}");
         events.flush();

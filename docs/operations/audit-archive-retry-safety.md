@@ -17,3 +17,11 @@ cd apps/control-plane
 운영 전달 상태나 기존 last_error를 변경·정리하지 않았다. 공개 이미지 v0.54.0에는 이 후속 변경을 아직 배포하지 않았다.
 
 로컬 검증 결과: 추가한 12개 및 서버 전체 verify 169개가 실패·오류·건너뜀 없이 통과했다.
+
+## 실제 DB 왕복 후속 검증
+
+`AuditStorageIntegrationTests`에 실제 repository/Worker와 mock sink를 사용하는 2개 시나리오를 추가했다. 실패 후 last_error/attempts/available_at/PENDING을 flush·clear·재조회하고, 복구 후 DELIVERED/delivered_at/오류 제거와 감사 해시 유지도 확인한다. 미래 available_at 항목이 전송 대상에 포함되지 않는지 실제 DB 조회로 검사한다.
+
+테스트는 외부 전송 없이 테스트 트랜잭션 안에서 진행하고 모두 롤백한다. 이는 저장·조회와 선택 조건 검증이지 프로세스 재시작 내구성이나 scheduler bean 자동 생성/실제 외부 저장소 전달 검증이 아니다. 기존 MySQL helper와 CI가 동일 테스트를 실행한다.
+
+검증 결과: H2 서버 전체 verify 171개 및 실제 MySQL 8.4.11 통합 21개(분석 6/감사 저장 13/동시성 2)가 모두 통과했다. Flyway migration 22개·JSON 타입 5개 검사와 소유권 확인 후 컨테이너/익명 볼륨 cleanup도 성공했다.
