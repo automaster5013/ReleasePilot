@@ -583,6 +583,20 @@ export default function Home() {
     finally { setConnectionBusyId(""); }
   }
 
+  async function validateAllConnections(kind: "clusters" | "prometheus") {
+    if (connectionBusyId) return;
+    setConnectionBusyId(`all-${kind}`); setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/connections/${kind}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+      if (!response.ok) throw new Error(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} 일괄 검증 요청이 거부되었습니다.`);
+      const results = await response.json() as { status: string }[];
+      if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
+      const failed = results.filter((result) => result.status !== "ACTIVE").length;
+      setConnectionNotice(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} ${results.length}개 검증 완료 · 성공 ${results.length - failed} · 실패 ${failed} · 비활성 연결 제외`);
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionBusyId(""); }
+  }
+
   async function loadConnectionAudit(aggregateType: "CLUSTER_CONNECTION" | "PROMETHEUS_CONNECTION", connectionId: string) {
     if (connectionAuditBusy) return;
     if (connectionAuditId === connectionId) { setConnectionAuditId(""); setConnectionAuditEvents([]); return; }
@@ -697,7 +711,7 @@ export default function Home() {
           {requestNotice && <p role="status">{requestNotice}</p>}
         </details>}
         {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
-          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></header>
+          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void validateAllConnections("clusters")} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-clusters" ? "Kubernetes 검증 중…" : "Kubernetes 전체 검증"}</button><button type="button" onClick={() => void validateAllConnections("prometheus")} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-prometheus" ? "Prometheus 검증 중…" : "Prometheus 전체 검증"}</button><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></div></header>
           <details className={sessionStyles.connectionCreate}><summary>NEW CONNECTION <span>Operator workflow</span></summary><div className={sessionStyles.connectionForms}>
             <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input required maxLength={100} value={clusterDraft.name} onChange={(event) => setClusterDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>API server<input required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => setClusterDraft((current) => ({ ...current, apiServer: event.target.value }))} /></label><label>Allowed namespaces<input required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => setClusterDraft((current) => ({ ...current, namespaces: event.target.value }))} /></label><label>Secret reference<input required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => setClusterDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
             <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input required maxLength={100} value={prometheusDraft.name} onChange={(event) => setPrometheusDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Base URL<input required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => setPrometheusDraft((current) => ({ ...current, baseUrl: event.target.value }))} /></label><label>Secret reference <small>선택 사항</small><input maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => setPrometheusDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><label>Query timeout seconds<input required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => setPrometheusDraft((current) => ({ ...current, queryTimeoutSeconds: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>

@@ -543,6 +543,21 @@ paths:
               schema: {$ref: '#/components/schemas/PrometheusConnectionValidation'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /connections/prometheus/validate:
+    post:
+      tags: [Catalog]
+      summary: 활성화된 모든 Prometheus 연결 검증
+      description: DISABLED 연결은 제외하고 이름순으로 ready·query 검증을 수행하며 각 결과를 감사 이벤트로 기록한다.
+      operationId: validateAllPrometheusConnections
+      responses:
+        '200':
+          description: 이름순 Prometheus 연결 검증 결과
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/PrometheusConnectionValidation'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /connections/prometheus/{connectionId}:
     put:
       tags: [Catalog]

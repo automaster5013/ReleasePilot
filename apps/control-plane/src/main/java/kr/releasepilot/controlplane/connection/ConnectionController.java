@@ -54,6 +54,10 @@ public class ConnectionController {
     }
     @PostMapping("/prometheus/{connectionId}/validate") @PreAuthorize("hasRole('OPERATOR')")
     PrometheusValidationResponse validatePrometheus(@PathVariable UUID connectionId,@AuthenticationPrincipal UserAccountPrincipal principal){return PrometheusValidationResponse.from(connectionId,service.validatePrometheus(connectionId,principal.id()));}
+    @PostMapping("/prometheus/validate") @PreAuthorize("hasRole('OPERATOR')")
+    List<PrometheusValidationResponse> validatePrometheusConnections(@AuthenticationPrincipal UserAccountPrincipal principal){
+        return service.validateAllPrometheus(principal.id()).stream().map(v->PrometheusValidationResponse.from(v.connection().getId(),v.result())).toList();
+    }
 
     public record CreateClusterRequest(@NotBlank @Size(max=100) String name,
         @NotBlank @URL(protocol="https") @Size(max=500) String apiServer,

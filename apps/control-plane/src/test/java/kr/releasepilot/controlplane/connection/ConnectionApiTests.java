@@ -108,6 +108,10 @@ class ConnectionApiTests {
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DISABLED"));
         mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CLUSTER_CONNECTION_DISABLED"));
+        mvc.perform(post("/api/v1/connections/clusters/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post("/api/v1/connections/clusters/validate").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
+            .andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/enable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNVERIFIED"));
         mvc.perform(get("/api/v1/audit-events").param("aggregateType","CLUSTER_CONNECTION").param("aggregateId",clusterId).with(authentication(auth("ROLE_OPERATOR"))))
@@ -115,7 +119,7 @@ class ConnectionApiTests {
             .andExpect(jsonPath("$.items[2].eventType").value("CLUSTER_CONNECTION_ENABLED")).andExpect(jsonPath("$.items.length()").value(3));
 
         var metrics=mvc.perform(post("/api/v1/connections/prometheus").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
-            {"name":"lifecycle-metrics","baseUrl":"http://prometheus:9090","secretRef":null,"queryTimeoutSeconds":15}
+            {"name":"lifecycle-metrics","baseUrl":"http://prometheus:9090","secretRef":"env:DEFINITELY_MISSING_PROMETHEUS_TOKEN","queryTimeoutSeconds":15}
             """)).andExpect(status().isCreated()).andReturn();
         String metricsId=json.readTree(metrics.getResponse().getContentAsString()).path("id").asText();
         mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/disable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
@@ -123,6 +127,14 @@ class ConnectionApiTests {
         mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROMETHEUS_CONNECTION_DISABLED"));
         mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/enable").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/connections/prometheus/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post("/api/v1/connections/prometheus/"+metricsId+"/enable").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNVERIFIED"));
+        mvc.perform(post("/api/v1/connections/prometheus/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].connectionId").value(metricsId)).andExpect(jsonPath("$[0].failureCode").value("SECRET_UNAVAILABLE"));
+        mvc.perform(post("/api/v1/connections/prometheus/validate").with(authentication(auth("ROLE_VIEWER"))).with(csrf()))
             .andExpect(status().isForbidden());
     }
     private UsernamePasswordAuthenticationToken auth(String role){
