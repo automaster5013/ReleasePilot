@@ -64,3 +64,13 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 결과: H2 전체 verify 185개, MySQL 통합 23개(분석 6/감사 저장 14/트랜잭션·동시성 3)가 실패·오류·건너뜀 없이 통과했다. MySQL Flyway 22개·JSON 타입 5개 검사, helper의 UUID label/기록된 ID 기반 컨테이너·익명 볼륨 cleanup과 종료 후 잔여 컨테이너 없음 확인도 성공했다. 실행 중 소유 임시 컨테이너 `248cd2cc1ca3`는 loopback에만 바인딩됐다. 실행 명령은 위 실제 DB 검증과 동일하며 Ruff도 통과했다.
 
 이 후속 테스트는 롤백하지 않고 임시 DB에 commit하며, DB 자체가 검증 종료 후 폐기된다. 같은 JVM에서 새 Worker와 새 트랜잭션을 사용하는 검증이므로 실제 프로세스/DB 재시작·강제 종료 내구성, DB rollback-only 격리, 복수 Worker 중복 전송, 실제 외부 저장소 전달을 증명하지 않는다. scheduler Spring proxy 자동 실행도 검사하지 않는다. 운영 데이터·전달 상태·기존 last_error 수정, 외래 키 우회, 실제 AWS/S3/외부 HTTP 호출과 새 운영 배포는 없고, 운영 전체 릴리스 E2E 및 SSO/GitHub Checks 보류를 유지한다.
+
+## 배치 트랜잭션 롤백 후 재전송 경계
+
+`AuditConcurrencyIntegrationTests.archiveBatchRollbackLeavesBothEventsDueForRedelivery`는 실제 DB에 합성 이벤트와 due 순서를 commit한 뒤 mock sink에서 첫 항목만 실패시키고 다음 항목은 성공시킨다. 배치 전달 상태를 flush해 SQL 저장을 실행하고, 트랜잭션 안에서 실패 PENDING/attempts=1/고정 오류와 성공 DELIVERED를 확인한 뒤 `setRollbackOnly()`로 전체 롤백한다.
+
+다음 별도 트랜잭션에서는 두 항목 모두 원래 PENDING/attempts=0/오류·완료 시각 없음/원래 due 시각으로 조회된다. 즉 sink 호출이 성공해도 그 성공 상태는 배치 DB 트랜잭션과 함께 롤백된다. 첫 항목의 mock 실패를 해제하고 같은 시각에 새 배치를 commit하면 두 항목이 모두 DELIVERED가 된다. 두 이벤트의 sink 호출은 각각 2회이며, 앞서 성공한 항목도 재전송 대상이 됨을 확인한다. 실패 횟수도 롤백되므로 복구 후 attempts는 0이다. 감사 체인은 롤백 후 유효하고 재전송 commit 후 이벤트 수·head hash·첫 이벤트 hash가 유지된다.
+
+결과: H2 전체 verify 186개, 실제 MySQL 통합 24개(분석 6/감사 저장 14/트랜잭션·동시성 4)가 실패·오류·건너뜀 없이 통과했다. Flyway migration 22개·JSON 타입 5개 검사와 Ruff도 통과했다. 소유 임시 컨테이너 `71a0925268d0`는 loopback에만 바인딩됐고, helper의 UUID label/기록된 컨테이너 ID 확인 후 컨테이너·익명 볼륨 cleanup과 잔여 컨테이너 없음 확인을 완료했다. 실행 명령은 위 실제 DB 검증과 같다.
+
+이는 명시적으로 rollback-only를 설정한 실제 트랜잭션 검증이며 실제 SQL 오류·DB 연결 단절·commit 실패·프로세스 강제 종료를 주입하지 않는다. 항목별 독립 commit이나 DB 장애 격리 기능을 추가하지 않았고, DB 상태와 외부 sink 호출 사이의 exactly-once 전달을 보장하지 않는다. mock 호출 횟수를 검증했으므로 원격 저장소의 실제 중복 저장·중복 제거는 미검증이다. 실제 HTTP loopback 및 S3 SDK mock 검증과 구분한다. 운영 데이터·전달 상태·기존 last_error, 외래 키, 실제 AWS/S3/외부 HTTP는 변경·호출하지 않았다. 새 운영 배포 없이 운영 E2E/실제 재시작/복수 Worker 검증 및 SSO/GitHub Checks 보류를 유지한다.

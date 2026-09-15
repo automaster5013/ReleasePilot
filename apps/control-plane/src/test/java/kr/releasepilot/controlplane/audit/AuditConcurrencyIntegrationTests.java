@@ -115,6 +115,61 @@ class AuditConcurrencyIntegrationTests {
         org.mockito.Mockito.verifyNoMoreInteractions(recoveredSink);
     }
 
+    @Test
+    void archiveBatchRollbackLeavesBothEventsDueForRedelivery() {
+        var transaction=new TransactionTemplate(transactionManager);
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var now=Instant.parse("2031-01-01T00:00:00Z");
+        var recorded=transaction.execute(status -> {
+            var first=trail.record(event());
+            var second=trail.record(event());
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(first),"availableAt",now.minusSeconds(2));
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(second),"availableAt",now.minusSeconds(1));
+            return java.util.List.of(first,second);
+        });
+        var first=recorded.get(0);
+        var second=recorded.get(1);
+        var sink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("synthetic rollback failure"))
+                .when(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        transaction.executeWithoutResult(status -> {
+            new AuditArchiveWorker(deliveries,events,sink,
+                    java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+            deliveries.flush();
+            assertDelivery(first,AuditArchiveDelivery.Status.PENDING,1,"AUDIT_ARCHIVE_UNAVAILABLE",null);
+            assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+            status.setRollbackOnly();
+        });
+        transaction.executeWithoutResult(status -> {
+            assertDelivery(first,AuditArchiveDelivery.Status.PENDING,0,null,null);
+            assertDelivery(second,AuditArchiveDelivery.Status.PENDING,0,null,null);
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(first),"availableAt"))
+                    .isEqualTo(now.minusSeconds(2));
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(second),"availableAt"))
+                    .isEqualTo(now.minusSeconds(1));
+            assertThat(verifier.verify().valid()).isTrue();
+        });
+        org.mockito.Mockito.doNothing().when(sink).archive(
+                org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick());
+        transaction.executeWithoutResult(status -> {
+            assertDelivery(first,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+            assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+            var result=verifier.verify();
+            assertThat(result.valid()).isTrue();
+            assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+            assertThat(result.headHash()).isEqualTo(second.getEventHash());
+            assertThat(events.findById(first.getId()).orElseThrow().getEventHash()).isEqualTo(first.getEventHash());
+        });
+        org.mockito.Mockito.verify(sink,org.mockito.Mockito.times(2)).archive(
+                org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        // A successful sink call is not undone by the database rollback.
+        org.mockito.Mockito.verify(sink,org.mockito.Mockito.times(2)).archive(
+                org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(second.getId())));
+    }
+
     private AuditArchiveDelivery deliveryFor(AuditEvent event) {
         return deliveries.findAll().stream().filter(value -> value.auditEventId().equals(event.getId()))
                 .findFirst().orElseThrow();
