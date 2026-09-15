@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -76,6 +76,14 @@ test("audit events have readable action and privacy-safe actor labels", () => {
   const base = { id: "1", occurredAt: "2026-09-15T00:00:00Z", correlationId: "correlation", chainSequence: 1 };
   assert.equal(auditEventLabel({ ...base, eventType: "RELEASE_APPROVED", actorType: "USER", actorId: "12345678-abcd" }), "Release Approved · User 12345678");
   assert.equal(auditEventLabel({ ...base, eventType: "ROLLOUT_PROMOTE_COMPLETED", actorType: "SYSTEM", actorId: null }), "Rollout Promote Completed · System");
+});
+
+test("connection audit details expose stable status codes without unsafe payload fallback", () => {
+  const base = { id: "1", eventType: "CLUSTER_CONNECTION_VALIDATED", actorType: "USER", actorId: "12345678-abcd", occurredAt: "2026-09-15T00:00:00Z", correlationId: "correlation", chainSequence: 1 };
+  assert.equal(connectionAuditDetail({ ...base, payloadJson: '{"status":"INVALID","failureCode":"SECRET_UNAVAILABLE"}' }), "INVALID · SECRET_UNAVAILABLE");
+  assert.equal(connectionAuditDetail({ ...base, payloadJson: '{"status":"ACTIVE","failureCode":"null"}' }), "ACTIVE");
+  assert.equal(connectionAuditDetail({ ...base, payloadJson: "not-json" }), null);
+  assert.equal(connectionAuditDetail(base), null);
 });
 
 test("audit integrity verification is operator-only and has stable labels", () => {

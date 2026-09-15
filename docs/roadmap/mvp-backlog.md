@@ -237,3 +237,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 32. Prometheus 연결 재검증 Web Console — 완료 (2026-09-15, OPERATOR 전용 목록·신선도 표시·CSRF 재검증·VIEWER 조회 차단)
 33. Kubernetes 연결 재검증 Web Console — 완료 (2026-09-15, OPERATOR 전용 목록·namespace 범위·신선도 표시·CSRF 재검증·VIEWER 조회 차단)
 34. 외부 연결 등록 Web Console — 완료 (2026-09-15, Kubernetes·Prometheus 입력 사전 검증·secret reference·CSRF 생성·생성 후 목록 갱신)
+35. 외부 연결 감사 이력 Web Console — 완료 (2026-09-15, OPERATOR aggregate 조회·actor·시각·체인 sequence·검증 상태/failure code 표시)

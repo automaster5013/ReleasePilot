@@ -6,12 +6,17 @@
 .connections h3 { margin: 0; padding: 12px 26px; border-top: 1px solid #293730; color: #67b997; font: 650 10px monospace; letter-spacing: .1em; text-transform: uppercase; }
 .connections button { border: 1px solid #496158; background: transparent; color: #d8e8e1; padding: 9px 12px; font-weight: 700; cursor: pointer; }
 .connections button:disabled { opacity: .35; cursor: wait; }
-.connectionList article { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 26px; border-top: 1px solid #293730; }
+.connectionList article { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 26px; border-top: 1px solid #293730; }
 .connectionList article:first-child { border-top: 0; }
 .connectionList article div { display: grid; gap: 4px; min-width: 0; }
 .connectionList code { color: #8fa39b; overflow-wrap: anywhere; }
 .connectionList small { color: #67d6a3; }
 .connectionList small[data-status="INVALID"], .connectionList small[data-status="UNVERIFIED"] { color: #ffacb0; }
+.connectionActions { display: flex; grid-template-columns: none; gap: 7px; }
+.connectionAudit { flex-basis: 100%; display: grid; gap: 7px; padding: 12px; border: 1px solid #293730; background: #0b1210; }
+.connectionAudit > span { display: flex; justify-content: space-between; gap: 12px; }
+.connectionAudit strong { font-size: 11px; }
+.connectionAudit small { color: #81958d; text-align: right; }
 .connectionCreate { border-bottom: 1px solid #293730; }
 .connectionCreate summary { padding: 14px 26px; cursor: pointer; color: #3adea3; font: 650 10px monospace; letter-spacing: .1em; }
 .connectionCreate summary span { margin-left: 9px; color: #71847c; letter-spacing: normal; }
@@ -86,6 +91,8 @@
 @media(max-width: 600px) {
   .connections > header, .connectionList article { align-items: flex-start; }
   .connectionList article { flex-direction: column; }
+  .connectionAudit > span { flex-direction: column; }
+  .connectionAudit small { text-align: left; }
   .connectionForms { grid-template-columns: 1fr; }
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }

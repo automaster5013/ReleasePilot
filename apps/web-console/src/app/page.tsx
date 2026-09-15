@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -111,6 +111,9 @@ export default function Home() {
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
   const [prometheusDraft, setPrometheusDraft] = useState<PrometheusConnectionDraft>(emptyPrometheusDraft);
   const [connectionCreateBusy, setConnectionCreateBusy] = useState(false);
+  const [connectionAuditId, setConnectionAuditId] = useState("");
+  const [connectionAuditEvents, setConnectionAuditEvents] = useState<AuditEventView[]>([]);
+  const [connectionAuditBusy, setConnectionAuditBusy] = useState(false);
 
   const refreshAuditIntegrity = useCallback(async () => {
     setAuditIntegrityBusy(true);
@@ -530,6 +533,19 @@ export default function Home() {
     finally { setConnectionCreateBusy(false); }
   }
 
+  async function loadConnectionAudit(aggregateType: "CLUSTER_CONNECTION" | "PROMETHEUS_CONNECTION", connectionId: string) {
+    if (connectionAuditBusy) return;
+    if (connectionAuditId === connectionId) { setConnectionAuditId(""); setConnectionAuditEvents([]); return; }
+    setConnectionAuditBusy(true); setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/audit-events?aggregateType=${aggregateType}&aggregateId=${connectionId}`, { credentials: "include" });
+      if (!response.ok) throw new Error("연결 감사 이력을 불러올 수 없습니다.");
+      const page = await response.json() as { items: AuditEventView[] };
+      setConnectionAuditId(connectionId); setConnectionAuditEvents(page.items);
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionAuditBusy(false); }
+  }
+
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
@@ -637,9 +653,9 @@ export default function Home() {
             <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input required maxLength={100} value={prometheusDraft.name} onChange={(event) => setPrometheusDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Base URL<input required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => setPrometheusDraft((current) => ({ ...current, baseUrl: event.target.value }))} /></label><label>Secret reference <small>선택 사항</small><input maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => setPrometheusDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><label>Query timeout seconds<input required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => setPrometheusDraft((current) => ({ ...current, queryTimeoutSeconds: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>
           </div></details>
           <h3>Kubernetes clusters</h3>
-          {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
+          {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void loadConnectionAudit("CLUSTER_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
           <h3>Prometheus</h3>
-          {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
+          {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
           {connectionNotice && <p className={sessionStyles.sessionNotice} role="status">{connectionNotice}</p>}
         </section>}
         <section className={styles.grid}>
@@ -679,4 +695,8 @@ function format(value: number | null, key: string) {
   if (key === "HTTP_5XX_RATE") return `${(value * 100).toFixed(2)}%`;
   if (key === "HTTP_P95_LATENCY_MS") return `${Math.round(value)}ms`;
   return Math.round(value).toLocaleString();
+}
+
+function ConnectionAudit({ events }: { events: AuditEventView[] }) {
+  return <div className={sessionStyles.connectionAudit}>{events.length ? events.map((event) => <span key={event.id}><strong>{auditEventLabel(event)}</strong><small>{connectionAuditDetail(event) ?? "—"} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</small></span>) : <span>기록된 연결 감사 이벤트가 없습니다.</span>}</div>;
 }

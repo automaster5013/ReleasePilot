@@ -2,7 +2,7 @@ export type CsrfToken = { headerName: string; token: string };
 
 export type CatalogItem = { id: string; name: string; status: string; key?: string; strategy?: string };
 export type ReleaseSummary = { id: string; version: string; status: string; createdAt: string; context?: { serviceName: string; environmentName: string } };
-export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null };
+export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null; payloadJson?: string | null };
 export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
 export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; validUntil: string; checks: { code: string; outcome: string; message: string }[] };
 export type PrometheusConnection = { id: string; name: string; baseUrl: string; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
@@ -25,6 +25,16 @@ export function auditEventLabel(event: AuditEventView) {
   const action = event.eventType.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   const actor = event.actorType === "SYSTEM" ? "System" : event.actorId ? `User ${event.actorId.slice(0, 8)}` : "User";
   return `${action} · ${actor}`;
+}
+
+export function connectionAuditDetail(event: AuditEventView) {
+  if (!event.payloadJson) return null;
+  try {
+    const payload = JSON.parse(event.payloadJson) as { status?: unknown; failureCode?: unknown };
+    const status = typeof payload.status === "string" ? payload.status : null;
+    const failure = typeof payload.failureCode === "string" && payload.failureCode !== "null" ? payload.failureCode : null;
+    return [status, failure].filter(Boolean).join(" · ") || null;
+  } catch { return null; }
 }
 
 export function canVerifyAudit(roles: string[]) {
