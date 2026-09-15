@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+CSRF HTTP 오류 후속 검증: 기존 세 역할 토큰 실패 테스트를 연결 실패 및 401/403/500 응답으로 확장했다. HTTP 오류에서는 `보안 토큰을 갱신할 수 없습니다.` 안내·버튼 복구·변경 요청 0개·성공 안내 없음이 확인됐다. 오류 응답 본문에도 합성 토큰을 포함해 HTTP 성공 여부 검사 없이 토큰을 사용하는 회귀를 탐지한다. 신규 9개를 포함한 전체 fixture E2E 66개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없고 실제 인증 만료·backend CSRF enforcement·잘못된 성공 응답 형식은 별도다.
+
 CSRF 조회 실패 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort에서 `/session/csrf` GET만 `connectionfailed`로 중단한다. 오류 표시 후 버튼 복구, 변경 요청 0개 및 성공 안내 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 57개와 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 토큰 HTTP 거부·잘못된 응답 형식·실제 backend CSRF enforcement는 별도 검증이다.
 
 연결 실패 후 수동 재시도 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort의 첫 POST만 `connectionfailed`로 중단하고 두 번째 요청은 fixture 성공 응답을 제공한다. 첫 오류와 버튼 복구를 기다린 뒤 사용자 클릭으로 재시도해 성공 안내/생성 상세·이전 오류 제거·동일 endpoint와 본문 2회·성공 감사 `chain #1`·예상하지 않은 요청 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 54개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 첫 요청은 fixture에서 처리되지 않으므로 실제 서버 처리 후 응답 유실의 중복 방지나 멱등 키 재사용을 증명하지 않는다.
