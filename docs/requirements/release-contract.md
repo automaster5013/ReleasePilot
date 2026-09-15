@@ -78,6 +78,10 @@ Web Console 승인 상세는 대상 Environment의 최신 상태와 검증 유�
 비활성화되면 Control Plane은 `CLUSTER_CONNECTION_NOT_ACTIVE`로 승인을 거부하고 Rollout execution과
 outbox 명령을 생성하지 않는다. Web Console은 운영자 연결 검증이 필요함을 안내한다.
 
+승인과 `START_ROLLOUT` outbox 처리 사이에도 상태가 바뀔 수 있으므로 실제 Kubernetes mutation 직전에
+Environment 활성 상태·검증 유효 기한·ClusterConnection 활성 상태를 다시 확인한다. 실패 시 외부 API와
+secret resolver를 호출하지 않고 안정 reason code로 명령을 재시도 대기시킨다.
+
 릴리스 상세 API와 Web Console은 승인 검토를 위해 Service·Environment 이름, 요청자 표시명과 계정,
 이미지 repository/digest, 변경 요약·Commit SHA·Pipeline URL, 불변 PolicySnapshot의 전략·단계·지표 임계값을
 함께 표시한다. 정책 정보는 현재 활성 정책을 다시 조회하지 않고 요청 시점 snapshot을 사용한다.
