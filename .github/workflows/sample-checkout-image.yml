@@ -1,0 +1,67 @@
+name: Sample checkout images
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sample-checkout-images
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [v1, v2]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify built application before publication
+        env:
+          APP_VERSION: ${{ matrix.version }}
+        run: |
+          docker build --build-arg "APP_VERSION=$APP_VERSION" -t sample-verification apps/sample-checkout
+          docker run -d --name sample-verification -p 127.0.0.1:18085:8085 sample-verification
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:18085/health', timeout=2) as response:
+                      assert response.status == 200
+                  break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise RuntimeError('Sample container did not become healthy')
+          with urllib.request.urlopen('http://127.0.0.1:18085/checkout/verify', timeout=5) as response:
+              assert response.status == 200
+              assert json.load(response)['version'] == os.environ['APP_VERSION']
+          with urllib.request.urlopen('http://127.0.0.1:18085/metrics', timeout=5) as response:
+              metrics = response.read().decode()
+              assert 'http_server_request_duration_seconds_count{' in metrics
+              assert 'http_route="/checkout/{id}"' in metrics
+          PY
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: apps/sample-checkout
+          build-args: APP_VERSION=${{ matrix.version }}
+          push: true
+          provenance: true
+          sbom: true
+          tags: automaster5013/releasepilot-sample-checkout:${{ github.sha }}-${{ matrix.version }}
+      - name: Record digest
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          APP_VERSION: ${{ matrix.version }}
+        run: printf '%s=automaster5013/releasepilot-sample-checkout@%s\n' "$APP_VERSION" "$IMAGE_DIGEST" > "sample-$APP_VERSION.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sample-${{ matrix.version }}
+          path: sample-${{ matrix.version }}.txt
