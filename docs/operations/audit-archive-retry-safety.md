@@ -57,6 +57,8 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 
 ## commit 이후 별도 트랜잭션 복구 검증
 
+후속 [JVM 종료 후 상태 유지·복구](audit-archive-jvm-restart.md)는 동일 임시 MySQL을 사용하는 서로 다른 테스트 JVM에서 commit 상태 재조회와 실패 항목 복구를 검증한다.
+
 `AuditConcurrencyIntegrationTests.archiveBatchFailureCommitsAndNewWorkerRecoversInSeparateTransaction`를 추가했다. 실제 `TransactionTemplate`으로 합성 이벤트·due 순서를 commit한 뒤, mock sink가 첫 항목에만 예외를 발생시키는 Worker 배치를 별도 트랜잭션에서 실행하고 commit한다. 다음 트랜잭션에서 실패 항목의 PENDING/고정 오류/attempts=1/재시도 시각/완료 시각 없음과 성공 항목의 DELIVERED/attempts=0/오류 없음/완료 시각을 확인한다.
 
 새 Worker와 새 mock sink를 만들고 2초 뒤 재시도를 다른 트랜잭션에서 commit한다. 다시 별도 트랜잭션에서 실패 항목의 DELIVERED/오류 제거/attempts=1/새 완료 시각과 기존 성공 항목의 상태·완료 시각 유지를 확인한다. 복구 sink는 실패했던 이벤트만 정확히 한 번 받고 추가 호출이 없으며, 실패 commit 후와 복구 commit 후 모두 감사 체인 유효성·이벤트 수·head hash가 유지된다. 첫 이벤트 hash도 복구 후 원본과 일치한다.

@@ -78,6 +78,8 @@ def main():
         if not 1 <= port <= 65535:
             raise RuntimeError("Invalid temporary port")
         test_env = os.environ.copy()
+        test_env.pop("AUDIT_RESTART_PHASE", None)
+        test_env.pop("AUDIT_RESTART_RUN_ID", None)
         test_env.update(
             {
                 "ANALYSIS_TEST_JDBC_URL": f"jdbc:mysql://127.0.0.1:{port}/releasepilot?allowPublicKeyRetrieval=true&useSSL=false",
@@ -108,6 +110,24 @@ def main():
             timeout=600,
             check=True,
         )
+        restart_command = [
+            *command[:-2],
+            "-Dtest=AuditArchiveRestartIntegrationTests",
+            "test",
+        ]
+        restart_env = test_env.copy()
+        restart_env["AUDIT_RESTART_RUN_ID"] = owner
+        for phase in ("seed", "recover"):
+            restart_env["AUDIT_RESTART_PHASE"] = phase
+            print(f"Running audit archive JVM restart phase: {phase}", flush=True)
+            subprocess.run(
+                restart_command,
+                cwd=ROOT / "apps/control-plane",
+                env=restart_env,
+                timeout=600,
+                check=True,
+            )
+        print("PASS: audit archive state recovered in a separate JVM", flush=True)
         for table, field, expected in (
             ("policy_versions", "definition", "OBJECT"),
             ("policy_snapshots", "definition", "OBJECT"),
