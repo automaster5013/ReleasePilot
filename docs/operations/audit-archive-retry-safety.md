@@ -27,3 +27,5 @@ cd apps/control-plane
 검증 결과: H2 서버 전체 verify 171개 및 실제 MySQL 8.4.11 통합 21개(분석 6/감사 저장 13/동시성 2)가 모두 통과했다. Flyway migration 22개·JSON 타입 5개 검사와 소유권 확인 후 컨테이너/익명 볼륨 cleanup도 성공했다.
 
 이후 [실제 loopback HTTP 장애·복구](audit-http-recovery.md) 검증을 추가했다. 운영 외부 저장소 검증과 구분한다.
+
+후속 [S3 SDK 경계 실패·복구](audit-s3-recovery.md)는 실제 AWS 호출 없이 조건부 쓰기와 충돌 시 미완료 상태 유지를 검사한다.
