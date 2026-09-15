@@ -64,6 +64,15 @@ export function approvalReadinessMessage(code: string | undefined) {
   if (code === "ENVIRONMENT_VALIDATION_STALE") return "환경 검증이 만료되어 승인할 수 없습니다. 운영자 재검증 후 다시 승인하세요.";
   if (code === "ENVIRONMENT_NOT_ACTIVE") return "환경이 최신 검증을 통과하지 못해 승인할 수 없습니다. 운영자 점검이 필요합니다.";
   if (code === "CLUSTER_CONNECTION_NOT_ACTIVE") return "대상 Kubernetes 연결이 비활성 상태여서 승인할 수 없습니다. 운영자 연결 검증이 필요합니다.";
+  if (code === "CLUSTER_CONNECTION_VALIDATION_STALE") return "대상 Kubernetes 연결 검증이 만료되어 승인할 수 없습니다. 운영자 연결 재검증 후 다시 승인하세요.";
+  return null;
+}
+
+export function releaseRequestReadinessMessage(code: string | undefined) {
+  if (code === "ENVIRONMENT_VALIDATION_STALE") return "환경 검증이 만료되었습니다. 운영자 재검증 후 다시 요청하세요.";
+  if (code === "ENVIRONMENT_NOT_ACTIVE") return "환경이 최신 검증을 통과하지 못했습니다. 운영자 점검 후 다시 요청하세요.";
+  if (code === "CLUSTER_CONNECTION_NOT_ACTIVE") return "대상 Kubernetes 연결이 비활성 상태입니다. 운영자 연결 검증 후 다시 요청하세요.";
+  if (code === "CLUSTER_CONNECTION_VALIDATION_STALE") return "대상 Kubernetes 연결 검증이 만료되었습니다. 운영자 연결 재검증 후 다시 요청하세요.";
   return null;
 }
 

@@ -77,7 +77,8 @@ Web Console 승인 상세는 대상 Environment의 최신 상태와 검증 유�
 승인 시점에 대상 Kubernetes ClusterConnection도 `ACTIVE`이고 최근 검증이 기본 6시간 이내여야 한다.
 요청 접수 뒤 연결이 무효화·비활성화되면 `CLUSTER_CONNECTION_NOT_ACTIVE`, 검증 기한이 지나면
 `CLUSTER_CONNECTION_VALIDATION_STALE`로 승인을 거부하고 Rollout execution과 outbox 명령을 생성하지
-않는다. Web Console은 운영자 연결 재검증이 필요함을 안내한다.
+않는다. Web Console은 요청과 승인 각각에서 비활성·만료 원인을 구분하고 운영자 연결 재검증이 필요함을
+안내하며, 서버의 fail-closed 판정을 일반 오류 문구로 숨기지 않는다.
 
 승인과 `START_ROLLOUT` outbox 처리 사이에도 상태가 바뀔 수 있으므로 실제 Kubernetes mutation 직전에
 Environment 활성 상태·검증 유효 기한·ClusterConnection 활성 상태와 검증 유효 기한을 다시 확인한다.

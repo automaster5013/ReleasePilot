@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -401,7 +401,8 @@ export default function Home() {
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
-        if (problem?.code === "ENVIRONMENT_VALIDATION_STALE") throw new Error("환경 검증이 만료되었습니다. 운영자 재검증 후 다시 요청하세요.");
+        const readinessMessage = releaseRequestReadinessMessage(problem?.code);
+        if (readinessMessage) throw new Error(readinessMessage);
         throw new Error(problem?.detail ?? "릴리스 요청이 거부되었습니다.");
       }
       const created = await response.json() as { id: string };

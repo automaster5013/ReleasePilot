@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -18,12 +18,21 @@ test("approval readiness failures tell approvers how to recover", () => {
   assert.match(approvalReadinessMessage("ENVIRONMENT_VALIDATION_STALE") ?? "", /재검증/);
   assert.match(approvalReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /점검/);
   assert.match(approvalReadinessMessage("CLUSTER_CONNECTION_NOT_ACTIVE") ?? "", /Kubernetes 연결/);
+  assert.match(approvalReadinessMessage("CLUSTER_CONNECTION_VALIDATION_STALE") ?? "", /연결 재검증/);
   assert.equal(approvalReadinessMessage("UNKNOWN"), null);
   assert.equal(approvalReadinessLabel(null), "Readiness unavailable");
   const base = { environmentId: "env", checkedAt: "2026-09-15T00:00:00Z", checks: [] };
   assert.equal(approvalReadinessLabel({ ...base, status: "INVALID", validUntil: "2099-01-01T00:00:00Z" }), "INVALID · revalidation required");
   assert.equal(approvalReadinessLabel({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), "ACTIVE · revalidation required");
   assert.match(approvalReadinessLabel({ ...base, status: "ACTIVE", validUntil: "2099-01-01T00:00:00Z" }), /^ACTIVE · valid until /);
+});
+
+test("release readiness failures tell developers how to recover", () => {
+  assert.match(releaseRequestReadinessMessage("ENVIRONMENT_VALIDATION_STALE") ?? "", /환경 검증.*재검증/);
+  assert.match(releaseRequestReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /운영자 점검/);
+  assert.match(releaseRequestReadinessMessage("CLUSTER_CONNECTION_NOT_ACTIVE") ?? "", /연결 검증/);
+  assert.match(releaseRequestReadinessMessage("CLUSTER_CONNECTION_VALIDATION_STALE") ?? "", /연결 재검증/);
+  assert.equal(releaseRequestReadinessMessage("UNKNOWN"), null);
 });
 
 test("operator mutations include JSON and idempotency headers", () => {
