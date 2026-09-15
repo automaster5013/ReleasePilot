@@ -31,4 +31,10 @@ npm run test:e2e
 
 기존 CI web-console job이 같은 Playwright testDir를 실행하므로 새 역할별 테스트도 자동 실행한다. production standalone build에서 실행하는 fixture UI 검증이며 실제 SSO 인증·서버 권한 enforcement·실제 배포 완료·DB 감사 저장을 증명하지 않는다. 운영 조작의 접수 안내를 검증하며 Rollout 완료를 검증하는 것이 아니다.
 
-연결 등록/재검증, 세션 원격 종료, API 장애·지연·중복 클릭과 대상 전환, 전체 키보드·스크린리더 접근성 및 역할별 모바일 검수는 별도 과제다. 기존 함수 단위 보호 검증과 이번 화면 흐름 검증을 구분한다. 새 운영 배포·운영 데이터 변경은 없고 전체 운영 E2E와 SSO/GitHub Checks 활성화 보류를 유지한다.
+## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
+
+fixture E2E 8개를 추가했다. DEVELOPER 요청과 APPROVER 승인에서 서버의 ENVIRONMENT_VALIDATION_STALE 응답을 표시하고 성공 안내 없이 버튼을 다시 사용할 수 있는지 확인한다. OPERATOR Abort의 FORBIDDEN 응답에서도 접수 안내 없이 오류를 표시하고 busy 상태를 해제한다. APPROVER/OPERATOR의 공백 사유·1001자 사유 및 승인 prompt 취소는 mutation이 전송되지 않는지 확인한다. 모든 시나리오에서 예상하지 않은 요청이 없어야 한다.
+
+웹 단위 34개, lint, typecheck, 새 production build 및 전체 fixture E2E 28개가 통과했다. 제품 코드 변경은 없으며 실제 backend 장애나 권한 enforcement 검증을 의미하지 않는다.
+
+연결 등록/재검증, 세션 원격 종료, API 지연·중복 클릭과 대상 전환, 전체 키보드·스크린리더 접근성 및 역할별 모바일 검수는 별도 과제다. 기존 함수 단위 보호 검증과 이번 화면 흐름 검증을 구분한다. 새 운영 배포·운영 데이터 변경은 없고 전체 운영 E2E와 SSO/GitHub Checks 활성화 보류를 유지한다.

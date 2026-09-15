@@ -161,3 +161,70 @@ test("cancelled operator reason does not transmit a mutation", async ({ page }) 
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
+
+test("developer sees server readiness rejection without a created release", async ({ page }) => {
+  const state = await fixture(page, "DEVELOPER", { failure: "ENVIRONMENT_VALIDATION_STALE" });
+  await fillRequest(page);
+  await page.getByRole("button", { name: "릴리스 요청", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "환경 검증이 만료되었습니다." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toHaveCount(0);
+  await expect(page.getByText(/요청이 생성되었습니다/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "릴리스 요청", exact: true })).toBeEnabled();
+  expect(state.mutations).toHaveLength(1);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("approver sees server readiness rejection and retains decision controls", async ({ page }) => {
+  const state = await fixture(page, "APPROVER", { failure: "ENVIRONMENT_VALIDATION_STALE" });
+  await load(page);
+  const approve = page.getByRole("button", { name: "Approve", exact: true });
+  await expect(approve).toBeEnabled();
+  page.once("dialog", (dialog) => dialog.accept("Role decision"));
+  await approve.click();
+  await expect(page.getByRole("alert").filter({ hasText: "환경 검증이 만료되어 승인할 수 없습니다." })).toBeVisible();
+  await expect(approve).toBeEnabled();
+  await expect(page.getByText("승인 결정이 기록되었습니다.", { exact: true })).toHaveCount(0);
+  expect(state.mutations).toHaveLength(1);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("operator rejection does not claim acceptance and releases the busy state", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { failure: "FORBIDDEN" });
+  await load(page);
+  const abort = page.getByRole("button", { name: "Abort", exact: true });
+  page.once("dialog", (dialog) => dialog.accept("Role operation"));
+  await abort.click();
+  await expect(page.getByRole("alert").filter({ hasText: "abort 요청이 거부되었습니다." })).toBeVisible();
+  await expect(abort).toBeEnabled();
+  await expect(page.getByText("abort 요청이 접수되었습니다.", { exact: true })).toHaveCount(0);
+  expect(state.mutations).toHaveLength(1);
+  expect(state.unexpected).toEqual([]);
+});
+
+for (const role of ["APPROVER", "OPERATOR"]) {
+  for (const reason of ["   ", "x".repeat(1001)]) {
+    test(`${role} rejects ${reason.length === 3 ? "blank" : "oversized"} reason before transmission`, async ({ page }) => {
+      const state = await fixture(page, role);
+      await load(page);
+      const action = page.getByRole("button", { name: role === "APPROVER" ? "Reject" : "Abort", exact: true });
+      page.once("dialog", (dialog) => dialog.accept(reason));
+      await action.click();
+      await expect(page.getByRole("alert").filter({ hasText: "1000자 이하여야 합니다." })).toBeVisible();
+      await expect(action).toBeEnabled();
+      expect(state.mutations).toEqual([]);
+      expect(state.unexpected).toEqual([]);
+    });
+  }
+}
+
+test("cancelled approval reason does not transmit a mutation", async ({ page }) => {
+  const state = await fixture(page, "APPROVER");
+  await load(page);
+  const approve = page.getByRole("button", { name: "Approve", exact: true });
+  await expect(approve).toBeEnabled();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await approve.click();
+  await expect(approve).toBeEnabled();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
