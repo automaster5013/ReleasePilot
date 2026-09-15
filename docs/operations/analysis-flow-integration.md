@@ -35,7 +35,7 @@ cd apps/control-plane
 
 ## 실제 MySQL 후속 검증
 
-`python scripts/analysis_mysql_integration.py`는 Docker의 임시 MySQL 8.4에 같은 6개 시나리오를 실행한다. `mysql:8.4` 이미지를 미리 준비하고 Python/Docker/Java/Maven wrapper 실행 환경이 필요하다.
+`python scripts/analysis_mysql_integration.py`는 Docker의 임시 MySQL 8.4에 같은 분석 6개 및 [감사 저장 무결성 검증](audit-storage-integration.md) 5개 시나리오를 실행한다. `mysql:8.4` 이미지를 미리 준비하고 Python/Docker/Java/Maven wrapper 실행 환경이 필요하다.
 
 ```powershell
 docker pull mysql:8.4

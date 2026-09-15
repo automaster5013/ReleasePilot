@@ -90,9 +90,15 @@ def main():
         command = (
             ["cmd", "/d", "/c", "mvnw.cmd"] if os.name == "nt" else ["bash", "mvnw"]
         )
-        command.extend(["--batch-mode", "-Dtest=AnalysisFlowIntegrationTests", "test"])
+        command.extend(
+            [
+                "--batch-mode",
+                "-Dtest=AnalysisFlowIntegrationTests,AuditStorageIntegrationTests",
+                "test",
+            ]
+        )
         print(
-            "Running 6 analysis flows: MySQL 8.4, Flyway enabled, Hibernate validate",
+            "Running 6 analysis flows and 5 audit storage checks: MySQL 8.4, Flyway enabled, Hibernate validate",
             flush=True,
         )
         subprocess.run(

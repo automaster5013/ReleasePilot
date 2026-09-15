@@ -115,7 +115,7 @@ public class AuditEvent {
         event.eventType = eventType;
         event.actorType = "USER";
         event.actorId = actorId;
-        event.occurredAt = occurredAt;
+        event.occurredAt = occurredAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         event.correlationId = CorrelationIdFilter.current();
         event.payloadJson = "{}";
         return event;
