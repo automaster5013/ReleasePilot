@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -12,6 +12,12 @@ test("only approvers can decide a pending release", () => {
   assert.equal(canDecideRelease(["APPROVER"], "PENDING_APPROVAL"), true);
   assert.equal(canDecideRelease(["OPERATOR"], "PENDING_APPROVAL"), false);
   assert.equal(canDecideRelease(["APPROVER"], "APPROVED"), false);
+});
+
+test("approval readiness failures tell approvers how to recover", () => {
+  assert.match(approvalReadinessMessage("ENVIRONMENT_VALIDATION_STALE") ?? "", /재검증/);
+  assert.match(approvalReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /점검/);
+  assert.equal(approvalReadinessMessage("UNKNOWN"), null);
 });
 
 test("operator mutations include JSON and idempotency headers", () => {

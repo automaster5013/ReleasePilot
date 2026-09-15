@@ -148,7 +148,7 @@ ReleasePilot이 모든 Prometheus 시계열을 검색하지 않도록 Environmen
   `ENVIRONMENT_REVALIDATION_*` 환경 변수로 조정할 수 있다.
 - 최신 검증의 유효 기간도 같은 기본 6시간이며 `ENVIRONMENT_REVALIDATION_MAX_AGE`로 조정한다. 조회 API는
   `validUntil`을 반환하고 Web Console은 기한이 지난 Environment의 요청을 사전 차단한다. 서버는 스케줄러
-  지연과 무관하게 릴리스 요청 시 다시 기한을 검사하고 `ENVIRONMENT_VALIDATION_STALE`로 거부한다.
+  지연과 무관하게 릴리스 요청과 승인 시점에 다시 기한을 검사하고 `ENVIRONMENT_VALIDATION_STALE`로 거부한다.
 - 릴리스 직전 Rollout UID가 마지막 등록 검증 시점과 다르면 자동 실행하지 않는다.
 - 변경 결과는 이전 설정 전체를 덮어쓴 감사 payload가 아니라 변경된 필드 목록과 검증 결과로 기록한다.
 

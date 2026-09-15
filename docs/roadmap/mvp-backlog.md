@@ -226,3 +226,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 21. Environment 수동 재검증 Web Console — 완료 (2026-09-15, OPERATOR 전용 CSRF 재검증·결과 즉시 갱신·실패 환경 요청 차단)
 22. Environment 재검증 감사 이력 — 완료 (2026-09-15, 수동 실행자 감사 체인 기록·OPERATOR aggregate 조회·Web Console 이력 표시)
 23. Environment 검증 만료 릴리스 차단 — 완료 (2026-09-15, 6시간 유효 기한 서버 강제·Web Console 사전 차단·안정 오류 코드)
+24. 승인 시점 Environment readiness 재확인 — 완료 (2026-09-15, 승인 대기 중 만료·무효화 차단·Rollout 미예약 보장·복구 안내)

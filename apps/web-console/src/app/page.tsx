@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -453,6 +453,8 @@ export default function Home() {
       if (!response.ok) {
         const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
         if (problem?.code === "SELF_APPROVAL_NOT_ALLOWED") throw new Error("요청자는 자신의 릴리스를 승인할 수 없습니다.");
+        const readinessMessage = approvalReadinessMessage(problem?.code);
+        if (action === "approve" && readinessMessage) throw new Error(readinessMessage);
         throw new Error(problem?.detail ?? `${action} 요청이 거부되었습니다.`);
       }
       const decided = await response.json() as { status: string };

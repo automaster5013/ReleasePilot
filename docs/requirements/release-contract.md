@@ -66,6 +66,10 @@ ReleasePilot은 다음 조건을 만족할 때만 요청을 `PENDING_APPROVAL`�
 
 승인자는 승인 또는 거부 사유를 기록한다. 승인 후에는 릴리스 입력, 정책 버전과 Canary 단계가 변경되지 않는다. 변경이 필요하면 기존 요청을 취소하고 새 요청을 만들어야 한다.
 
+승인 대기 중 Environment가 무효화되거나 최신 검증 유효 기한이 지나면 승인은 실패하고 Rollout을 예약하지
+않는다. Control Plane은 각각 `ENVIRONMENT_NOT_ACTIVE`, `ENVIRONMENT_VALIDATION_STALE`을 반환한다. 거부 결정은
+Environment readiness와 무관하게 허용해 대기 요청을 안전하게 종료할 수 있어야 한다.
+
 릴리스 상세 API와 Web Console은 승인 검토를 위해 Service·Environment 이름, 요청자 표시명과 계정,
 이미지 repository/digest, 변경 요약·Commit SHA·Pipeline URL, 불변 PolicySnapshot의 전략·단계·지표 임계값을
 함께 표시한다. 정책 정보는 현재 활성 정책을 다시 조회하지 않고 요청 시점 snapshot을 사용한다.
