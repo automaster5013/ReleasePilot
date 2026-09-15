@@ -1,0 +1,7 @@
+# Historical test-only idempotency keys, not authentication credentials.
+74aabfbeaea938335b67890f31d7b37217396411:apps/web-console/src/app/control-api.test.mts:generic-api-key:13
+74aabfbeaea938335b67890f31d7b37217396411:apps/web-console/src/app/control-api.test.mts:generic-api-key:16
+522d9d35f6b41801975d7bb0d671b0141101dbea:apps/control-plane/src/test/java/kr/releasepilot/controlplane/release/ReleaseRequestApiTests.java:generic-api-key:22
+522d9d35f6b41801975d7bb0d671b0141101dbea:apps/control-plane/src/test/java/kr/releasepilot/controlplane/release/ReleaseRequestApiTests.java:generic-api-key:25
+d4f6c9190549a4504458cb4abf639670ea0a7ef4:apps/control-plane/src/test/java/kr/releasepilot/controlplane/release/ReleaseRequestApiTests.java:generic-api-key:21
+d4f6c9190549a4504458cb4abf639670ea0a7ef4:apps/control-plane/src/test/java/kr/releasepilot/controlplane/release/ReleaseRequestApiTests.java:generic-api-key:24
