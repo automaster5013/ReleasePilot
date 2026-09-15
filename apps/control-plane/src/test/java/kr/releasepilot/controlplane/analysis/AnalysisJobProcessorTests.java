@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -25,6 +27,149 @@ import tools.jackson.databind.ObjectMapper;
 
 class AnalysisJobProcessorTests {
     private static final Instant NOW = Instant.parse("2026-09-15T00:00:00Z");
+
+    @Test
+    void configuredValidationMaxAgeIsUsed() {
+        var fixture = new Fixture(3, Duration.ofHours(1));
+        when(fixture.connection.getLastValidatedAt()).thenReturn(NOW.minus(Duration.ofHours(2)));
+        fixture.processor.processOne();
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_VALIDATION_STALE");
+        verifyNoInteractions(fixture.worker, fixture.commands);
+    }
+
+    @Test
+    void failResultStillAbortsWhenConnectionIsDisabledDuringWorkerCall() {
+        var fixture = new Fixture(1);
+        when(fixture.worker.evaluate(any())).thenAnswer(invocation -> {
+            when(fixture.connection.getStatus()).thenReturn(ConnectionStatus.DISABLED);
+            return new AnalysisWorkerGateway.Result(AnalysisVerdict.FAIL,"THRESHOLD_FAILED","[]");
+        });
+        fixture.processor.processOne();
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.FAIL);
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("ABORT_ROLLOUT");
+    }
+
+    @Test
+    void missingConnectionTargetDuringWorkerCallCannotPromote() {
+        var fixture = new Fixture(3);
+        when(fixture.worker.evaluate(any())).thenAnswer(invocation -> {
+            when(fixture.environment.getPrometheusConnectionId()).thenReturn(null);
+            return new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS,"ALL_RULES_PASSED","[]");
+        });
+        fixture.processor.processOne();
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("ANALYSIS_CONTEXT_UNAVAILABLE");
+        verifyNoInteractions(fixture.commands);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ConnectionStatus.class, names = {"DISABLED", "UNVERIFIED", "INVALID"})
+    void inactiveConnectionBlocksWorkerAndRetries(ConnectionStatus status) {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getStatus()).thenReturn(status);
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_NOT_ACTIVE");
+        assertThat(ReflectionTestUtils.getField(fixture.job, "availableAt")).isEqualTo(NOW.plusSeconds(120));
+        verifyNoInteractions(fixture.worker, fixture.commands, fixture.secrets);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {-1, 0, 1})
+    void validationExpiryBoundaryIsStrict(long offsetSeconds) {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getLastValidatedAt()).thenReturn(NOW.minus(Duration.ofHours(6)).plusSeconds(offsetSeconds));
+        when(fixture.worker.evaluate(any())).thenReturn(new AnalysisWorkerGateway.Result(AnalysisVerdict.INCONCLUSIVE,"NO_DATA","[]"));
+        fixture.processor.processOne();
+        if(offsetSeconds > 0) {
+            verify(fixture.worker).evaluate(any());
+            assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("NO_DATA");
+        } else {
+            verifyNoInteractions(fixture.worker);
+            assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_VALIDATION_STALE");
+        }
+        verifyNoInteractions(fixture.commands);
+    }
+
+    @Test
+    void missingValidationTimestampBlocksWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getLastValidatedAt()).thenReturn(null);
+        fixture.processor.processOne();
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_VALIDATION_STALE");
+        verifyNoInteractions(fixture.worker, fixture.commands);
+    }
+
+    @Test
+    void inactiveConnectionAtMaxAttemptsPauses() {
+        var fixture = new Fixture(1);
+        when(fixture.connection.getStatus()).thenReturn(ConnectionStatus.DISABLED);
+        fixture.processor.processOne();
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.INCONCLUSIVE);
+        assertThat(fixture.job.getReasonCode()).isEqualTo("PROMETHEUS_CONNECTION_NOT_ACTIVE");
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PAUSE_ROLLOUT");
+        verifyNoInteractions(fixture.worker);
+    }
+
+    @Test
+    void revalidatedConnectionCanRecoverOnNextAttempt() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getStatus()).thenReturn(ConnectionStatus.UNVERIFIED);
+        fixture.processor.processOne();
+        verifyNoInteractions(fixture.worker, fixture.commands);
+        when(fixture.clock.instant()).thenReturn(NOW.plusSeconds(120));
+        when(fixture.connection.getStatus()).thenReturn(ConnectionStatus.ACTIVE);
+        when(fixture.connection.getLastValidatedAt()).thenReturn(NOW.plusSeconds(120));
+        when(fixture.worker.evaluate(any())).thenReturn(new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS,"ALL_RULES_PASSED","[]"));
+        fixture.processor.processOne();
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.PASS);
+        assertThat(fixture.job.getAttempts()).isEqualTo(2);
+        verify(fixture.worker).evaluate(any());
+    }
+
+    @Test
+    void connectionDisabledDuringWorkerCallCannotPromote() {
+        var fixture = new Fixture(1);
+        when(fixture.worker.evaluate(any())).thenAnswer(invocation -> {
+            when(fixture.connection.getStatus()).thenReturn(ConnectionStatus.DISABLED);
+            return new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS,"ALL_RULES_PASSED","[]");
+        });
+        fixture.processor.processOne();
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.INCONCLUSIVE);
+        assertThat(fixture.job.getReasonCode()).isEqualTo("PROMETHEUS_CONNECTION_NOT_ACTIVE");
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PAUSE_ROLLOUT");
+    }
+
+    @Test
+    void validationExpiresDuringWorkerCallCannotPromote() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getLastValidatedAt()).thenReturn(NOW.minus(Duration.ofHours(6)).plusSeconds(1));
+        when(fixture.worker.evaluate(any())).thenAnswer(invocation -> {
+            when(fixture.clock.instant()).thenReturn(NOW.plusSeconds(1));
+            return new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS,"ALL_RULES_PASSED","[]");
+        });
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_VALIDATION_STALE");
+        verifyNoInteractions(fixture.commands);
+    }
+
+    @Test
+    void connectionTargetChangedDuringWorkerCallCannotPromote() {
+        var fixture = new Fixture(3);
+        when(fixture.worker.evaluate(any())).thenAnswer(invocation -> {
+            when(fixture.environment.getPrometheusConnectionId()).thenReturn(UUID.randomUUID());
+            return new AnalysisWorkerGateway.Result(AnalysisVerdict.PASS,"ALL_RULES_PASSED","[]");
+        });
+        fixture.processor.processOne();
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_CONNECTION_CHANGED");
+        verifyNoInteractions(fixture.commands);
+    }
 
     @ParameterizedTest
     @NullAndEmptySource
@@ -243,8 +388,13 @@ class AnalysisJobProcessorTests {
         final Clock clock = mock(Clock.class);
         final PolicySnapshot snapshot = mock(PolicySnapshot.class);
         final PolicySnapshotRepository snapshots = mock(PolicySnapshotRepository.class);
+        final Environment environment = mock(Environment.class);
 
         Fixture(int maxAttempts) {
+            this(maxAttempts, Duration.ofHours(6));
+        }
+
+        Fixture(int maxAttempts, Duration maxAge) {
             var jobs = mock(AnalysisJobRepository.class);
             var steps = mock(RolloutStepRepository.class);
             var executions = mock(RolloutExecutionRepository.class);
@@ -255,7 +405,6 @@ class AnalysisJobProcessorTests {
             var step = mock(RolloutStep.class);
             var execution = mock(RolloutExecution.class);
             var release = mock(Release.class);
-            var environment = mock(Environment.class);
             var service = mock(CatalogService.class);
             var stepId = UUID.randomUUID();
             var executionId = UUID.randomUUID();
@@ -282,6 +431,8 @@ class AnalysisJobProcessorTests {
             when(connections.findById(connectionId)).thenReturn(Optional.of(connection));
             when(connection.getId()).thenReturn(connectionId);
             when(connection.getBaseUrl()).thenReturn("http://prometheus.invalid");
+            when(connection.getStatus()).thenReturn(ConnectionStatus.ACTIVE);
+            when(connection.getLastValidatedAt()).thenReturn(NOW);
             when(snapshots.findByReleaseId(releaseId)).thenReturn(Optional.of(snapshot));
             when(snapshot.getDefinition()).thenReturn(
                     "{\"metrics\":[],\"inconclusivePolicy\":{\"additionalObservationSeconds\":120}}");
@@ -290,7 +441,7 @@ class AnalysisJobProcessorTests {
             when(clock.instant()).thenReturn(NOW);
             processor = new AnalysisJobProcessor(jobs, steps, executions, releases, environments,
                     services, connections, snapshots, secrets, worker, commands, new ObjectMapper(),
-                    new TransactionTemplate(manager), clock);
+                    new TransactionTemplate(manager), clock, maxAge);
         }
     }
 }
