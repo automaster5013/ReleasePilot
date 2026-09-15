@@ -66,6 +66,12 @@ export function approvalReadinessMessage(code: string | undefined) {
   return null;
 }
 
+export function approvalReadinessLabel(result: EnvironmentValidation | null) {
+  if (result === null) return "Readiness unavailable";
+  if (!environmentAllowsRelease(result)) return `${result.status} · revalidation required`;
+  return `${result.status} · valid until ${new Date(result.validUntil).toLocaleString("ko-KR")}`;
+}
+
 export type ReleaseDraft = {
   serviceId: string;
   environmentId: string;

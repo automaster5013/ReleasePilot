@@ -17,6 +17,9 @@
 .approvalActions span { margin-right: auto; color: #ffcf78; font: 650 10px monospace; letter-spacing: .12em; }
 .approvalActions button { border: 0; background: #3adea3; color: #07100d; padding: 10px 14px; font-weight: 700; cursor: pointer; }
 .approvalActions button:disabled { opacity: .35; cursor: not-allowed; }
+.approvalReadiness { display: flex; justify-content: space-between; gap: 12px; padding: 12px 26px; border-top: 1px solid #293730; color: #ff9b8f; font: 650 11px monospace; }
+.approvalReadiness[data-ready="true"] { color: #67d6a3; }
+.approvalReadiness span { text-align: right; }
 .approvalContext { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 22px 26px; border-top: 1px solid #293730; background: #0d1513; }
 .approvalContext > div { display: grid; gap: 5px; min-width: 0; }
 .approvalContext span { color: #789087; font: 650 10px monospace; letter-spacing: .08em; }

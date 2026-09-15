@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, ReleaseDraft, releaseOptionLabel, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -35,6 +35,7 @@ type PolicyStep = { weight: number; minimumObservationSeconds: number };
 type PolicyMetric = { key: string; threshold: number; comparison?: string; route?: string; importance?: string };
 type Release = {
   id: string;
+  environmentId: string;
   version: string;
   imageRepository: string;
   imageDigest: string;
@@ -94,6 +95,8 @@ export default function Home() {
   const [environmentValidationNotice, setEnvironmentValidationNotice] = useState("");
   const [environmentValidationBusy, setEnvironmentValidationBusy] = useState(false);
   const [environmentAuditEvents, setEnvironmentAuditEvents] = useState<AuditEventView[]>([]);
+  const [approvalEnvironmentValidation, setApprovalEnvironmentValidation] = useState<EnvironmentValidation | null>(null);
+  const [approvalReadinessNotice, setApprovalReadinessNotice] = useState("");
   const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const [requestNotice, setRequestNotice] = useState("");
@@ -288,6 +291,18 @@ export default function Home() {
     if (!releaseResponse.ok || !analysesResponse.ok || !auditResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
     const loadedRelease = await releaseResponse.json() as Release;
     setRelease(loadedRelease);
+    setApprovalEnvironmentValidation(null);
+    setApprovalReadinessNotice(loadedRelease.status === "PENDING_APPROVAL" ? "환경 readiness를 확인하는 중…" : "");
+    if (loadedRelease.status === "PENDING_APPROVAL") {
+      try {
+        const validationResponse = await fetch(`/control-api/environments/${loadedRelease.environmentId}/validation-results/latest`, { credentials: "include" });
+        if (!validationResponse.ok) throw new Error();
+        setApprovalEnvironmentValidation(await validationResponse.json() as EnvironmentValidation);
+        setApprovalReadinessNotice("");
+      } catch {
+        setApprovalReadinessNotice("환경 readiness를 확인할 수 없어 승인을 차단했습니다.");
+      }
+    }
     setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
     setAnalyses(await analysesResponse.json());
     setAuditEvents((await auditResponse.json() as { items: AuditEventView[] }).items);
@@ -514,7 +529,7 @@ export default function Home() {
               <ul>{release.policySnapshot.definition.metrics.map((metric, index) => <li key={`${metric.key}:${metric.route ?? "global"}:${index}`}><strong>{metric.key}{metric.route ? ` · ${metric.route}` : ""}</strong><span>{metric.comparison ?? "THRESHOLD"} {metric.threshold}{metric.importance ? ` · ${metric.importance}` : ""}</span></li>)}</ul>
             </section>}
             <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
-            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div>}
+            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <><div className={sessionStyles.approvalReadiness} data-ready={environmentAllowsRelease(approvalEnvironmentValidation)} role="status"><strong>ENVIRONMENT READINESS</strong><span>{approvalReadinessNotice || approvalReadinessLabel(approvalEnvironmentValidation)}</span></div><div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy || !environmentAllowsRelease(approvalEnvironmentValidation)}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div></>}
             {operationNotice && <p className={sessionStyles.operationNotice} role="status">{operationNotice}</p>}
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>

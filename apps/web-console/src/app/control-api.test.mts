@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, releaseOptionLabel, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -18,6 +18,11 @@ test("approval readiness failures tell approvers how to recover", () => {
   assert.match(approvalReadinessMessage("ENVIRONMENT_VALIDATION_STALE") ?? "", /재검증/);
   assert.match(approvalReadinessMessage("ENVIRONMENT_NOT_ACTIVE") ?? "", /점검/);
   assert.equal(approvalReadinessMessage("UNKNOWN"), null);
+  assert.equal(approvalReadinessLabel(null), "Readiness unavailable");
+  const base = { environmentId: "env", checkedAt: "2026-09-15T00:00:00Z", checks: [] };
+  assert.equal(approvalReadinessLabel({ ...base, status: "INVALID", validUntil: "2099-01-01T00:00:00Z" }), "INVALID · revalidation required");
+  assert.equal(approvalReadinessLabel({ ...base, status: "ACTIVE", validUntil: "2000-01-01T00:00:00Z" }), "ACTIVE · revalidation required");
+  assert.match(approvalReadinessLabel({ ...base, status: "ACTIVE", validUntil: "2099-01-01T00:00:00Z" }), /^ACTIVE · valid until /);
 });
 
 test("operator mutations include JSON and idempotency headers", () => {
