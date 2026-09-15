@@ -53,7 +53,7 @@ jobs:
           path: dockerhub-${{ matrix.name }}.txt
   update-gitops:
     needs: publish
-    if: vars.DOCKERHUB_AUTO_DEPLOY == 'true'
+    if: vars.DOCKERHUB_AUTO_DEPLOY != 'false'
     runs-on: ubuntu-latest
     permissions:
       contents: write

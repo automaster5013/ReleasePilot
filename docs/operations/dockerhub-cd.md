@@ -6,6 +6,8 @@ GitHub Actions repository secrets에 DOCKERHUB_USERNAME=automaster5013 및 쓰�
 
 태그는 소스 commit SHA이며 배포는 게시 결과의 sha256 digest로 고정한다. 세 게시 job 성공 전에는 배포 파일을 갱신하지 않는다. 오래된 소스의 배포는 main HEAD 검사로 건너뛰고, 배포 파일만 바뀐 push는 새 Docker Hub CD를 실행하지 않는다. 기존 ECR release workflow는 유지된다. 병행 ECR release와 Docker Hub 배포는 운영 시 조정해야 한다.
 
-기존 AWS Argo CD 배포를 사용할 경우 repository variable DOCKERHUB_AUTO_DEPLOY=true를 설정하면 aws-demo overlay를 자동 갱신한다. 기본은 이미지 게시까지다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.
+사용자가 기존 AWS/Argo CD 배포를 지정했으므로 aws-demo overlay 자동 갱신을 기본 활성화한다. repository variable DOCKERHUB_AUTO_DEPLOY=false로 중단할 수 있다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.
 
-현재 자격 증명 및 배포 대상 확인이 필요하다. 실제 Docker Hub 게시와 운영 배포 완료는 workflow 실행 결과와 클러스터 상태로 별도 확인해야 한다.
+2026-09-16: GitHub Secrets 두 개 등록 후 run 34998468081의 재실행에서 CI 6개 및 세 이미지 게시가 성공했다. Docker Hub API로 소스 SHA 9800909c5d868b497eca75628b74cf75432f3688의 세 태그 active/digest를 확인했다. 자동배포 변수는 미활성 상태로 update-gitops는 skipped다. 배포 대상 확인이 필요하며 운영 배포 완료는 클러스터 상태로 별도 확인해야 한다.
+
+scripts/test_dockerhub_cd.py의 회귀 4개가 CI contracts에서 게시 gate·서비스/SHA/digest·배포 활성화/HEAD/no-op·배포 commit 반복 방지를 검사한다. 정적 workflow 계약 검증이며 실제 배포 완료를 보장하지 않는다.
