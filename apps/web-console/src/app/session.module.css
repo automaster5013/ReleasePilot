@@ -92,6 +92,9 @@
 .releaseRequest form > button:disabled { opacity: .4; cursor: wait; }
 .releaseRequest > p { margin: 0; padding: 14px 24px; border-top: 1px solid #293730; color: #c9e8dc; }
 @media(max-width: 600px) {
+  .connections > header { flex-direction: column; gap: 16px; }
+  .connectionActions { flex-wrap: wrap; width: 100%; }
+  .connectionActions button { min-height: 44px; }
   .connections > header, .connectionList article { align-items: flex-start; }
   .connectionList article { flex-direction: column; }
   .connectionAudit > span { flex-direction: column; }

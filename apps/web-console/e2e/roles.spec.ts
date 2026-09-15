@@ -3,6 +3,35 @@ import { expect, Page, test } from "@playwright/test";
 const origin = "http://127.0.0.1:3100";
 const serviceId = "11111111-1111-4111-8111-111111111111";
 const environmentId = "22222222-2222-4222-8222-222222222222";
+
+for (const width of [320, 390]) {
+  for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
+    test(`${role} mobile flow fits and remains actionable at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const state = await fixture(page, role);
+      if (role === "DEVELOPER") await fillRequest(page);
+      else await load(page);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const names = role === "DEVELOPER" ? ["릴리스 요청"] : role === "APPROVER" ? ["Approve", "Reject"] : ["Promote", "Pause", "Resume", "Abort"];
+      for (const name of names) {
+        const button = page.getByRole("button", { name, exact: true });
+        await expect(button).toBeEnabled();
+        await button.scrollIntoViewIfNeeded();
+        const box = await button.boundingBox();
+        expect(box).toBeTruthy();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      await page.screenshot({ path: `test-results/role-${role}-${width}.png`, fullPage: true });
+      if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Mobile fixture reason"));
+      await page.getByRole("button", { name: names[0], exact: true }).click();
+      if (role === "DEVELOPER") await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+      else await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.");
+      expect(state.mutations).toHaveLength(1);
+      expect(state.unexpected).toEqual([]);
+    });
+  }
+}
 type Mutation = { path: string; body: Record<string, string | null> };
 
 async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string } = {}) {
