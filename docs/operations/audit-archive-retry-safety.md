@@ -37,3 +37,20 @@ Worker의 배치 첫 항목에서 sink 예외 또는 이벤트 누락이 발생�
 추가 3개는 repository/sink mock을 쓰는 제어 흐름 검증이다. DB 예외에 따른 transaction rollback-only, 프로세스 중단, 복수 Worker의 중복 전송을 격리·복구하는 검증은 아니다. 운영 코드는 변경하지 않는다.
 
 로컬 결과: Worker 테스트 15개 및 서버 전체 verify 183개가 실패·오류·건너뜀 없이 통과했다.
+
+## 배치 sink 실패 격리 실제 DB 검증
+
+`AuditStorageIntegrationTests.archiveBatchSinkFailureDoesNotPreventNextDeliveryDatabaseRoundTrip`는 실제 Worker/repository와 mock sink를 사용한다. 두 합성 이벤트의 due 시각을 다르게 설정해 실제 DB 조회 순서를 고정하고, 첫 이벤트에만 sink 예외를 주입한다. flush·clear·재조회 후 첫 항목의 PENDING/고정 오류/attempts=1/2초 재시도/완료 시각 없음과 다음 항목의 DELIVERED/오류 없음/attempts=0/완료 시각을 각각 확인한다. sink 호출 순서와 감사 체인의 유효성·이벤트 수 증가·head hash·첫 이벤트 hash 유지도 검사한다.
+
+H2와 소유권 확인 임시 MySQL에서 같은 테스트가 통과했다. 서버 전체 verify는 184개, MySQL 통합은 22개(분석 6/감사 저장 14/동시성 2)이며 실패·오류·건너뜀은 없다. MySQL helper의 Flyway migration 22개·JSON 컬럼 타입 5개 검사와 UUID label/기록된 컨테이너 ID 기반 컨테이너·익명 볼륨 cleanup도 성공했다. 실행 중 임시 컨테이너 `43202e572c6c`의 loopback 바인딩을 확인했고 종료 후 해당 label의 컨테이너가 남아 있지 않음을 확인했다. helper 실행 계정은 임시 DB의 `analysis_test`다.
+
+```powershell
+cd C:\ReleasePilot\apps\control-plane
+./mvnw.cmd --batch-mode verify
+cd C:\ReleasePilot
+docker pull mysql:8.4
+python scripts/analysis_mysql_integration.py
+apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integration.py
+```
+
+새 시나리오는 테스트 트랜잭션 내 SQL 저장·재조회 후 롤백한다. commit 이후 재시작 내구성, DB 장애로 인한 rollback-only 격리, 프로세스 중단, 복수 Worker 중복 전송은 미검증이다. 외래 키를 우회하는 이벤트 누락 재현은 하지 않았다. 기존 제어 흐름 mock/HTTP loopback/S3 SDK mock 검증과 이번 실제 DB 검증을 구분하며 실제 AWS/S3/외부 HTTP에는 전송하거나 장애를 주입하지 않았다. 운영 데이터·전달 상태·기존 last_error는 수정하지 않았고 새 운영 배포는 없다. 운영 실제 릴리스 데이터 부재로 전체 운영 E2E는 계속 미검증이다. SSO/GitHub Checks 보류를 유지한다.

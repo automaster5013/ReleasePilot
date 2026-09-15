@@ -63,6 +63,46 @@ class AuditStorageIntegrationTests {
     }
 
     @Test
+    void archiveBatchSinkFailureDoesNotPreventNextDeliveryDatabaseRoundTrip() {
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var first=record("{\"reason\":\"batch first\"}");
+        var second=record("{\"reason\":\"batch next\"}");
+        var now=Instant.parse("2026-09-15T12:00:00Z");
+        // Distinct due times make the repository's availableAt ordering deterministic.
+        ReflectionTestUtils.setField(deliveryFor(first),"availableAt",now.minusSeconds(2));
+        ReflectionTestUtils.setField(deliveryFor(second),"availableAt",now.minusSeconds(1));
+        events.flush();deliveries.flush();entityManager.clear();
+        var sink=org.mockito.Mockito.mock(AuditArchiveSink.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Bearer synthetic-batch-secret private-url"))
+                .when(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+
+        new AuditArchiveWorker(deliveries,events,sink,
+                java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+        deliveries.flush();entityManager.clear();
+
+        var failed=deliveryFor(first);
+        assertThat(ReflectionTestUtils.getField(failed,"status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+        assertThat(ReflectionTestUtils.getField(failed,"lastError")).isEqualTo("AUDIT_ARCHIVE_UNAVAILABLE");
+        assertThat(ReflectionTestUtils.getField(failed,"attempts")).isEqualTo(1);
+        assertThat(ReflectionTestUtils.getField(failed,"availableAt")).isEqualTo(now.plusSeconds(2));
+        assertThat(ReflectionTestUtils.getField(failed,"deliveredAt")).isNull();
+        var delivered=deliveryFor(second);
+        assertThat(ReflectionTestUtils.getField(delivered,"status")).isEqualTo(AuditArchiveDelivery.Status.DELIVERED);
+        assertThat(ReflectionTestUtils.getField(delivered,"lastError")).isNull();
+        assertThat(ReflectionTestUtils.getField(delivered,"attempts")).isEqualTo(0);
+        assertThat(ReflectionTestUtils.getField(delivered,"deliveredAt")).isEqualTo(now);
+        var order=org.mockito.Mockito.inOrder(sink);
+        order.verify(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(first.getId())));
+        order.verify(sink).archive(org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(second.getId())));
+        var result=verifier.verify();
+        assertThat(result.valid()).isTrue();
+        assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+        assertThat(result.headHash()).isEqualTo(second.getEventHash());
+        assertThat(events.findById(first.getId()).orElseThrow().getEventHash()).isEqualTo(first.getEventHash());
+    }
+
+    @Test
     void archiveRetryInFutureIsNotSelectedFromDatabase() {
         var event=record("{}");
         var now=Instant.parse("2026-09-15T12:00:00Z");

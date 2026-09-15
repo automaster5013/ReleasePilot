@@ -281,3 +281,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 76. S3 SDK 경계 장애·복구 검증 — 완료 (2026-09-15, 403/500/503 후 복구·동일 요청/본문/조건부 쓰기/metadata 유지·합성 비밀 제외·412 충돌 미완료/읽기·삭제 없음 4개·서버 전체 178개 통과; SDK/repository mock, 실제 AWS/충돌 복구/복수 Worker는 별도)
 77. HTTP 아카이브 timeout·중단 검증 — 완료 (2026-09-15, loopback 실제 10초 timeout 원인·중단 flag 보존·PENDING/고정 코드/재시도/미완료 확인 2개·서버 전체 180개 통과·서버/중단 상태 cleanup; repository mock, 응답 유실 후 원격 중복 제거/운영 네트워크는 별도)
 78. 감사 아카이브 배치 실패 격리 검증 — 완료 (2026-09-15, 첫 sink 실패/이벤트 누락 후 다음 정상 항목 완료·각 상태/오류/시도 분리·빈 배치 조회/전송 생략 3개·서버 전체 183개 통과; repository/sink mock, DB rollback-only/프로세스 중단/복수 Worker는 별도)
+79. 감사 아카이브 배치 sink 실패 격리 실제 DB 검증 — 완료 (2026-09-15, 실제 Worker/repository·sink mock·첫 실패 PENDING/고정 오류/재시도와 다음 DELIVERED 상태 DB 재조회·호출 순서/감사 체인 유지 1개·H2 전체 184개/MySQL 통합 22개 통과·Flyway 22개/JSON 타입 5개·소유권 cleanup; 테스트 트랜잭션 롤백, commit 후 재시작/DB rollback-only/이벤트 누락/복수 Worker/운영 외부 전달/E2E는 미검증, 새 운영 배포 없음)
