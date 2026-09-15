@@ -12,4 +12,4 @@ Worker를 호출하지 않고 `INCONCLUSIVE` 및 빈 근거 `[]`를 기존 결�
 
 새 회귀 사례 10개를 포함해 로컬 서버 전체 `mvnw --batch-mode verify`에서 110개 테스트가 실패·오류·건너뜀 없이 통과했다.
 
-실행 대상을 찾기 위한 Job/Step/Execution/Release 조회 실패와 DB 자체 장애는 이 변경의 범위 밖이며 기존 lease 복구의 대상이다. 대상이 불명확한 상태에서 임의의 Rollout 명령을 예약하지 않는다. 공개 배포 이미지는 변경하지 않았다.
+실행 대상을 찾기 위한 Job/Step/Execution/Release 조회 실패와 DB 자체 장애는 이 변경의 범위 밖이며 기존 lease 복구의 대상이다. 대상이 불명확한 상태에서 임의의 Rollout 명령을 예약하지 않는다. 초기 코드 보강 이후 [v0.52.0 배포 검증](../operations/analysis-safety-v0.52.0.md)에서 공개 이미지 반영까지 확인했다.

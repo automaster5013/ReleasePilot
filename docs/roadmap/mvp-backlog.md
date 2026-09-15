@@ -266,4 +266,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 61. 분석 요청 구성 실패 재시도 및 안전 종료 — 완료 (2026-09-15, 잘못된 정책/누락 snapshot에서 Worker 호출 차단·고정 코드/300초 재시도·최종 INCONCLUSIVE/PAUSE·정책 복구 재조회·회귀 사례 10개·서버 전체 110개 테스트 통과; 실행 대상 조회/DB 장애와 공개 이미지 배포는 별도)
 62. 분석 시도/PASS 예약 Prometheus readiness — 완료 (2026-09-15, ACTIVE/설정 유효기간 엄격 경계 검사·Worker 호출 전 및 PASS 결과 처리 시 재조회·연결 ID 변경 차단·재시도/최종 PAUSE·FAIL ABORT 유지·회귀 사례 15개·서버 전체 125개 테스트 통과; 예약 이후 mutation 경계와 공개 이미지 배포는 별도)
 63. 예약된 승격 명령 실행 전 readiness — 완료 (2026-09-15, PROMOTE 실행 직전 Environment/Kubernetes/Prometheus 상태·검증 만료 검사·비밀 조회/외부 mutation/Step 통과/성공 감사 차단·정상/재검증 복구·PAUSE/ABORT 유지·회귀 13개·서버 전체 138개 테스트 통과; Outbox 재시도 제한과 공개 이미지 배포는 별도)
-64. 분석 안전성 v0.52.0 공개 배포 — 진행 중 (2026-09-15, 구현/릴리스 CI·세 이미지·GitOps digest 갱신 완료; AWS 임시 인증 만료로 새 Canary 검증/수동 승격/최종 공개 검증 대기)
+64. 분석 안전성 v0.52.0 공개 배포 — 완료 (2026-09-15, 61–63번 반영·구현/릴리스 CI/이미지 workflow 통과·기존 IAM 사용자 인증 복구·Canary 검증과 수동 승격·세 Rollout 2/2 Healthy·새 Pod 6개 재시작 0·VIEWER/CSP/공개 메트릭 재검증; 실제 릴리스 분석 E2E는 데이터 부재로 미검증)

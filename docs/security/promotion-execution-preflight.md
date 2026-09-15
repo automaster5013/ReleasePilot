@@ -14,4 +14,4 @@ PAUSE/ABORT는 위험을 줄이는 조작이므로 이 readiness gate를 적용�
 
 로컬 서버 전체 `mvnw --batch-mode verify`에서 138개 테스트가 실패·오류·건너뜀 없이 통과했다.
 
-조회와 외부 mutation 사이의 다른 트랜잭션을 전역 직렬화하지 않는다. 분석 시점의 연결 ID/전체 설정 snapshot을 Outbox에 추가한 변경도 아니다. 공개 배포 이미지는 변경하지 않았다.
+조회와 외부 mutation 사이의 다른 트랜잭션을 전역 직렬화하지 않는다. 분석 시점의 연결 ID/전체 설정 snapshot을 Outbox에 추가한 변경도 아니다. 초기 코드 보강 이후 [v0.52.0 배포 검증](../operations/analysis-safety-v0.52.0.md)에서 공개 이미지 반영까지 확인했다.
