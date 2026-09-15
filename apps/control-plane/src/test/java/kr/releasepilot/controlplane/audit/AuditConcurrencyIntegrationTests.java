@@ -241,6 +241,75 @@ class AuditConcurrencyIntegrationTests {
     private record ArchiveRequest(String method,String path,String key,String body) {}
 
     @Test
+    void httpConflictRemainsPendingWithoutOverwritingReceiverOrBlockingNextEvent() throws Exception {
+        var transaction=new TransactionTemplate(transactionManager);
+        var now=Instant.parse("2034-01-01T00:00:00Z");
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var recorded=transaction.execute(status -> {
+            var first=trail.record(event());
+            var second=trail.record(event());
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(first),"availableAt",now.minusSeconds(2));
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(second),"availableAt",now.minusSeconds(1));
+            return java.util.List.of(first,second);
+        });
+        var first=recorded.get(0);
+        var second=recorded.get(1);
+        var conflicting=new ArchiveRequest("PUT","/archive/"+first.getChainSequence()+"-"+first.getEventHash()+".json",
+                first.getEventHash(),"{\"synthetic\":\"existing conflicting object\"}");
+        var stored=new java.util.concurrent.ConcurrentHashMap<String,ArchiveRequest>();
+        stored.put(first.getEventHash(),conflicting);
+        var requests=java.util.Collections.synchronizedList(new ArrayList<ArchiveRequest>());
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/archive/",exchange -> {
+            try {
+                var request=new ArchiveRequest(exchange.getRequestMethod(),exchange.getRequestURI().getPath(),
+                        exchange.getRequestHeaders().getFirst("Idempotency-Key"),
+                        new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
+                requests.add(request);
+                var previous=stored.putIfAbsent(request.key(),request);
+                var response="Bearer synthetic-conflict-secret private-url".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(previous==null?201:previous.equals(request)?200:409,response.length);
+                exchange.getResponseBody().write(response);
+            } finally {exchange.close();}
+        });
+        server.start();
+        try {
+            var endpoint=java.net.URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/archive/");
+            var sink=new HttpAuditArchiveSink(new tools.jackson.databind.ObjectMapper(),endpoint,"");
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,sink,
+                    java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick());
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(first,AuditArchiveDelivery.Status.PENDING,1,"AUDIT_ARCHIVE_UNAVAILABLE",null);
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(first),"availableAt"))
+                        .isEqualTo(now.plusSeconds(2));
+                assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+                assertThat(verifier.verify().valid()).isTrue();
+            });
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,sink,
+                    java.time.Clock.fixed(now.plusSeconds(2),java.time.ZoneOffset.UTC)).tick());
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(first,AuditArchiveDelivery.Status.PENDING,2,"AUDIT_ARCHIVE_UNAVAILABLE",null);
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(first),"availableAt"))
+                        .isEqualTo(now.plusSeconds(6));
+                assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+                var result=verifier.verify();
+                assertThat(result.valid()).isTrue();
+                assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+                assertThat(result.headHash()).isEqualTo(second.getEventHash());
+            });
+            var targetRequests=requests.stream().filter(value -> value.key().equals(first.getEventHash())
+                    ||value.key().equals(second.getEventHash())).toList();
+            assertThat(targetRequests.stream().map(ArchiveRequest::key).toList())
+                    .containsExactly(first.getEventHash(),second.getEventHash(),first.getEventHash());
+            assertThat(targetRequests.get(0)).isEqualTo(targetRequests.get(2));
+            assertThat(targetRequests).allSatisfy(value -> assertThat(value.method()).isEqualTo("PUT"));
+            assertThat(stored.get(first.getEventHash())).isEqualTo(conflicting);
+            assertThat(stored.get(second.getEventHash())).isEqualTo(targetRequests.get(1));
+        } finally {server.stop(0);}
+    }
+
+    @Test
     void httpReceiverDeduplicatesRedeliveryAfterDatabaseRollback() throws Exception {
         var transaction=new TransactionTemplate(transactionManager);
         var now=Instant.parse("2033-01-01T00:00:00Z");

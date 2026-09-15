@@ -54,3 +54,13 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 H2 전체 verify 188개 및 MySQL 통합 26개(분석 6/감사 저장 14/트랜잭션·동시성 6)가 실패·오류·건너뜀 없이 통과했다. 위 실행 명령의 Flyway migration 22개·JSON 타입 5개 검사와 Ruff도 통과했다. 소유 임시 MySQL 컨테이너 `59479c7d05a3`의 loopback 바인딩을 확인하고, UUID label/기록된 컨테이너 ID 검증 후 컨테이너·익명 볼륨 cleanup과 잔여 컨테이너 없음 확인을 완료했다. HTTP 서버는 finally에서 stop한다.
 
 repository와 sink는 실제 구현이며 수신 저장은 테스트 서버의 메모리 map이다. 실제 외부 저장소의 영구 저장·중복 제거·충돌 처리, 응답 유실, 실제 DB 장애/commit 실패, 프로세스·DB 재시작/강제 종료와 복수 Worker를 증명하지 않는다. 수신 규칙이 동일 재시도를 성공으로 인정해야 DB 롤백 이후 재전송을 완료할 수 있다는 통합 계약 검증이다. exactly-once 전달이나 S3 412 복구 기능을 추가하지 않았다. 운영 데이터·전달 상태·기존 last_error 및 외래 키는 수정하지 않았고 실제 외부 HTTP/AWS/S3 호출과 새 운영 배포는 없다. 운영 전체 E2E 및 SSO/GitHub Checks 보류를 유지한다.
+
+## HTTP 객체 충돌·다음 항목 격리
+
+`AuditConcurrencyIntegrationTests.httpConflictRemainsPendingWithoutOverwritingReceiverOrBlockingNextEvent`는 실제 DB/repository/Worker/HTTP sink와 loopback 수신 서버를 결합한다. 합성 이벤트 두 개와 due 순서를 commit하고, 첫 이벤트의 멱등 키·경로에 다른 본문을 가진 합성 객체를 테스트 서버 메모리에 미리 둔다. 서버는 putIfAbsent 규칙으로 기존 객체를 보존하고 다른 envelope에는 실제 409를 반환하며 다음 정상 이벤트는 새 객체로 저장해 201을 반환한다.
+
+첫 배치를 commit한 뒤 별도 트랜잭션에서 충돌 항목의 PENDING/고정 오류/attempts=1/2초 재시도/완료 시각 없음과 다음 항목의 DELIVERED/attempts=0/오류 없음/완료 시각을 확인한다. 2초 뒤 충돌 재시도를 commit하면 PENDING/고정 오류/attempts=2와 4초 뒤 다음 재시도 시각을 저장하고, 정상 항목 상태·완료 시각은 유지된다. 대상 HTTP 요청 순서는 첫 이벤트→다음 이벤트→첫 이벤트이며 모두 PUT이고 충돌 이벤트의 요청·본문은 두 번 모두 같다. 서버의 기존 충돌 객체는 그대로, 정상 객체는 수신 요청과 일치한다. 감사 체인은 첫 실패 commit 후 유효하고 재시도 commit 후 이벤트 수·head hash도 유지된다.
+
+결과: H2 전체 verify 189개, 실제 MySQL 통합 27개(분석 6/감사 저장 14/트랜잭션·동시성 7)가 실패·오류·건너뜀 없이 통과했다. 위 명령의 Flyway 22개·JSON 타입 5개 검사와 Ruff도 통과했다. 소유 임시 MySQL 컨테이너 `74eb3db34b03`의 loopback 바인딩을 확인하고 UUID label/기록된 ID 검증 후 컨테이너·익명 볼륨 cleanup 및 잔여 컨테이너 없음 확인을 완료했다. HTTP 서버는 finally에서 stop한다.
+
+이번 충돌 분기는 앞선 멱등 재수신 테스트에서 실행하지 않았던 규칙을 별도 시나리오로 검증한다. 수신 객체는 테스트 서버 메모리이며 실제 외부 저장소의 영구 저장·충돌 처리·중복 제거를 증명하지 않는다. Worker가 충돌 객체를 읽어 비교·삭제·덮어쓰거나 정상 완료로 간주하는 기능은 추가하지 않았다. 충돌 자동 복구, 실제 AWS/S3/외부 HTTP, 응답 유실/실제 DB 장애·재시작/복수 Worker/운영 전체 E2E는 미검증이다. 운영 데이터·전달 상태·기존 last_error·외래 키 수정과 새 운영 배포는 없고 SSO/GitHub Checks 보류를 유지한다.
