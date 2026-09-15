@@ -45,9 +45,9 @@ export function auditIntegrityLabel(result: AuditChainVerification) {
   return result.valid ? `Verified · ${result.verifiedEvents} events` : `Integrity failure · event ${result.failedEventId?.slice(0, 8) ?? "unknown"}`;
 }
 
-export function environmentValidationSummary(result: EnvironmentValidation) {
+export function environmentValidationSummary(result: EnvironmentValidation, now = Date.now()) {
   const validUntil = Date.parse(result.validUntil);
-  if (!Number.isFinite(validUntil) || validUntil <= Date.now()) return "Validation expired";
+  if (!Number.isFinite(validUntil) || validUntil <= now) return "Validation expired";
   const failed = result.checks.filter((check) => check.outcome === "FAIL").length;
   const warnings = result.checks.filter((check) => check.outcome === "WARNING").length;
   return failed ? `${failed} failed checks` : warnings ? `${warnings} warnings` : `${result.checks.length} checks passed`;
@@ -115,10 +115,10 @@ export function validatePrometheusConnectionDraft(draft: PrometheusConnectionDra
   return null;
 }
 
-export function environmentAllowsRelease(result: EnvironmentValidation | null) {
+export function environmentAllowsRelease(result: EnvironmentValidation | null, now = Date.now()) {
   if (result === null || !["ACTIVE", "ACTIVE_WITH_WARNINGS"].includes(result.status)) return false;
   const validUntil = Date.parse(result.validUntil);
-  return Number.isFinite(validUntil) && validUntil > Date.now();
+  return Number.isFinite(validUntil) && validUntil > now;
 }
 
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
@@ -152,9 +152,9 @@ export function releaseRequestReadinessMessage(code: string | undefined) {
   return null;
 }
 
-export function approvalReadinessLabel(result: EnvironmentValidation | null) {
+export function approvalReadinessLabel(result: EnvironmentValidation | null, now = Date.now()) {
   if (result === null) return "Readiness unavailable";
-  if (!environmentAllowsRelease(result)) return `${result.status} · revalidation required`;
+  if (!environmentAllowsRelease(result, now)) return `${result.status} · revalidation required`;
   return `${result.status} · valid until ${new Date(result.validUntil).toLocaleString("ko-KR")}`;
 }
 

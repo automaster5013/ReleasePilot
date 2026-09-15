@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
+test("request and approval readiness expire together on the display clock", () => {
+  const expiry = Date.parse("2026-09-15T06:00:00Z");
+  const result = { environmentId: "env", status: "ACTIVE", checkedAt: "2026-09-15T00:00:00Z", validUntil: "2026-09-15T06:00:00Z", checks: [] };
+  assert.equal(environmentAllowsRelease(result, expiry - 1), true);
+  assert.equal(environmentAllowsRelease(result, expiry), false);
+  assert.equal(environmentAllowsRelease(result, expiry + 1), false);
+  assert.equal(environmentValidationSummary(result, expiry), "Validation expired");
+  assert.equal(approvalReadinessLabel(result, expiry), "ACTIVE · revalidation required");
+  assert.equal(environmentAllowsRelease({ ...result, validUntil: "invalid" }, expiry), false);
+});
+
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
     "X-CSRF-TOKEN": "token",

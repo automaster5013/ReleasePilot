@@ -123,7 +123,7 @@ export default function Home() {
   const filteredPrometheusConnections = useMemo(() => filterConnections(prometheusConnections, prometheusQuery, prometheusFilter, connectionClock), [prometheusConnections, prometheusQuery, prometheusFilter, connectionClock]);
 
   useEffect(() => {
-    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    if (!sessionUser) return;
     const tick = () => setConnectionClock(Date.now());
     const timer = window.setInterval(tick, 30_000);
     window.addEventListener("focus", tick);
@@ -203,7 +203,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    if (!sessionUser) return;
     const controller = new AbortController();
     fetch("/control-api/connections/prometheus", { credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<PrometheusConnection[]> : Promise.reject())
@@ -213,7 +213,7 @@ export default function Home() {
   }, [sessionUser]);
 
   useEffect(() => {
-    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    if (!sessionUser) return;
     const controller = new AbortController();
     fetch("/control-api/connections/clusters", { credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<ClusterConnection[]> : Promise.reject())
@@ -713,7 +713,7 @@ export default function Home() {
             <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Service<select required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Environment<select required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => selectEnvironment(event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
-            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")} · 유효 기한 {new Date(environmentValidation.validUntil).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <div className={sessionStyles.environmentAudit}><strong>REVALIDATION HISTORY</strong>{environmentAuditEvents.length ? environmentAuditEvents.map((event) => <span key={event.id}>{auditEventLabel(event)} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</span>) : <span>기록된 재검증 이력이 없습니다.</span>}</div>}</section>}
+            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation, connectionClock)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")} · 유효 기한 {new Date(environmentValidation.validUntil).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <div className={sessionStyles.environmentAudit}><strong>REVALIDATION HISTORY</strong>{environmentAuditEvents.length ? environmentAuditEvents.map((event) => <span key={event.id}>{auditEventLabel(event)} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</span>) : <span>기록된 재검증 이력이 없습니다.</span>}</div>}</section>}
             <label>Version<input required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>
@@ -721,7 +721,7 @@ export default function Home() {
             <label>Commit SHA<input required pattern="[a-fA-F0-9]{40}" value={releaseDraft.commitSha} onChange={(event) => updateDraft("commitSha", event.target.value)} /></label>
             <label>Pipeline URL<input required type="url" maxLength={1000} value={releaseDraft.pipelineUrl} onChange={(event) => updateDraft("pipelineUrl", event.target.value)} /></label>
             <label className={sessionStyles.wide}>Policy Version ID <small>선택 사항 · 비우면 Environment 기본 정책</small><input value={releaseDraft.requestedPolicyVersionId} onChange={(event) => updateDraft("requestedPolicyVersionId", event.target.value)} placeholder="UUID" /></label>
-            <button disabled={requestBusy || Boolean(releaseDraft.environmentId && !environmentAllowsRelease(environmentValidation))}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
+            <button disabled={requestBusy || Boolean(releaseDraft.environmentId && !environmentAllowsRelease(environmentValidation, connectionClock))}>{requestBusy ? "요청 중…" : "릴리스 요청"}</button>
           </form>
           {catalogNotice && <p role="alert">{catalogNotice}</p>}
           {requestNotice && <p role="status">{requestNotice}</p>}
@@ -753,7 +753,7 @@ export default function Home() {
               <ul>{release.policySnapshot.definition.metrics.map((metric, index) => <li key={`${metric.key}:${metric.route ?? "global"}:${index}`}><strong>{metric.key}{metric.route ? ` · ${metric.route}` : ""}</strong><span>{metric.comparison ?? "THRESHOLD"} {metric.threshold}{metric.importance ? ` · ${metric.importance}` : ""}</span></li>)}</ul>
             </section>}
             <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
-            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <><div className={sessionStyles.approvalReadiness} data-ready={environmentAllowsRelease(approvalEnvironmentValidation)} role="status"><strong>ENVIRONMENT READINESS</strong><span>{approvalReadinessNotice || approvalReadinessLabel(approvalEnvironmentValidation)}</span></div><div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy || !environmentAllowsRelease(approvalEnvironmentValidation)}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div></>}
+            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <><div className={sessionStyles.approvalReadiness} data-ready={environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)} role="status"><strong>ENVIRONMENT READINESS</strong><span>{approvalReadinessNotice || approvalReadinessLabel(approvalEnvironmentValidation, connectionClock)}</span></div><div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy || !environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div></>}
             {operationNotice && <p className={sessionStyles.operationNotice} role="status">{operationNotice}</p>}
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
