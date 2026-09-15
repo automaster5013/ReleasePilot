@@ -34,6 +34,36 @@ for (const width of [320, 390]) {
 }
 type Mutation = { path: string; body: Record<string, string | null> };
 
+for (const rejected of [false, true]) {
+  test(`developer request remains locked until ${rejected ? "rejection" : "creation"}`, async ({ page }) => {
+    let respond!: () => void;
+    const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+    const state = await fixture(page, "DEVELOPER", { responseGate, failure: rejected ? "FORBIDDEN" : undefined });
+    try {
+      await fillRequest(page);
+      const button = page.getByRole("button", { name: "릴리스 요청", exact: true });
+      await button.click();
+      await expect.poll(() => state.mutations.length).toBe(1);
+      const pending = page.getByRole("button", { name: "요청 중…", exact: true });
+      await expect(pending).toBeDisabled();
+      await pending.evaluate((element) => (element as HTMLButtonElement).click());
+      await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toHaveCount(0);
+      expect(state.mutations).toHaveLength(1);
+      respond();
+      if (rejected) {
+        await expect(page.getByRole("alert").filter({ hasText: "릴리스 요청이 거부되었습니다." })).toBeVisible();
+        await expect(button).toBeEnabled();
+        await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toHaveCount(0);
+      } else {
+        await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+        await expect(button).toBeEnabled();
+      }
+      expect(state.mutations).toHaveLength(1);
+      expect(state.unexpected).toEqual([]);
+    } finally { respond(); }
+  });
+}
+
 for (const role of ["APPROVER", "OPERATOR"]) {
   for (const rejected of [false, true]) {
   test(`${role} prevents repeated actions while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {

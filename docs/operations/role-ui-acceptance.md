@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+DEVELOPER 요청 대기 후속 검증: 생성 POST 응답을 gate로 보류하면 `요청 중…` 버튼이 비활성화되고 native click으로 추가 mutation이 발생하지 않는다. 응답 전 생성된 상세가 없으며, 성공 응답 후 생성 상세 자동 로드와 요청 버튼 복구를 확인한다. 403 FORBIDDEN 응답 후에는 오류 표시·요청 버튼 복구·생성 상세 없음이 유지된다. 두 경우 모두 mutation은 1개이고 예상하지 않은 요청은 없다. 신규 2개를 포함한 전체 fixture E2E 48개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없으며 서버 멱등성·실제 네트워크 장애 검증은 별도다.
+
 지연 후 거부 복구 후속 검증: 기존 응답 gate 테스트를 성공/403 FORBIDDEN 두 경우로 실행한다. APPROVER 승인과 OPERATOR Promote의 거부 응답을 해제하면 오류가 표시되고 관련 버튼이 모두 다시 활성화된다. 성공 안내와 `chain #1` 감사 표시가 없으며 mutation은 여전히 1개다. 초기 승인 오류 예상 문구를 실제 `approve 요청이 거부되었습니다.`에 맞춘 뒤 전체 fixture E2E 46개가 통과했다. lint/typecheck도 통과했고 제품 코드 변경은 없다. 실제 네트워크 장애·backend 감사 저장 검증은 별도다.
 
 응답 대기 중 재조작 방지 후속 검증: fixture POST 응답을 명시적 Promise gate로 보류한 상태에서 APPROVER의 Approve/Reject 및 OPERATOR의 Promote/Pause/Resume/Abort가 모두 비활성화되는지 확인했다. disabled 버튼에 native click을 시도해도 mutation은 1개이며 응답 전 성공 안내는 없다. 응답을 해제하면 성공 안내가 표시되고 운영 버튼이 재활성화되며 승인 버튼은 결정 완료로 제거된다. gate는 finally에서도 해제해 실패 시 대기 요청을 남기지 않는다. 신규 2개를 포함한 전체 fixture E2E 44개와 lint/typecheck가 통과했다. 빠른 동시 클릭의 모든 타이밍, 서버 멱등성 및 실제 네트워크 지연은 별도 검증이다.
