@@ -15,6 +15,21 @@ test("latest release request rejects delayed data, readiness and errors from old
   assert.equal(third(), true);
 });
 
+test("environment A-B-A navigation and manual validation invalidate older requests", () => {
+  const guard = createLatestRequestGuard();
+  const originalA = guard.begin();
+  guard.begin(); // select B
+  guard.begin(); // return to A
+  const latestA = guard.begin();
+  assert.equal(originalA(), false);
+  assert.equal(latestA(), true);
+  const manual = guard.begin();
+  assert.equal(latestA(), false);
+  assert.equal(manual(), true);
+  guard.begin(); // selection changes while manual request is pending
+  assert.equal(manual(), false);
+});
+
 test("release mutation gate blocks same-tick submissions and recovers after failure", async () => {
   const gate = createMutationGate();
   assert.equal(gate.tryAcquire(), true);

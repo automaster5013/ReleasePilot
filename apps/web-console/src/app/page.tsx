@@ -95,6 +95,8 @@ export default function Home() {
   const [environments, setEnvironments] = useState<CatalogItem[]>([]);
   const [environmentValidation, setEnvironmentValidation] = useState<EnvironmentValidation | null>(null);
   const selectedEnvironmentId = useRef("");
+  const environmentSelectionGeneration = useRef(0);
+  const latestEnvironmentValidation = useRef(createLatestRequestGuard());
   const [environmentValidationNotice, setEnvironmentValidationNotice] = useState("");
   const [environmentValidationBusy, setEnvironmentValidationBusy] = useState(false);
   const [environmentAuditEvents, setEnvironmentAuditEvents] = useState<AuditEventView[]>([]);
@@ -148,10 +150,11 @@ export default function Home() {
   }, []);
 
   const refreshEnvironmentAudit = useCallback(async (id: string) => {
+    const selection = environmentSelectionGeneration.current;
     const response = await fetch(`/control-api/audit-events?aggregateType=ENVIRONMENT&aggregateId=${id}`, { credentials: "include" });
     if (response.ok) {
       const page = await response.json() as { items: AuditEventView[] };
-      if (selectedEnvironmentId.current === id) setEnvironmentAuditEvents(page.items);
+      if (selectedEnvironmentId.current === id && selection === environmentSelectionGeneration.current) setEnvironmentAuditEvents(page.items);
     }
   }, []);
 
@@ -258,11 +261,12 @@ export default function Home() {
 
   useEffect(() => {
     if (!releaseDraft.environmentId) return;
+    const isCurrent = latestEnvironmentValidation.current.begin();
     const controller = new AbortController();
     fetch(`/control-api/environments/${releaseDraft.environmentId}/validation-results/latest`, { credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<EnvironmentValidation> : Promise.reject())
-      .then((result) => { if (!controller.signal.aborted && result.environmentId === selectedEnvironmentId.current) setEnvironmentValidation(result); })
-      .catch((failure: Error) => { if (!controller.signal.aborted && failure.name !== "AbortError") setEnvironmentValidationNotice("최신 환경 점검 결과를 불러올 수 없습니다."); });
+      .then((result) => { if (isCurrent() && !controller.signal.aborted && result.environmentId === selectedEnvironmentId.current) setEnvironmentValidation(result); })
+      .catch((failure: Error) => { if (isCurrent() && !controller.signal.aborted && failure.name !== "AbortError") setEnvironmentValidationNotice("최신 환경 점검 결과를 불러올 수 없습니다."); });
     return () => controller.abort();
   }, [releaseDraft.environmentId]);
 
@@ -439,6 +443,8 @@ export default function Home() {
   }
 
   function selectProject(value: string) {
+    environmentSelectionGeneration.current++;
+    latestEnvironmentValidation.current.begin();
     selectedEnvironmentId.current = "";
     setCatalogNotice(""); setProjectId(value); setServices([]); setEnvironments([]);
     setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
@@ -446,6 +452,8 @@ export default function Home() {
   }
 
   function selectService(value: string) {
+    environmentSelectionGeneration.current++;
+    latestEnvironmentValidation.current.begin();
     selectedEnvironmentId.current = "";
     setCatalogNotice(""); setEnvironments([]);
     setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
@@ -453,6 +461,8 @@ export default function Home() {
   }
 
   function selectEnvironment(value: string) {
+    environmentSelectionGeneration.current++;
+    latestEnvironmentValidation.current.begin();
     selectedEnvironmentId.current = value;
     setEnvironmentValidation(null); setEnvironmentValidationNotice(""); setEnvironmentAuditEvents([]);
     updateDraft("environmentId", value);
@@ -461,19 +471,20 @@ export default function Home() {
   async function revalidateEnvironment() {
     if (!releaseDraft.environmentId || !canRevalidateEnvironment(sessionUser?.roles ?? []) || environmentValidationBusy) return;
     const environmentId = releaseDraft.environmentId;
+    const isCurrent = latestEnvironmentValidation.current.begin();
     setEnvironmentValidationBusy(true); setEnvironmentValidationNotice("");
     try {
       const response = await fetch(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
       if (!response.ok) throw new Error("환경 재검증 요청이 거부되었습니다.");
       const result = await response.json() as EnvironmentValidation;
-      if (selectedEnvironmentId.current !== environmentId) return;
+      if (!isCurrent() || selectedEnvironmentId.current !== environmentId) return;
       if (result.environmentId !== environmentId) throw new Error("환경 검증 결과의 대상이 일치하지 않습니다.");
       setEnvironmentValidation(result);
       setEnvironments((current) => current.map((item) => item.id === result.environmentId ? { ...item, status: result.status } : item));
       setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
       await refreshEnvironmentAudit(result.environmentId);
     } catch (failure) {
-      if (selectedEnvironmentId.current === environmentId) setEnvironmentValidationNotice((failure as Error).message);
+      if (isCurrent() && selectedEnvironmentId.current === environmentId) setEnvironmentValidationNotice((failure as Error).message);
     } finally {
       setEnvironmentValidationBusy(false);
     }
