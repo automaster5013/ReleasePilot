@@ -203,7 +203,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!sessionUser) return;
+    if (!canManageConnections(sessionUser?.roles ?? [])) return;
     const controller = new AbortController();
     fetch("/control-api/connections/prometheus", { credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<PrometheusConnection[]> : Promise.reject())
@@ -213,7 +213,7 @@ export default function Home() {
   }, [sessionUser]);
 
   useEffect(() => {
-    if (!sessionUser) return;
+    if (!canManageConnections(sessionUser?.roles ?? [])) return;
     const controller = new AbortController();
     fetch("/control-api/connections/clusters", { credentials: "include", signal: controller.signal })
       .then((response) => response.ok ? response.json() as Promise<ClusterConnection[]> : Promise.reject())
