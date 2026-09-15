@@ -73,6 +73,37 @@ async function assertViewer(page: Page) {
   await expect(page.getByRole("region", { name: "활성 세션" })).toContainText("공유 데모에서는");
 }
 
+test("sample state is explicit until an actual release is loaded", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await expect(page.getByRole("note")).toContainText("실제 운영 결과가 아닙니다");
+  await expect(page.getByText("SAMPLE RELEASE · 예시", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "불러오기", exact: true }).click();
+  await expect(page.getByText("SELECTED RELEASE", { exact: true })).toBeVisible();
+  await expect(page.getByRole("note")).toHaveCount(0);
+  expect(unexpected).toEqual([]);
+});
+
+for (const width of [320, 390, 800, 1024]) {
+  test(`navigation and release controls fit at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const unexpected = await isolateApi(page);
+    await login(page);
+    const nav = page.getByRole("navigation");
+    const brand = await nav.getByText("ReleasePilot").boundingBox();
+    const demo = await nav.getByRole("button", { name: "읽기 전용 데모", exact: true }).boundingBox();
+    expect(brand).toBeTruthy();
+    expect(demo).toBeTruthy();
+    expect(brand!.y + brand!.height <= demo!.y || brand!.x + brand!.width <= demo!.x).toBe(true);
+    const load = page.getByRole("button", { name: "불러오기", exact: true });
+    expect((await load.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(load).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/ui-${width}.png`, fullPage: true });
+    expect(unexpected).toEqual([]);
+  });
+}
+
 test("production CSP authorizes bootstrap with fresh nonces", async ({ page, request }) => {
   const unexpected = await isolateApi(page);
   const errors: string[] = [];

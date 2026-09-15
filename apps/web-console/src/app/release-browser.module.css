@@ -1,13 +1,22 @@
 .browser {
   display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
 }
 
 .browser select {
-  width: 285px;
+  width: 220px;
+  min-width: 0;
   border: 1px solid #35463f;
   background: #111b18;
   color: #fff;
   padding: 13px;
+}
+
+.browser button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 44px;
 }
 
 .browser button:disabled {
@@ -22,8 +31,11 @@
 }
 
 @media(max-width: 800px) {
-  .browser,
-  .browser select {
+  .browser {
     width: 100%;
+  }
+  .browser select {
+    flex: 1;
+    width: 0;
   }
 }

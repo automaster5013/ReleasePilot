@@ -4,6 +4,8 @@
 
 후속 [release CI gate 보강](release-ci-gate.md)에서 아래 P1의 workflow 연결을 수정하고 정적·negative 회귀 검증을 추가했다. 아래 표는 1차 검수 당시 상태이며 다른 발견 사항은 계속 남아 있다.
 
+후속 [샘플 표시·모바일 상단 개선](ui-sample-mobile-refinement.md)에서 샘플 카드의 production 표시와 모바일 상단·조회 컨트롤을 수정했다. 로컬 production/fixture 검증이며 공개 서비스 배포는 아직 하지 않았다. 역할별 화면 검수·운영 E2E와 다른 CI/CD 과제는 남아 있다.
+
 ## 확인 결과
 
 - 공개 UI: 데모 로그인, 새로고침 후 VIEWER 세션 복원, 변경 버튼 비활성화, 빈 최근 릴리스 목록을 브라우저에서 확인했다.

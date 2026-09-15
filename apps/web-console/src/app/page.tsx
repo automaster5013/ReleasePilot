@@ -775,7 +775,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></span>
+        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></div>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>
@@ -783,6 +783,7 @@ export default function Home() {
           <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy}>불러오기</button><button type="button" className={browserStyles.refresh} onClick={() => void refreshReleases()} disabled={!sessionUser || releaseListBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
         </header>
         {error && <p className={styles.error} role="alert">{error}</p>}
+        {!release && <p className={styles.sampleNotice} role="note">예시 화면입니다. 아래 릴리스 상태와 판정 근거는 샘플 데이터이며 실제 운영 결과가 아닙니다. 실제 데이터를 확인하려면 최근 릴리스를 선택해 불러오세요.</p>}
         {canRequestRelease(sessionUser?.roles ?? []) && <details className={sessionStyles.releaseRequest}>
           <summary>NEW RELEASE REQUEST <span>Developer workflow</span></summary>
           <form onSubmit={(event) => void requestRelease(event)}>
@@ -818,7 +819,7 @@ export default function Home() {
         </section>}
         <section className={styles.grid}>
           <article className={styles.releaseCard}>
-            <header><div><span>PRODUCTION RELEASE</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
+            <header><div><span>{release ? "SELECTED RELEASE" : "SAMPLE RELEASE · 예시"}</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
             <div className={styles.stages}>{live.steps.map((step) => <div className={styles.stage} data-status={step.status} key={step.index}><i /><span>{step.weight}%</span><small>{step.status}</small></div>)}</div>
             {release && <section className={sessionStyles.approvalContext} aria-label="릴리스 승인 컨텍스트">
