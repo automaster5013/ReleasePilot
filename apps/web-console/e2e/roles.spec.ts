@@ -35,10 +35,11 @@ for (const width of [320, 390]) {
 type Mutation = { path: string; body: Record<string, string | null> };
 
 for (const role of ["APPROVER", "OPERATOR"]) {
-  test(`${role} prevents repeated actions while the server response is pending`, async ({ page }) => {
+  for (const rejected of [false, true]) {
+  test(`${role} prevents repeated actions while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {
     let respond!: () => void;
     const responseGate = new Promise<void>((resolve) => { respond = resolve; });
-    const state = await fixture(page, role, { responseGate });
+    const state = await fixture(page, role, { responseGate, failure: rejected ? "FORBIDDEN" : undefined });
     try {
       await load(page);
       const names = role === "APPROVER" ? ["Approve", "Reject"] : ["Promote", "Pause", "Resume", "Abort"];
@@ -53,15 +54,23 @@ for (const role of ["APPROVER", "OPERATOR"]) {
       expect(state.mutations).toHaveLength(1);
       await expect(page.getByText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.", { exact: true })).toHaveCount(0);
       respond();
+      if (rejected) {
+        await expect(page.getByRole("alert").filter({ hasText: role === "APPROVER" ? "approve 요청이 거부되었습니다." : "promote 요청이 거부되었습니다." })).toBeVisible();
+        for (const name of names) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
+        await expect(page.getByText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.", { exact: true })).toHaveCount(0);
+        await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).not.toContainText("chain #1");
+      } else {
       await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.");
       if (role === "OPERATOR") for (const name of names) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
       else await expect(button).toHaveCount(0);
+      }
       expect(state.mutations).toHaveLength(1);
       expect(state.unexpected).toEqual([]);
     } finally {
       respond();
     }
   });
+  }
 }
 
 for (const action of ["approve", "reject", "promote", "pause", "resume", "abort"]) {
