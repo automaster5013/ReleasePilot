@@ -13,6 +13,11 @@ images:
     newName: 327771416502.dkr.ecr.ap-northeast-2.amazonaws.com/releasepilot/web-console
     digest: sha256:f28219f8173d701d4aa8ddd38ce4b65e3599c24e30f6092086c0fc2588402ddd
 patches:
+  - target: { kind: Rollout }
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/annotations
+        value: { releasepilot.kr/release: v0.26.0 }
   - target: { kind: Rollout, name: control-plane }
     patch: |-
       - op: add
