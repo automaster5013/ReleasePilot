@@ -84,6 +84,8 @@ export default function Home() {
   const [canOperate, setCanOperate] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const logoutInFlight = useRef(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState("");
@@ -280,6 +282,26 @@ export default function Home() {
       .catch((failure: Error) => { if (!controller.signal.aborted && failure.name !== "AbortError") setEnvironmentAuditEvents([]); });
     return () => controller.abort();
   }, [releaseDraft.environmentId, sessionUser]);
+
+  async function logout() {
+    if (logoutInFlight.current) return;
+    logoutInFlight.current = true;
+    setLogoutBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/control-api/session/logout", {
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      });
+      if (!response.ok) throw new Error("로그아웃하지 못했습니다. 다시 시도해 주세요.");
+      // A full document navigation discards authenticated state and pending requests.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/");
+    } catch (failure) {
+      setError((failure as Error).message);
+      logoutInFlight.current = false;
+      setLogoutBusy(false);
+    }
+  }
 
   async function startDemo() {
     if (demoBusy) return;
@@ -784,7 +806,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy}>읽기 전용 데모</button></div>
+        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button>}</div>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>

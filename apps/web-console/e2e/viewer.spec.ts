@@ -127,6 +127,14 @@ async function isolateApi(page: Page, deniedId?: string) {
       authenticated = true;
       return json(session);
     }
+    if (request.method() === "POST" && path === "/session/logout") {
+      if (request.headers()["x-csrf-token"] !== "test-only-csrf") {
+        unexpected.push("Missing logout CSRF header");
+        return json({ code: "CSRF_INVALID" }, 403);
+      }
+      authenticated = false;
+      return route.fulfill({ status: 204 });
+    }
     if (request.method() !== "GET") {
       unexpected.push(`Unexpected mutation: ${request.method()} ${path}`);
       return json({ code: "FORBIDDEN" }, 403);
@@ -234,6 +242,40 @@ test("demo session survives reload with the same read-only banner", async ({ pag
   await expect(page.getByRole("navigation")).not.toContainText("DEMO SNAPSHOT");
   await expect(page.getByRole("button", { name: "최근 릴리스 새로고침" })).toBeEnabled();
   await assertViewer(page);
+  expect(unexpected).toEqual([]);
+});
+
+test("logout clears the session and selected release after navigation", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  await expect(page.getByRole("navigation")).toContainText("DEMO SNAPSHOT");
+  await expect(page.getByRole("button", { name: "로그아웃", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "최근 릴리스 새로고침" })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole("navigation")).toContainText("DEMO SNAPSHOT");
+  expect(unexpected).toEqual([]);
+});
+
+test("rejected logout preserves the session and permits a manual retry", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  let attempts = 0;
+  await page.route("**/control-api/session/logout", async (route) => {
+    attempts++;
+    if (attempts === 1) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "FORBIDDEN" }) });
+    await route.fallback();
+  });
+  await login(page);
+  const button = page.getByRole("button", { name: "로그아웃", exact: true });
+  await button.click();
+  await expect(page.getByRole("alert").filter({ hasText: "로그아웃하지 못했습니다. 다시 시도해 주세요." })).toBeVisible();
+  await expect(button).toBeEnabled();
+  await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+  expect(attempts).toBe(1);
+  await button.click();
+  await expect(page.getByRole("navigation")).toContainText("DEMO SNAPSHOT");
+  await expect(button).toHaveCount(0);
+  expect(attempts).toBe(2);
   expect(unexpected).toEqual([]);
 });
 
