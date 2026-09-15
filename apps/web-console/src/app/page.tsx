@@ -83,6 +83,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [canOperate, setCanOperate] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState("");
@@ -281,6 +282,8 @@ export default function Home() {
   }, [releaseDraft.environmentId, sessionUser]);
 
   async function startDemo() {
+    if (demoBusy) return;
+    setDemoBusy(true);
     setError("");
     try {
     const response = await fetch("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
@@ -293,6 +296,8 @@ export default function Home() {
     await refreshReleases();
     } catch (failure) {
       setError((failure as Error).message);
+    } finally {
+      setDemoBusy(false);
     }
   }
 
@@ -779,7 +784,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo}>읽기 전용 데모</button></div>
+        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy}>읽기 전용 데모</button></div>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>

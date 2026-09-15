@@ -3,6 +3,37 @@ import { expect, Page, test } from "@playwright/test";
 const origin = "http://127.0.0.1:3100";
 const createdAt = "2026-09-15T00:00:00Z";
 
+for (const rejected of [false, true]) {
+  test(`demo login locks controls while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {
+    const unexpected = await isolateApi(page);
+    let respond!: () => void;
+    const gate = new Promise<void>((resolve) => { respond = resolve; });
+    let requests = 0;
+    await page.route("**/control-api/session/demo", async (route) => {
+      requests++;
+      await gate;
+      if (rejected) return route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+      await route.fallback();
+    });
+    try {
+      await page.goto("/");
+      const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+      await button.click();
+      await expect.poll(() => requests).toBe(1);
+      await expect(button).toBeDisabled();
+      await button.evaluate((element) => (element as HTMLButtonElement).click());
+      await expect(page.getByRole("navigation")).not.toContainText("DEMO · VIEW ONLY");
+      expect(requests).toBe(1);
+      respond();
+      if (rejected) await expect(page.getByRole("alert").filter({ hasText: "공개 데모 세션을 시작할 수 없습니다." })).toBeVisible();
+      else await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+      await expect(button).toBeEnabled();
+      expect(requests).toBe(1);
+      expect(unexpected).toEqual([]);
+    } finally { respond(); }
+  });
+}
+
 for (const failure of ["null", "empty", "forbidden", "connection"]) {
   test(`demo login blocks ${failure} CSRF and recovers on retry`, async ({ page }) => {
     const unexpected = await isolateApi(page);
