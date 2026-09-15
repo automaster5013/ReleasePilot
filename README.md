@@ -70,7 +70,8 @@ external-dns, cert-manager, Argo CD와 digest 기반 GitOps 정의는 `infra/aws
 ## 설계 선택
 
 - 실행 엔진은 Argo Rollouts에 맡기고 ReleasePilot은 승인, 정책 판정, 실행 명령과 감사 증거를 소유합니다.
-- Canary 트래픽은 10→30→60→100 단계로 진행하며 FAIL은 abort, 불확실한 관측은 자동 승격하지 않습니다.
+- 관리 대상 앱의 Canary 단계는 릴리스 정책으로 정하며 FAIL은 abort, 불확실한 관측은 자동 승격하지 않습니다.
+  ReleasePilot 자체의 AWS 배포는 20%→60초 대기→50%→수동 승격이며, replica-weight 방식이라 정확한 요청 비율을 보장하지 않습니다.
 - Blue/Green은 격리된 preview를 분석한 뒤에만 active Service를 전환하며, Environment와 정책 전략의
   불일치를 실행 전에 차단합니다.
 - 여러 Kubernetes 클러스터를 등록할 수 있으며, Environment가 배포 대상을 명시적으로 고정합니다.

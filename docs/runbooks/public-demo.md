@@ -27,10 +27,14 @@ kubectl -n releasepilot get pods,pvc,ingress
 kubectl get challenges,certificates -A
 ```
 
-브라우저에서 `읽기 전용 데모`를 누른 뒤 판정 근거가 표시되는지 확인한다. 공개 세션의 역할은 `VIEWER`여야 하며 Promote, Pause, Abort 버튼은 비활성 상태여야 한다. 서버 통합 테스트도 VIEWER의 Abort 요청이 403임을 검증한다. 데모 계정은 쓰기 권한이 없고 세션이 한 시간 뒤 만료되므로 별도 데이터 reset 작업이 필요하지 않다.
+브라우저에서 `읽기 전용 데모`를 누른 뒤 판정 근거가 표시되는지 확인한다. 공개 세션의 역할은 `VIEWER`여야 하며 상태 변경 조작을 사용할 수 없어야 한다. 서버 통합 테스트도 VIEWER의 Abort 요청이 403임을 검증한다. 일반 세션의 비활성 만료 기본값은 30분이고, demo session은 생성 시 60분으로 설정된다. 이는 로그인 시점부터의 고정 만료 시간이 아니라 마지막 접근 기준의 비활성 만료다. 공개 세션은 데모 데이터를 변경할 수 없으므로 공개 조회 자체에는 별도 reset이 필요하지 않다.
 
 릴리스 검증은 Git에 임시 변경을 만들지 않고 `v*` 태그를 push해 수행한다. workflow 성공 후 overlay의 세
-digest가 바뀌고 Argo CD가 새 revision을 동기화하며 Rollout이 Healthy가 되는지 확인한다. 실패 시나리오는
+digest가 바뀌고 Argo CD가 최종 Git revision을 동기화하는지 확인한다. ReleasePilot 자체의 세 Rollout은
+20% → 60초 대기 → 50% → 수동 대기 단계다. 50%에서 새 Pod의 준비 상태, 재시작 수, 이미지 digest,
+오류 로그와 공개 헬스를 확인한 뒤 Argo Rollouts의 수동 승격을 수행한다. 이후 세 Rollout이 Healthy,
+ready/updated/available이 각각 2이며 Argo CD가 최종 revision에 Synced/Healthy인지 확인한다.
+이는 ReleasePilot이 관리하는 대상 앱의 정책별 Canary 단계와 별개다. 실패 시나리오는
 분석/상태 머신 통합 테스트로 반복하며, 공개 VIEWER가 실제 운영 Rollout을 변경하는 시연은 하지 않는다.
 
 ## 실패 시
@@ -42,13 +46,20 @@ digest가 바뀌고 Argo CD가 새 revision을 동기화하며 Rollout이 Health
 
 ## 종료 및 비용 차단
 
-GitOps 동기화를 중지하고 `terraform destroy` 계획에서 대상이 ReleasePilot demo VPC/EKS/Route53/ECR인지 확인한 뒤 실행한다. ECR 이미지가 남아 있으면 `force_delete=false` 때문에 삭제가 중단되며, 보존 여부를 결정한 후 별도로 정리한다.
+GitOps 동기화를 중지하고 `infra/aws/terraform`에서 destroy 계획의 대상이 ReleasePilot demo 자원인지 확인한 뒤 승인된 범위만 제거한다. ECR 이미지가 남아 있으면 `force_delete=false` 때문에 삭제가 중단되며, 보존 여부를 결정한 후 별도로 정리한다. 감사 S3 버킷은 `force_destroy=false`이며 COMPLIANCE Object Lock의 보존 기간 중인 객체는 삭제할 수 없다. 따라서 전체 자원이 즉시 제거된다고 가정하지 말고, 보존 자원과 잔여 과금을 따로 확인한다. 감사 보관 정책은 [감사 무결성·외부 보관 문서](../operations/audit-integrity-and-archive.md)를 따른다.
 
 ## 알려진 제한
 
 - 데모 MySQL은 단일 StatefulSet/PVC이므로 다중 AZ 복구와 관리형 백업을 보장하지 않는다.
-- Grafana, Prometheus와 Kubernetes API는 공개하지 않는다. 공개 콘솔에는 정제된 판정 증거만 표시한다.
-- 공개 인증은 VIEWER demo session만 제공한다. 조직 SSO/OIDC와 운영자 UI 로그인은 MVP 이후 범위다.
+- Grafana, Prometheus 서버와 Kubernetes API는 공개하지 않는다. 다만 Control Plane의
+  `/actuator/prometheus`는 현재 인증 없이 접근 가능하고 AWS Ingress가 `/actuator`를 라우팅한다.
+  공개 콘솔의 정제된 판정 증거와 이 scrape endpoint의 공개 범위를 구분하며, 운영 전환 시 접근 통제가 필요하다.
+- 공개 방문자에게는 VIEWER demo session을 제공한다. 조직 OIDC/SSO와 역할별 운영 UI는 구현돼 있지만,
+  기본값은 `OIDC_ENABLED=false`이며 공급자 등록·client secret·내부 계정/프로젝트 권한 연결이 필요하다.
+  활성화 절차는 [인증 문서](../security/authentication-and-demo-access.md)를 따른다. 저장소 정의만으로
+  실제 공급자 연결 완료를 판단하지 않는다.
+- GitHub Checks 전달은 구현돼 있지만 기본값은 `GITHUB_CHECKS_ENABLED=false`다. 활성화에는 repository의
+  Checks 쓰기 권한과 런타임 token 주입·갱신이 필요하다. [연동 문서](../integrations/github-checks.md)를 따른다.
 - NGINX Canary traffic routing이 아닌 Argo Rollouts replica-weight 단계이므로 요청 단위의 정확한 비율은
   보장하지 않는다.
 - AWS 리소스는 데모용 단일 계정·서울 리전에 한정된다.
@@ -63,4 +74,8 @@ GitOps 동기화를 중지하고 `terraform destroy` 계획에서 대상이 Rele
   제외한다.
 - 외부 트래픽은 HTTPS로 강제하고 HSTS, CSP, frame 차단, MIME sniff 방지, Referrer/Permissions Policy를
   응답한다.
-- 운영 전환에는 RDS, Secrets Manager, WAF/rate limit, 중앙 감사 보관, 백업/복구 훈련이 필요하다.
+- 인증 endpoint의 MySQL 공유 rate limit은 구현됐고 기본 활성화된다. AWS overlay는 S3 감사 보관을
+  활성화한다. 보관 전달 실패·재시도와 해시 체인 무결성은 운영 중 점검해야 한다.
+- 운영 전환의 후속 작업은 RDS와 백업/복구 훈련, Secrets Manager/Vault 연결 및 비밀 자동 교체,
+  WAF와 관측성 접근 통제, 실제 조직 SSO·GitHub Checks 연결 검증이다. 현재 secret resolver는 `env:`만
+  지원하며 `vault:` reference를 등록하는 것만으로 Vault가 연결되지는 않는다.
