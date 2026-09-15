@@ -34,6 +34,29 @@ for (const width of [320, 390]) {
 }
 type Mutation = { path: string; body: Record<string, string | null> };
 
+for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
+  test(`${role} recovers controls after a mutation connection failure`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const state = await fixture(page, role, { disconnect: true });
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const name = role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Abort";
+    const button = page.getByRole("button", { name, exact: true });
+    await expect(button).toBeEnabled();
+    if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Connection failure fixture"));
+    await button.click();
+    await expect(page.getByRole("alert").filter({ hasText: "Failed to fetch" })).toBeVisible();
+    await expect(button).toBeEnabled();
+    await expect(page.getByText(/승인 결정이 기록되었습니다\.|abort 요청이 접수되었습니다\.|요청이 생성되었습니다/)).toHaveCount(0);
+    if (role === "DEVELOPER") await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toHaveCount(0);
+    else await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).not.toContainText("chain #1");
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+}
+
 for (const rejected of [false, true]) {
   test(`developer request remains locked until ${rejected ? "rejection" : "creation"}`, async ({ page }) => {
     let respond!: () => void;
@@ -136,7 +159,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void> } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -161,6 +184,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       }
       mutations.push({ path, body: request.postDataJSON() });
       if (options.responseGate) await options.responseGate;
+      if (options.disconnect) return route.abort("connectionfailed");
       if (options.failure) return json({ code: options.failure }, 403);
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
