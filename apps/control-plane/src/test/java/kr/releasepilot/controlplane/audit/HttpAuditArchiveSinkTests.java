@@ -11,6 +11,75 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HttpAuditArchiveSinkTests {
+    @Test
+    void responseTimeoutLeavesDeliveryPendingWithSafeCode() throws Exception {
+        var release=new java.util.concurrent.CountDownLatch(1);
+        var received=new java.util.concurrent.CountDownLatch(1);
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/archive/",exchange->{
+            exchange.getRequestBody().readAllBytes();received.countDown();
+            try {
+                release.await(20,java.util.concurrent.TimeUnit.SECONDS);
+                exchange.sendResponseHeaders(201,-1);
+            } catch(InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            } finally {exchange.close();}
+        });server.start();
+        try {
+            var fixture=new TransportFixture(server.getAddress().getPort());
+            var failure=new AtomicReference<RuntimeException>();
+            fixture.tick(event -> {
+                try {fixture.sink.archive(event);}
+                catch(RuntimeException exception) {failure.set(exception);throw exception;}
+            });
+            assertThat(received.await(1,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(failure.get()).hasCauseInstanceOf(java.net.http.HttpTimeoutException.class);
+            fixture.assertPending();
+        } finally {release.countDown();server.stop(0);}
+    }
+
+    @Test
+    void interruptedTransportPreservesInterruptAndDoesNotClaimCompletion() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/archive/",exchange->{exchange.sendResponseHeaders(201,-1);exchange.close();});
+        server.start();
+        try {
+            var fixture=new TransportFixture(server.getAddress().getPort());
+            Thread.currentThread().interrupt();
+            fixture.tick(fixture.sink);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            fixture.assertPending();
+        } finally {Thread.interrupted();server.stop(0);}
+    }
+
+    private static class TransportFixture {
+        final Instant now=Instant.parse("2026-09-15T12:00:00Z");
+        final AuditArchiveDeliveryRepository deliveries=org.mockito.Mockito.mock(AuditArchiveDeliveryRepository.class);
+        final AuditEventRepository events=org.mockito.Mockito.mock(AuditEventRepository.class);
+        final AuditArchiveDelivery delivery;
+        final HttpAuditArchiveSink sink;
+        TransportFixture(int port) {
+            var event=AuditEvent.projectCreated(UUID.randomUUID(),UUID.randomUUID(),now);
+            event.seal(7,AuditTrail.GENESIS_HASH,"a".repeat(64));
+            delivery=AuditArchiveDelivery.pending(event.getId(),now);
+            org.mockito.Mockito.when(deliveries.findByStatusAndAvailableAtLessThanEqualOrderByAvailableAtAsc(
+                    org.mockito.ArgumentMatchers.eq(AuditArchiveDelivery.Status.PENDING),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(java.util.List.of(delivery));
+            org.mockito.Mockito.when(events.findById(event.getId())).thenReturn(java.util.Optional.of(event));
+            sink=new HttpAuditArchiveSink(new ObjectMapper(),URI.create("http://127.0.0.1:"+port+"/archive/"),"synthetic-test-token");
+        }
+        void tick(AuditArchiveSink sink) {
+            new AuditArchiveWorker(deliveries,events,sink,java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+        }
+        void assertPending() {
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(delivery,"status")).isEqualTo(AuditArchiveDelivery.Status.PENDING);
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(delivery,"lastError")).isEqualTo("AUDIT_ARCHIVE_UNAVAILABLE");
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(delivery,"attempts")).isEqualTo(1);
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(delivery,"availableAt")).isEqualTo(now.plusSeconds(2));
+            assertThat(org.springframework.test.util.ReflectionTestUtils.getField(delivery,"deliveredAt")).isNull();
+        }
+    }
+
     @Test void putsImmutableEnvelopeWithEventHashAsIdempotencyKey() throws Exception {
         var path=new AtomicReference<String>();var key=new AtomicReference<String>();var authorization=new AtomicReference<String>();var body=new AtomicReference<String>();
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
