@@ -34,6 +34,36 @@ for (const width of [320, 390]) {
 }
 type Mutation = { path: string; body: Record<string, string | null> };
 
+for (const role of ["APPROVER", "OPERATOR"]) {
+  test(`${role} prevents repeated actions while the server response is pending`, async ({ page }) => {
+    let respond!: () => void;
+    const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+    const state = await fixture(page, role, { responseGate });
+    try {
+      await load(page);
+      const names = role === "APPROVER" ? ["Approve", "Reject"] : ["Promote", "Pause", "Resume", "Abort"];
+      const button = page.getByRole("button", { name: names[0], exact: true });
+      await expect(button).toBeEnabled();
+      page.once("dialog", (dialog) => dialog.accept("Pending fixture reason"));
+      await button.click();
+      await expect.poll(() => state.mutations.length).toBe(1);
+      for (const name of names) await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+      // A native click on a disabled control must not initiate another mutation.
+      await button.evaluate((element) => (element as HTMLButtonElement).click());
+      expect(state.mutations).toHaveLength(1);
+      await expect(page.getByText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.", { exact: true })).toHaveCount(0);
+      respond();
+      await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.");
+      if (role === "OPERATOR") for (const name of names) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
+      else await expect(button).toHaveCount(0);
+      expect(state.mutations).toHaveLength(1);
+      expect(state.unexpected).toEqual([]);
+    } finally {
+      respond();
+    }
+  });
+}
+
 for (const action of ["approve", "reject", "promote", "pause", "resume", "abort"]) {
   test(`${action} accepts a single character reason after whitespace trimming`, async ({ page }) => {
     const decision = action === "approve" || action === "reject";
@@ -67,7 +97,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void> } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -91,6 +121,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
         return json({ code: "FORBIDDEN" }, 403);
       }
       mutations.push({ path, body: request.postDataJSON() });
+      if (options.responseGate) await options.responseGate;
       if (options.failure) return json({ code: options.failure }, 403);
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
