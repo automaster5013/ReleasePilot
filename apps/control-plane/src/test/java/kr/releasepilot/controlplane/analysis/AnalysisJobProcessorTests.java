@@ -25,6 +25,78 @@ class AnalysisJobProcessorTests {
     private static final Instant NOW = Instant.parse("2026-09-15T00:00:00Z");
 
     @Test
+    void missingConfiguredSecretRetriesWithoutCallingWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        when(fixture.secrets.resolve("env:TEST_ONLY_TOKEN")).thenReturn(Optional.empty());
+        assertThat(fixture.processor.processOne()).isTrue();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("SECRET_UNAVAILABLE");
+        assertThat(ReflectionTestUtils.getField(fixture.job, "availableAt")).isEqualTo(NOW.plusSeconds(120));
+        verifyNoInteractions(fixture.worker, fixture.commands);
+    }
+
+    @Test
+    void blankConfiguredSecretDoesNotCallWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        when(fixture.secrets.resolve(anyString())).thenReturn(Optional.of(new SecretResolver.SecretMaterial("  ")));
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("SECRET_UNAVAILABLE");
+        verifyNoInteractions(fixture.worker, fixture.commands);
+    }
+
+    @Test
+    void resolverExceptionIsHandledWithoutPersistingMessageOrCallingWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        when(fixture.secrets.resolve(anyString())).thenThrow(new IllegalStateException("test-only-sensitive-token"));
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("SECRET_UNAVAILABLE");
+        verifyNoInteractions(fixture.worker, fixture.commands);
+    }
+
+    @Test
+    void exhaustedMissingSecretPausesInsteadOfPromoting() {
+        var fixture = new Fixture(1);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        fixture.processor.processOne();
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.INCONCLUSIVE);
+        assertThat(fixture.job.getReasonCode()).isEqualTo("SECRET_UNAVAILABLE");
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PAUSE_ROLLOUT");
+        assertThat(saved.getValue().getPayloadJson()).contains("SECRET_UNAVAILABLE");
+        verifyNoInteractions(fixture.worker);
+    }
+
+    @Test
+    void connectionWithoutSecretStillUsesAnonymousWorkerRequest() {
+        var fixture = new Fixture(3);
+        when(fixture.worker.evaluate(any())).thenReturn(new AnalysisWorkerGateway.Result(AnalysisVerdict.INCONCLUSIVE,"NO_DATA","[]"));
+        fixture.processor.processOne();
+        var request = ArgumentCaptor.forClass(AnalysisWorkerGateway.Request.class);
+        verify(fixture.worker).evaluate(request.capture());
+        assertThat(request.getValue().bearerToken()).isNull();
+        verifyNoInteractions(fixture.secrets);
+    }
+
+    @Test
+    void availableConfiguredSecretStillReachesWorker() {
+        var fixture = new Fixture(3);
+        when(fixture.connection.getSecretRef()).thenReturn("env:TEST_ONLY_TOKEN");
+        when(fixture.secrets.resolve(anyString())).thenReturn(Optional.of(new SecretResolver.SecretMaterial("test-only-token")));
+        when(fixture.worker.evaluate(any())).thenReturn(new AnalysisWorkerGateway.Result(AnalysisVerdict.INCONCLUSIVE,"NO_DATA","[]"));
+        fixture.processor.processOne();
+        var request = ArgumentCaptor.forClass(AnalysisWorkerGateway.Request.class);
+        verify(fixture.worker).evaluate(request.capture());
+        assertThat(request.getValue().bearerToken()).isEqualTo("test-only-token");
+    }
+
+    @Test
     void retryStoresStableCodeInsteadOfSensitiveExceptionMessage() {
         var fixture = new Fixture(3);
         when(fixture.worker.evaluate(any())).thenThrow(new IllegalStateException(
@@ -75,6 +147,8 @@ class AnalysisJobProcessorTests {
         final AnalysisWorkerGateway worker = mock(AnalysisWorkerGateway.class);
         final OutboxCommandRepository commands = mock(OutboxCommandRepository.class);
         final AnalysisJobProcessor processor;
+        final SecretResolver secrets = mock(SecretResolver.class);
+        final PrometheusConnection connection = mock(PrometheusConnection.class);
 
         Fixture(int maxAttempts) {
             var jobs = mock(AnalysisJobRepository.class);
@@ -85,13 +159,11 @@ class AnalysisJobProcessorTests {
             var services = mock(CatalogServiceRepository.class);
             var connections = mock(PrometheusConnectionRepository.class);
             var snapshots = mock(PolicySnapshotRepository.class);
-            var secrets = mock(SecretResolver.class);
             var step = mock(RolloutStep.class);
             var execution = mock(RolloutExecution.class);
             var release = mock(Release.class);
             var environment = mock(Environment.class);
             var service = mock(CatalogService.class);
-            var connection = mock(PrometheusConnection.class);
             var snapshot = mock(PolicySnapshot.class);
             var stepId = UUID.randomUUID();
             var executionId = UUID.randomUUID();
