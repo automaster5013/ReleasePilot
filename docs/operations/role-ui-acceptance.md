@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+데모 CSRF 대기 단계 후속 검증: 로그인 대기 gate 테스트를 POST 및 토큰 GET 두 단계로 확장했다. 토큰 GET 대기 중 버튼 잠금·조회 1회·로그인 POST 0개·미인증 유지, 성공 응답 후 로그인 POST 1개, 403 응답 후 로그인 POST 0개 및 보안 토큰 오류·버튼 복구가 확인됐다. 최종 전체 fixture E2E 86개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 실제 네트워크 지연·모든 동시 클릭 타이밍 검증은 별도다.
+
 데모 로그인 대기 중 재조작 방지: demoBusy 상태로 대기 중 버튼을 비활성화하고 재진입을 차단한다. finally에서 성공/오류/거부 모두 상태를 해제한다. 로그인 POST 응답 gate를 성공/403으로 실행해 버튼 잠금·disabled native click 후 POST 1개·응답 전 DEMO 상태 없음·응답 후 성공 또는 오류 안내·버튼 복구를 확인했다. 단위 35개·lint/typecheck·새 production build·전체 E2E 84개(신규 2개)가 통과했다. 서버 멱등성 및 모든 동시 클릭 타이밍 검증은 별도이며 운영 배포는 없다.
 
 데모 로그인 CSRF 보호 연결: startDemo도 공통 csrfToken()/mutationHeaders()를 사용해 HTTP 성공 여부와 토큰 형식을 검사한다. 시작 시 이전 오류를 제거하고 fetch/토큰 실패를 alert로 처리해 unhandled rejection을 방지한다. null·빈 객체·403·연결 실패의 첫 토큰 응답에서 로그인 POST 0개·미인증 유지, 정상 응답으로 재시도 후 POST 1개·DEMO 상태·오류 제거·pageerror 없음이 검증됐다. 단위 35개·lint/typecheck·새 production build·전체 E2E 82개(신규 4개)가 통과했다. 실제 backend CSRF enforcement·로그인 중복 클릭·세션 성공 응답 형식 검증은 별도다. 운영 배포 없음.

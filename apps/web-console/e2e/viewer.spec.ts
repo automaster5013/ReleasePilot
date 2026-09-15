@@ -4,12 +4,15 @@ const origin = "http://127.0.0.1:3100";
 const createdAt = "2026-09-15T00:00:00Z";
 
 for (const rejected of [false, true]) {
-  test(`demo login locks controls while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {
+  for (const stage of ["demo", "csrf"]) {
+  test(`demo login locks controls while awaiting ${stage} ${rejected ? "rejection" : "success"}`, async ({ page }) => {
     const unexpected = await isolateApi(page);
     let respond!: () => void;
     const gate = new Promise<void>((resolve) => { respond = resolve; });
     let requests = 0;
-    await page.route("**/control-api/session/demo", async (route) => {
+    let demoRequests = 0;
+    await page.route("**/control-api/session/demo", async (route) => { demoRequests++; await route.fallback(); });
+    await page.route(`**/control-api/session/${stage}`, async (route) => {
       requests++;
       await gate;
       if (rejected) return route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
@@ -24,14 +27,18 @@ for (const rejected of [false, true]) {
       await button.evaluate((element) => (element as HTMLButtonElement).click());
       await expect(page.getByRole("navigation")).not.toContainText("DEMO · VIEW ONLY");
       expect(requests).toBe(1);
+      if (stage === "csrf") expect(demoRequests).toBe(0);
       respond();
-      if (rejected) await expect(page.getByRole("alert").filter({ hasText: "공개 데모 세션을 시작할 수 없습니다." })).toBeVisible();
+      if (rejected) await expect(page.getByRole("alert").filter({ hasText: stage === "demo" ? "공개 데모 세션을 시작할 수 없습니다." : "보안 토큰을 갱신할 수 없습니다." })).toBeVisible();
       else await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
       await expect(button).toBeEnabled();
       expect(requests).toBe(1);
+      // Rejected token retrieval must never reach the login mutation.
+      if (stage === "csrf") expect(demoRequests).toBe(rejected ? 0 : 1);
       expect(unexpected).toEqual([]);
     } finally { respond(); }
   });
+  }
 }
 
 for (const failure of ["null", "empty", "forbidden", "connection"]) {
