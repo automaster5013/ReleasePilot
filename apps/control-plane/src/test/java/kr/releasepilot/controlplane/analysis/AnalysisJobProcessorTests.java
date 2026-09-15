@@ -1,0 +1,131 @@
+package kr.releasepilot.controlplane.analysis;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
+import kr.releasepilot.controlplane.catalog.*;
+import kr.releasepilot.controlplane.connection.*;
+import kr.releasepilot.controlplane.environment.*;
+import kr.releasepilot.controlplane.release.*;
+import kr.releasepilot.controlplane.rollout.*;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+class AnalysisJobProcessorTests {
+    private static final Instant NOW = Instant.parse("2026-09-15T00:00:00Z");
+
+    @Test
+    void retryStoresStableCodeInsteadOfSensitiveExceptionMessage() {
+        var fixture = new Fixture(3);
+        when(fixture.worker.evaluate(any())).thenThrow(new IllegalStateException(
+                "Bearer test-only-sensitive-token https://private.example/query?password=test-only-password"));
+
+        assertThat(fixture.processor.processOne()).isTrue();
+
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(fixture.job.getAttempts()).isEqualTo(1);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_UNAVAILABLE");
+        assertThat(ReflectionTestUtils.getField(fixture.job, "availableAt")).isEqualTo(NOW.plusSeconds(120));
+        verifyNoInteractions(fixture.commands);
+    }
+
+    @Test
+    void nullExceptionMessageAlsoStoresStableCode() {
+        var fixture = new Fixture(3);
+        when(fixture.worker.evaluate(any())).thenThrow(new IllegalStateException());
+
+        fixture.processor.processOne();
+
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.RETRY_WAIT);
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isEqualTo("PROMETHEUS_UNAVAILABLE");
+        verifyNoInteractions(fixture.commands);
+    }
+
+    @Test
+    void exhaustedRetriesPauseWithoutPersistingExceptionDetails() {
+        var fixture = new Fixture(1);
+        when(fixture.worker.evaluate(any())).thenThrow(new IllegalStateException("test-only-sensitive-token"));
+
+        fixture.processor.processOne();
+
+        assertThat(fixture.job.getStatus()).isEqualTo(AnalysisJobStatus.COMPLETED);
+        assertThat(fixture.job.getVerdict()).isEqualTo(AnalysisVerdict.INCONCLUSIVE);
+        assertThat(fixture.job.getReasonCode()).isEqualTo("PROMETHEUS_UNAVAILABLE");
+        assertThat(fixture.job.getEvidenceJson()).isEqualTo("[]");
+        assertThat(ReflectionTestUtils.getField(fixture.job, "lastError")).isNull();
+        var saved = ArgumentCaptor.forClass(OutboxCommand.class);
+        verify(fixture.commands).save(saved.capture());
+        assertThat(saved.getValue().getCommandType()).isEqualTo("PAUSE_ROLLOUT");
+        assertThat(saved.getValue().getPayloadJson()).contains("PROMETHEUS_UNAVAILABLE")
+                .doesNotContain("test-only-sensitive-token");
+    }
+
+    private static class Fixture {
+        final AnalysisJob job;
+        final AnalysisWorkerGateway worker = mock(AnalysisWorkerGateway.class);
+        final OutboxCommandRepository commands = mock(OutboxCommandRepository.class);
+        final AnalysisJobProcessor processor;
+
+        Fixture(int maxAttempts) {
+            var jobs = mock(AnalysisJobRepository.class);
+            var steps = mock(RolloutStepRepository.class);
+            var executions = mock(RolloutExecutionRepository.class);
+            var releases = mock(ReleaseRepository.class);
+            var environments = mock(EnvironmentRepository.class);
+            var services = mock(CatalogServiceRepository.class);
+            var connections = mock(PrometheusConnectionRepository.class);
+            var snapshots = mock(PolicySnapshotRepository.class);
+            var secrets = mock(SecretResolver.class);
+            var step = mock(RolloutStep.class);
+            var execution = mock(RolloutExecution.class);
+            var release = mock(Release.class);
+            var environment = mock(Environment.class);
+            var service = mock(CatalogService.class);
+            var connection = mock(PrometheusConnection.class);
+            var snapshot = mock(PolicySnapshot.class);
+            var stepId = UUID.randomUUID();
+            var executionId = UUID.randomUUID();
+            var releaseId = UUID.randomUUID();
+            var environmentId = UUID.randomUUID();
+            var serviceId = UUID.randomUUID();
+            var connectionId = UUID.randomUUID();
+            job = AnalysisJob.pending(stepId, UUID.randomUUID(), maxAttempts, NOW.minusSeconds(60), NOW);
+            when(jobs.findFirstByStatusInAndAvailableAtLessThanEqualOrderByCreatedAtAsc(anyList(), eq(NOW)))
+                    .thenReturn(Optional.of(job));
+            when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+            when(steps.findById(stepId)).thenReturn(Optional.of(step));
+            when(step.getExecutionId()).thenReturn(executionId);
+            when(executions.findById(executionId)).thenReturn(Optional.of(execution));
+            when(execution.getId()).thenReturn(executionId);
+            when(execution.getReleaseId()).thenReturn(releaseId);
+            when(releases.findById(releaseId)).thenReturn(Optional.of(release));
+            when(release.getId()).thenReturn(releaseId);
+            when(release.getEnvironmentId()).thenReturn(environmentId);
+            when(release.getServiceId()).thenReturn(serviceId);
+            when(environments.findById(environmentId)).thenReturn(Optional.of(environment));
+            when(environment.getPrometheusConnectionId()).thenReturn(connectionId);
+            when(services.findById(serviceId)).thenReturn(Optional.of(service));
+            when(connections.findById(connectionId)).thenReturn(Optional.of(connection));
+            when(connection.getId()).thenReturn(connectionId);
+            when(connection.getBaseUrl()).thenReturn("http://prometheus.invalid");
+            when(snapshots.findByReleaseId(releaseId)).thenReturn(Optional.of(snapshot));
+            when(snapshot.getDefinition()).thenReturn(
+                    "{\"metrics\":[],\"inconclusivePolicy\":{\"additionalObservationSeconds\":120}}");
+            var manager = mock(PlatformTransactionManager.class);
+            when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+            processor = new AnalysisJobProcessor(jobs, steps, executions, releases, environments,
+                    services, connections, snapshots, secrets, worker, commands, new ObjectMapper(),
+                    new TransactionTemplate(manager), Clock.fixed(NOW, ZoneOffset.UTC));
+        }
+    }
+}
