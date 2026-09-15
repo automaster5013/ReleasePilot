@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+최대 허용 사유 길이 후속 검증: APPROVER 승인과 OPERATOR Abort에서 한글 1000자 앞뒤에 공백을 붙여 입력한 뒤 trim된 1000자가 정확히 전송되고 성공 안내가 표시되는지 검증했다. 기존 1001자 거부 테스트와 허용 경계를 함께 확인한다. lint/typecheck 및 전체 fixture E2E 36개가 통과했다. 제품 코드 변경은 없고 실제 backend의 길이 제한 검증은 별도다.
+
 후속 [역할별 모바일 검수](role-mobile-review.md)에서 320px·390px 역할별 6개 시나리오와 운영자 연결 검증 헤더 넘침 수정을 완료했다. 전체 fixture E2E는 34개다.
 
 fixture E2E 8개를 추가했다. DEVELOPER 요청과 APPROVER 승인에서 서버의 ENVIRONMENT_VALIDATION_STALE 응답을 표시하고 성공 안내 없이 버튼을 다시 사용할 수 있는지 확인한다. OPERATOR Abort의 FORBIDDEN 응답에서도 접수 안내 없이 오류를 표시하고 busy 상태를 해제한다. APPROVER/OPERATOR의 공백 사유·1001자 사유 및 승인 prompt 취소는 mutation이 전송되지 않는지 확인한다. 모든 시나리오에서 예상하지 않은 요청이 없어야 한다.

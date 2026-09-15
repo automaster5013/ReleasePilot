@@ -34,6 +34,22 @@ for (const width of [320, 390]) {
 }
 type Mutation = { path: string; body: Record<string, string | null> };
 
+for (const role of ["APPROVER", "OPERATOR"]) {
+  test(`${role} accepts the 1000 character reason boundary`, async ({ page }) => {
+    const state = await fixture(page, role);
+    await load(page);
+    const reason = "가".repeat(1000);
+    const action = role === "APPROVER" ? "approve" : "abort";
+    const button = page.getByRole("button", { name: role === "APPROVER" ? "Approve" : "Abort", exact: true });
+    await expect(button).toBeEnabled();
+    page.once("dialog", (dialog) => dialog.accept(` ${reason} `));
+    await button.click();
+    await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다.");
+    expect(state.mutations).toEqual([{ path: `/releases/role-release/${action}`, body: { reason } }]);
+    expect(state.unexpected).toEqual([]);
+  });
+}
+
 async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
