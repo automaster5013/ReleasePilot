@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("mutation headers include the server-selected CSRF header", () => {
   assert.deepEqual(mutationHeaders({ headerName: "X-CSRF-TOKEN", token: "token" }), {
@@ -125,6 +125,19 @@ test("Kubernetes connections share the same fail-closed freshness label", () => 
   const cluster = { status: "ACTIVE", lastValidatedAt: "2026-09-15T03:00:00Z" };
   assert.equal(connectionValidationLabel(cluster, Date.parse("2026-09-15T10:00:00Z")), "ACTIVE · validation expired");
   assert.match(connectionValidationLabel(cluster, Date.parse("2026-09-15T04:00:00Z")), /^ACTIVE · validated /);
+});
+
+test("connection search and status filters surface stale or failed targets", () => {
+  const now = Date.parse("2026-09-15T12:00:00Z");
+  const items = [
+    { name: "Production East", status: "ACTIVE", lastValidatedAt: "2026-09-15T11:00:00Z" },
+    { name: "Production West", status: "ACTIVE", lastValidatedAt: "2026-09-15T05:00:00Z" },
+    { name: "Staging", status: "INVALID", lastValidatedAt: "2026-09-15T11:00:00Z" },
+    { name: "Retired", status: "DISABLED", lastValidatedAt: null },
+  ];
+  assert.deepEqual(filterConnections(items, "production", "ALL", now).map((item) => item.name), ["Production East", "Production West"]);
+  assert.deepEqual(filterConnections(items, "", "NEEDS_ATTENTION", now).map((item) => item.name), ["Production West", "Staging"]);
+  assert.deepEqual(filterConnections(items, "ret", "DISABLED", now).map((item) => item.name), ["Retired"]);
 });
 
 test("connection drafts are validated before operator mutations", () => {

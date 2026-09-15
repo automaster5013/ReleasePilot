@@ -13,6 +13,9 @@
 .connectionList small { color: #67d6a3; }
 .connectionList small[data-status="INVALID"], .connectionList small[data-status="UNVERIFIED"] { color: #ffacb0; }
 .connectionActions { display: flex; grid-template-columns: none; gap: 7px; }
+.connectionFilters { display: flex; gap: 8px; padding: 10px 26px; border-top: 1px solid #293730; }
+.connectionFilters input, .connectionFilters select { min-width: 0; border: 1px solid #344740; background: #0b1210; color: #d8e8e1; padding: 8px 10px; }
+.connectionFilters input { flex: 1; }
 .connectionAudit { flex-basis: 100%; display: grid; gap: 7px; padding: 12px; border: 1px solid #293730; background: #0b1210; }
 .connectionAudit > span { display: flex; justify-content: space-between; gap: 12px; }
 .connectionAudit strong { font-size: 11px; }
@@ -94,6 +97,7 @@
   .connectionAudit > span { flex-direction: column; }
   .connectionAudit small { text-align: left; }
   .connectionForms { grid-template-columns: 1fr; }
+  .connectionFilters { flex-direction: column; }
   .sessions > header { align-items: start; flex-direction: column; gap: 16px; }
   .sessionList article { align-items: flex-start; }
   .sessionList article div { grid-template-columns: 1fr; }

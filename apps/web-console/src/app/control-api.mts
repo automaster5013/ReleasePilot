@@ -68,6 +68,21 @@ export function connectionValidationLabel(connection: Pick<PrometheusConnection,
   return `ACTIVE · validated ${new Date(validatedAt).toLocaleString("ko-KR")}`;
 }
 
+export type ConnectionFilter = "ALL" | "NEEDS_ATTENTION" | "ACTIVE" | "DISABLED";
+
+export function filterConnections<T extends { name: string; status: string; lastValidatedAt: string | null }>(items: T[], query: string, filter: ConnectionFilter, now = Date.now()) {
+  const term = query.trim().toLocaleLowerCase();
+  return items.filter((item) => {
+    if (term && !item.name.toLocaleLowerCase().includes(term)) return false;
+    if (filter === "ALL") return true;
+    if (filter === "NEEDS_ATTENTION") {
+      const validatedAt = item.lastValidatedAt ? Date.parse(item.lastValidatedAt) : Number.NaN;
+      return item.status === "INVALID" || item.status === "UNVERIFIED" || (item.status === "ACTIVE" && (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000));
+    }
+    return item.status === filter;
+  });
+}
+
 const secretReference = /^[A-Za-z0-9._:/-]+$/;
 const namespaceName = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 
