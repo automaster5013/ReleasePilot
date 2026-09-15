@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+
+test("release mutation gate blocks same-tick submissions and recovers after failure", async () => {
+  const gate = createMutationGate();
+  assert.equal(gate.tryAcquire(), true);
+  assert.equal(gate.tryAcquire(), false);
+  try { await Promise.reject(new Error("network failure")); } catch { /* expected */ } finally { gate.release(); }
+  assert.equal(gate.tryAcquire(), true);
+  assert.equal(gate.tryAcquire(), false);
+  gate.release();
+  assert.equal(gate.tryAcquire(), true);
+});
 
 test("mutation readiness is checked again after CSRF waits and rejection stays available", async () => {
   const originalNow = Date.now;

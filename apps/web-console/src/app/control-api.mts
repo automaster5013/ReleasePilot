@@ -129,6 +129,14 @@ export async function readinessMutationHeaders(result: EnvironmentValidation | n
   return mutationHeaders(csrf, options);
 }
 
+export function createMutationGate() {
+  let busy = false;
+  return {
+    tryAcquire() { if (busy) return false; busy = true; return true; },
+    release() { busy = false; },
+  };
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
