@@ -9,7 +9,12 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
   publish:
+    needs: validate
     runs-on: ubuntu-latest
     strategy:
       matrix:

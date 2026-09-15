@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main]
@@ -85,6 +86,7 @@ jobs:
           python-version: '3.13'
       - run: pip install jsonschema pyyaml
       - run: python -m unittest discover -s scripts -p test_public_ingress.py
+      - run: python -m unittest discover -s scripts -p test_release_ci_gate.py
       - name: Validate release policy example
         run: >-
           python -c "import json,jsonschema,pathlib;
