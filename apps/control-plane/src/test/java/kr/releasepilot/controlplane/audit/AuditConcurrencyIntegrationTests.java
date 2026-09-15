@@ -170,6 +170,76 @@ class AuditConcurrencyIntegrationTests {
                 org.mockito.ArgumentMatchers.argThat(value -> value.getId().equals(second.getId())));
     }
 
+    @Test
+    void committedHttpBatchFailureRecoversOnlyFailedEventWithSameEnvelope() throws Exception {
+        var transaction=new TransactionTemplate(transactionManager);
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var now=Instant.parse("2032-01-01T00:00:00Z");
+        var recorded=transaction.execute(status -> {
+            var first=trail.record(event());
+            var second=trail.record(event());
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(first),"availableAt",now.minusSeconds(2));
+            org.springframework.test.util.ReflectionTestUtils.setField(deliveryFor(second),"availableAt",now.minusSeconds(1));
+            return java.util.List.of(first,second);
+        });
+        var first=recorded.get(0);
+        var second=recorded.get(1);
+        var requests=java.util.Collections.synchronizedList(new ArrayList<ArchiveRequest>());
+        var failedOnce=new java.util.concurrent.atomic.AtomicBoolean();
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/archive/",exchange -> {
+            try {
+                var key=exchange.getRequestHeaders().getFirst("Idempotency-Key");
+                requests.add(new ArchiveRequest(exchange.getRequestMethod(),exchange.getRequestURI().getPath(),key,
+                        new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)));
+                var response="Bearer synthetic-http-db-secret private-url".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                int status=first.getEventHash().equals(key)&&failedOnce.compareAndSet(false,true)?503:201;
+                exchange.sendResponseHeaders(status,response.length);
+                exchange.getResponseBody().write(response);
+            } finally {exchange.close();}
+        });
+        server.start();
+        try {
+            var endpoint=java.net.URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/archive/");
+            var json=new tools.jackson.databind.ObjectMapper();
+            var sink=new HttpAuditArchiveSink(json,endpoint,"synthetic-loopback-token");
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,sink,
+                    java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick());
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(first,AuditArchiveDelivery.Status.PENDING,1,"AUDIT_ARCHIVE_UNAVAILABLE",null);
+                assertThat(org.springframework.test.util.ReflectionTestUtils.getField(deliveryFor(first),"availableAt"))
+                        .isEqualTo(now.plusSeconds(2));
+                assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+                assertThat(verifier.verify().valid()).isTrue();
+            });
+            var recoveredSink=new HttpAuditArchiveSink(json,endpoint,"synthetic-loopback-token");
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,recoveredSink,
+                    java.time.Clock.fixed(now.plusSeconds(2),java.time.ZoneOffset.UTC)).tick());
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(first,AuditArchiveDelivery.Status.DELIVERED,1,null,now.plusSeconds(2));
+                assertDelivery(second,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+                var result=verifier.verify();
+                assertThat(result.valid()).isTrue();
+                assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+2);
+                assertThat(result.headHash()).isEqualTo(second.getEventHash());
+            });
+            var batchRequests=requests.stream().filter(value -> value.key().equals(first.getEventHash())
+                    ||value.key().equals(second.getEventHash())).toList();
+            assertThat(batchRequests.stream().map(ArchiveRequest::key).toList())
+                    .containsExactly(first.getEventHash(),second.getEventHash(),first.getEventHash());
+            assertThat(batchRequests).allSatisfy(value -> {
+                assertThat(value.method()).isEqualTo("PUT");
+                assertThat(value.body()).doesNotContain("synthetic-loopback-token","synthetic-http-db-secret");
+            });
+            assertThat(batchRequests.get(0)).isEqualTo(batchRequests.get(2));
+            assertThat(batchRequests.get(0).path()).isEqualTo("/archive/"+first.getChainSequence()+"-"+first.getEventHash()+".json");
+            assertThat(json.readTree(batchRequests.get(0).body()).get("eventHash").asString()).isEqualTo(first.getEventHash());
+        } finally {server.stop(0);}
+    }
+
+    private record ArchiveRequest(String method,String path,String key,String body) {}
+
     private AuditArchiveDelivery deliveryFor(AuditEvent event) {
         return deliveries.findAll().stream().filter(value -> value.auditEventId().equals(event.getId()))
                 .findFirst().orElseThrow();

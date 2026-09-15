@@ -25,3 +25,22 @@ cd apps/control-plane
 repository는 여전히 mock이다. 원격 서버에 실제 객체가 저장됐는지, 응답을 잃은 경우의 중복 제거, 네트워크 전체 장애 복구는 증명하지 않는다. 운영 timeout 설정이나 코드는 변경하지 않았다.
 
 후속 로컬 결과: HTTP 테스트 6개 및 서버 전체 verify 180개가 실패·오류·건너뜀 없이 통과했다.
+
+## 실제 DB·HTTP 배치 commit 통합 검증
+
+`AuditConcurrencyIntegrationTests.committedHttpBatchFailureRecoversOnlyFailedEventWithSameEnvelope`는 실제 repository/Worker/HttpAuditArchiveSink와 loopback HTTP 서버를 결합한다. 두 합성 이벤트와 서로 다른 due 시각을 commit하고, 첫 이벤트의 멱등 키에만 최초 503을 반환하며 다음 이벤트에는 201을 반환한다. 배치를 commit한 뒤 별도 트랜잭션에서 첫 항목의 PENDING/고정 오류/attempts=1/2초 재시도/완료 시각 없음과 다음 항목의 DELIVERED/오류 없음/attempts=0/완료 시각을 확인한다.
+
+새 HTTP sink/Worker로 재시도 시각에 배치를 commit하고, 다시 별도 트랜잭션에서 첫 항목의 DELIVERED/오류 제거/attempts=1/복구 완료 시각과 기존 성공 항목의 상태·완료 시각 유지를 확인한다. 두 대상의 실제 요청 순서는 첫 이벤트→다음 이벤트→첫 이벤트다. 실패 이벤트의 첫 요청과 재시도는 PUT 경로·멱등 키·본문이 같고, 경로의 순번/hash와 JSON eventHash가 DB 기록에 일치한다. 요청 본문에 합성 인증 토큰·응답 비밀이 포함되지 않는다. 실패 commit 후 감사 체인은 유효하며 복구 commit 후 이벤트 수와 head hash도 유지된다.
+
+결과: H2 전체 verify 187개, 실제 MySQL 통합 25개(분석 6/감사 저장 14/트랜잭션·동시성 5)가 실패·오류·건너뜀 없이 통과했다. Flyway migration 22개·JSON 타입 5개 검사와 Ruff도 통과했다. 소유 임시 MySQL 컨테이너 `f13d5a6260f4`는 loopback에만 바인딩됐고, UUID label/기록된 ID 확인 후 컨테이너·익명 볼륨 cleanup 및 잔여 컨테이너 없음 확인을 완료했다. HTTP 서버는 finally에서 stop한다.
+
+```powershell
+cd C:\ReleasePilot\apps\control-plane
+./mvnw.cmd --batch-mode verify
+cd C:\ReleasePilot
+docker pull mysql:8.4
+python scripts/analysis_mysql_integration.py
+apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integration.py
+```
+
+이번 시나리오의 repository와 sink는 mock이 아니며 실제 DB commit과 loopback HTTP 응답을 검증한다. 앞선 HTTP 단위 테스트의 repository mock 및 S3 SDK mock 검증과 구분한다. 테스트 서버는 원격 저장소의 영구 저장·중복 제거를 구현하지 않는다. 실제 외부 HTTP/AWS/S3 전달, 응답 유실/네트워크 장애, 프로세스·DB 재시작, DB commit 실패, 복수 Worker 중복 전송과 scheduler proxy 자동 실행은 미검증이다. 합성 데이터만 임시 DB에 commit하고 DB를 폐기하며 운영 데이터·전달 상태·기존 last_error와 외래 키는 변경하지 않았다. 새 운영 배포 없이 운영 전체 E2E 및 SSO/GitHub Checks 보류를 유지한다.

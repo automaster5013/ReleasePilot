@@ -98,7 +98,7 @@ def main():
             ]
         )
         print(
-            "Running 6 analysis flows, 14 audit storage checks and 4 transaction/concurrency checks: MySQL 8.4, Flyway enabled, Hibernate validate",
+            "Running 6 analysis flows, 14 audit storage checks and 5 transaction/concurrency checks: MySQL 8.4, Flyway enabled, Hibernate validate",
             flush=True,
         )
         subprocess.run(

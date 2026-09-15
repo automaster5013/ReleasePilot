@@ -67,6 +67,8 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 
 ## 배치 트랜잭션 롤백 후 재전송 경계
 
+이후 [실제 DB·loopback HTTP 배치 commit 통합 검증](audit-http-recovery.md#실제-dbhttp-배치-commit-통합-검증)에서 repository와 sink 모두 실제 구현을 사용하는 실패·복구 시나리오를 추가했다.
+
 `AuditConcurrencyIntegrationTests.archiveBatchRollbackLeavesBothEventsDueForRedelivery`는 실제 DB에 합성 이벤트와 due 순서를 commit한 뒤 mock sink에서 첫 항목만 실패시키고 다음 항목은 성공시킨다. 배치 전달 상태를 flush해 SQL 저장을 실행하고, 트랜잭션 안에서 실패 PENDING/attempts=1/고정 오류와 성공 DELIVERED를 확인한 뒤 `setRollbackOnly()`로 전체 롤백한다.
 
 다음 별도 트랜잭션에서는 두 항목 모두 원래 PENDING/attempts=0/오류·완료 시각 없음/원래 due 시각으로 조회된다. 즉 sink 호출이 성공해도 그 성공 상태는 배치 DB 트랜잭션과 함께 롤백된다. 첫 항목의 mock 실패를 해제하고 같은 시각에 새 배치를 commit하면 두 항목이 모두 DELIVERED가 된다. 두 이벤트의 sink 호출은 각각 2회이며, 앞서 성공한 항목도 재전송 대상이 됨을 확인한다. 실패 횟수도 롤백되므로 복구 후 attempts는 0이다. 감사 체인은 롤백 후 유효하고 재전송 commit 후 이벤트 수·head hash·첫 이벤트 hash가 유지된다.
