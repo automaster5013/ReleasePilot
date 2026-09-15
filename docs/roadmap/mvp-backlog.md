@@ -265,3 +265,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 60. 누적 비밀 보안 보강 배포 및 복구 경계 검증 — 완료 (2026-09-15, 56–59번 v0.51.0 반영·null/빈 값/공백/탭·개행·다음 예약 시도 자격 증명 복구 추가 검증·서버 전체 100개 테스트·CI/이미지 workflow success·세 Rollout 2/2 Healthy·공개 VIEWER/메트릭 경계 재검증; 실제 릴리스 목록은 비어 있어 운영 분석 E2E와 구분)
 61. 분석 요청 구성 실패 재시도 및 안전 종료 — 완료 (2026-09-15, 잘못된 정책/누락 snapshot에서 Worker 호출 차단·고정 코드/300초 재시도·최종 INCONCLUSIVE/PAUSE·정책 복구 재조회·회귀 사례 10개·서버 전체 110개 테스트 통과; 실행 대상 조회/DB 장애와 공개 이미지 배포는 별도)
 62. 분석 시도/PASS 예약 Prometheus readiness — 완료 (2026-09-15, ACTIVE/설정 유효기간 엄격 경계 검사·Worker 호출 전 및 PASS 결과 처리 시 재조회·연결 ID 변경 차단·재시도/최종 PAUSE·FAIL ABORT 유지·회귀 사례 15개·서버 전체 125개 테스트 통과; 예약 이후 mutation 경계와 공개 이미지 배포는 별도)
+63. 예약된 승격 명령 실행 전 readiness — 완료 (2026-09-15, PROMOTE 실행 직전 Environment/Kubernetes/Prometheus 상태·검증 만료 검사·비밀 조회/외부 mutation/Step 통과/성공 감사 차단·정상/재검증 복구·PAUSE/ABORT 유지·회귀 13개·서버 전체 138개 테스트 통과; Outbox 재시도 제한과 공개 이미지 배포는 별도)
