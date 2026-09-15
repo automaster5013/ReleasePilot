@@ -33,6 +33,8 @@ npm run test:e2e
 
 ## 서버 거부·사유 입력 경계 추가 검증 (2026-09-16)
 
+연결 실패 후 수동 재시도 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort의 첫 POST만 `connectionfailed`로 중단하고 두 번째 요청은 fixture 성공 응답을 제공한다. 첫 오류와 버튼 복구를 기다린 뒤 사용자 클릭으로 재시도해 성공 안내/생성 상세·이전 오류 제거·동일 endpoint와 본문 2회·성공 감사 `chain #1`·예상하지 않은 요청 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 54개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 첫 요청은 fixture에서 처리되지 않으므로 실제 서버 처리 후 응답 유실의 중복 방지나 멱등 키 재사용을 증명하지 않는다.
+
 네트워크 실패 후속 검증: DEVELOPER 생성·APPROVER 승인·OPERATOR Abort POST를 Playwright `connectionfailed`로 중단한다. Chromium의 `Failed to fetch` 오류 표시·버튼 재활성화·성공 안내 없음·생성 상세 또는 성공 감사 표시 없음·mutation 1개·예상하지 않은 요청 및 pageerror 없음이 확인됐다. 신규 3개를 포함한 전체 fixture E2E 51개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없다. 전송 후 서버 처리 여부가 불명확한 실제 응답 유실, 서버 멱등성 및 재시도 정책은 별도다. 브라우저별 오류 문구는 검증 범위에 포함하지 않는다.
 
 DEVELOPER 요청 대기 후속 검증: 생성 POST 응답을 gate로 보류하면 `요청 중…` 버튼이 비활성화되고 native click으로 추가 mutation이 발생하지 않는다. 응답 전 생성된 상세가 없으며, 성공 응답 후 생성 상세 자동 로드와 요청 버튼 복구를 확인한다. 403 FORBIDDEN 응답 후에는 오류 표시·요청 버튼 복구·생성 상세 없음이 유지된다. 두 경우 모두 mutation은 1개이고 예상하지 않은 요청은 없다. 신규 2개를 포함한 전체 fixture E2E 48개 및 lint/typecheck가 통과했다. 제품 코드 변경은 없으며 서버 멱등성·실제 네트워크 장애 검증은 별도다.
