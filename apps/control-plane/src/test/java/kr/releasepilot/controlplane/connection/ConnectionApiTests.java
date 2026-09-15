@@ -19,6 +19,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import tools.jackson.databind.ObjectMapper;
@@ -57,6 +58,30 @@ class ConnectionApiTests {
             .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/connections/clusters").with(authentication(auth("ROLE_VIEWER"))))
             .andExpect(status().isForbidden());
+    }
+    @Test void operatorUpdatesConnectionsAndMustRevalidateWhileViewerIsForbidden() throws Exception {
+        var cluster=mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"old-cluster","apiServer":"https://old.example","allowedNamespaces":["old"],"secretRef":"vault:old"}
+            """)).andExpect(status().isCreated()).andReturn();
+        String clusterId=json.readTree(cluster.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(post("/api/v1/connections/clusters/"+clusterId+"/validate").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INVALID"));
+        mvc.perform(put("/api/v1/connections/clusters/"+clusterId).with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"new-cluster","apiServer":"https://new.example","allowedNamespaces":["east","west"],"secretRef":"vault:new"}
+            """)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNVERIFIED")).andExpect(jsonPath("$.lastValidatedAt").doesNotExist()).andExpect(jsonPath("$.allowedNamespaces[1]").value("west"));
+        mvc.perform(get("/api/v1/audit-events").param("aggregateType","CLUSTER_CONNECTION").param("aggregateId",clusterId).with(authentication(auth("ROLE_OPERATOR"))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.items[2].eventType").value("CLUSTER_CONNECTION_UPDATED"));
+
+        var metrics=mvc.perform(post("/api/v1/connections/prometheus").with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"old-metrics","baseUrl":"http://old:9090","secretRef":null,"queryTimeoutSeconds":15}
+            """)).andExpect(status().isCreated()).andReturn();
+        String metricsId=json.readTree(metrics.getResponse().getContentAsString()).path("id").asText();
+        mvc.perform(put("/api/v1/connections/prometheus/"+metricsId).with(authentication(auth("ROLE_OPERATOR"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"new-metrics","baseUrl":"https://metrics.example","secretRef":"env:METRICS_TOKEN","queryTimeoutSeconds":30}
+            """)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("UNVERIFIED")).andExpect(jsonPath("$.queryTimeoutSeconds").value(30));
+        mvc.perform(put("/api/v1/connections/prometheus/"+metricsId).with(authentication(auth("ROLE_VIEWER"))).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+            {"name":"blocked","baseUrl":"https://blocked.example","secretRef":null,"queryTimeoutSeconds":10}
+            """)).andExpect(status().isForbidden());
     }
     @Test void operatorCanValidateOneOrAllClustersAndMissingSecretFailsClosed()throws Exception{
         var created=mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())

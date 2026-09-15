@@ -5,8 +5,8 @@ export type ReleaseSummary = { id: string; version: string; status: string; crea
 export type AuditEventView = { id: string; eventType: string; actorType: string; actorId: string | null; occurredAt: string; correlationId: string; chainSequence: number | null; payloadJson?: string | null };
 export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
 export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; validUntil: string; checks: { code: string; outcome: string; message: string }[] };
-export type PrometheusConnection = { id: string; name: string; baseUrl: string; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
-export type ClusterConnection = { id: string; name: string; apiServer: string; allowedNamespaces: string[]; status: string; lastValidatedAt: string | null };
+export type PrometheusConnection = { id: string; name: string; baseUrl: string; secretRef: string | null; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
+export type ClusterConnection = { id: string; name: string; apiServer: string; allowedNamespaces: string[]; secretRef: string; status: string; lastValidatedAt: string | null };
 export type ClusterConnectionDraft = { name: string; apiServer: string; namespaces: string; secretRef: string };
 export type PrometheusConnectionDraft = { name: string; baseUrl: string; secretRef: string; queryTimeoutSeconds: string };
 

@@ -533,6 +533,42 @@ export default function Home() {
     finally { setConnectionCreateBusy(false); }
   }
 
+  async function editClusterConnection(item: ClusterConnection) {
+    if (connectionBusyId) return;
+    const name = window.prompt("Kubernetes 연결 이름", item.name); if (name === null) return;
+    const apiServer = window.prompt("Kubernetes API HTTPS 주소", item.apiServer); if (apiServer === null) return;
+    const namespaces = window.prompt("허용 namespace (쉼표 구분)", item.allowedNamespaces.join(", ")); if (namespaces === null) return;
+    const secretRef = window.prompt("Secret reference", item.secretRef); if (secretRef === null) return;
+    const draft = { name, apiServer, namespaces, secretRef };
+    const validation = validateClusterConnectionDraft(draft); if (validation) { setConnectionNotice(validation); return; }
+    setConnectionBusyId(item.id); setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
+      const problem = await response.json().catch(() => null) as { detail?: string } | null;
+      if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 수정이 거부되었습니다.");
+      await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionBusyId(""); }
+  }
+
+  async function editPrometheusConnection(item: PrometheusConnection) {
+    if (connectionBusyId) return;
+    const name = window.prompt("Prometheus 연결 이름", item.name); if (name === null) return;
+    const baseUrl = window.prompt("Prometheus HTTP(S) 주소", item.baseUrl); if (baseUrl === null) return;
+    const secretRef = window.prompt("Secret reference (인증이 없으면 비움)", item.secretRef ?? ""); if (secretRef === null) return;
+    const queryTimeoutSeconds = window.prompt("Query timeout (초)", String(item.queryTimeoutSeconds)); if (queryTimeoutSeconds === null) return;
+    const draft = { name, baseUrl, secretRef, queryTimeoutSeconds };
+    const validation = validatePrometheusConnectionDraft(draft); if (validation) { setConnectionNotice(validation); return; }
+    setConnectionBusyId(item.id); setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
+      const problem = await response.json().catch(() => null) as { detail?: string } | null;
+      if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 수정이 거부되었습니다.");
+      await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    finally { setConnectionBusyId(""); }
+  }
+
   async function loadConnectionAudit(aggregateType: "CLUSTER_CONNECTION" | "PROMETHEUS_CONNECTION", connectionId: string) {
     if (connectionAuditBusy) return;
     if (connectionAuditId === connectionId) { setConnectionAuditId(""); setConnectionAuditEvents([]); return; }
@@ -653,9 +689,9 @@ export default function Home() {
             <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input required maxLength={100} value={prometheusDraft.name} onChange={(event) => setPrometheusDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Base URL<input required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => setPrometheusDraft((current) => ({ ...current, baseUrl: event.target.value }))} /></label><label>Secret reference <small>선택 사항</small><input maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => setPrometheusDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><label>Query timeout seconds<input required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => setPrometheusDraft((current) => ({ ...current, queryTimeoutSeconds: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>
           </div></details>
           <h3>Kubernetes clusters</h3>
-          {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void loadConnectionAudit("CLUSTER_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
+          {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void editClusterConnection(item)} disabled={Boolean(connectionBusyId)}>편집</button><button type="button" onClick={() => void loadConnectionAudit("CLUSTER_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "처리 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
           <h3>Prometheus</h3>
-          {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
+          {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void editPrometheusConnection(item)} disabled={Boolean(connectionBusyId)}>편집</button><button type="button" onClick={() => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "처리 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
           {connectionNotice && <p className={sessionStyles.sessionNotice} role="status">{connectionNotice}</p>}
         </section>}
         <section className={styles.grid}>

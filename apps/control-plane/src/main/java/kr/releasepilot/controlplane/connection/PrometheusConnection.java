@@ -25,4 +25,8 @@ public class PrometheusConnection {
         if(status!=ConnectionStatus.ACTIVE&&status!=ConnectionStatus.INVALID)throw new IllegalArgumentException("Validation status must be ACTIVE or INVALID");
         this.status=status;this.lastValidatedAt=now;
     }
+    public void update(String name,String baseUrl,String secretRef,int timeout){
+        this.name=name;this.baseUrl=baseUrl;this.secretRef=secretRef;this.queryTimeoutSeconds=timeout;
+        this.status=ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
+    }
 }

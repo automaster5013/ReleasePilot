@@ -27,4 +27,8 @@ public class ClusterConnection {
         if(status!=ConnectionStatus.ACTIVE&&status!=ConnectionStatus.INVALID)throw new IllegalArgumentException("Validation status must be ACTIVE or INVALID");
         this.status=status;this.lastValidatedAt=now;
     }
+    public void update(String name,String apiServer,List<String> namespaces,String secretRef){
+        this.name=name;this.apiServer=apiServer;this.allowedNamespaces=String.join(",",namespaces);this.secretRef=secretRef;
+        this.status=ConnectionStatus.UNVERIFIED;this.lastValidatedAt=null;
+    }
 }

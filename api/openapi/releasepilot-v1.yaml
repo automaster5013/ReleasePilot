@@ -427,6 +427,32 @@ paths:
                 type: array
                 items: {$ref: '#/components/schemas/ClusterValidation'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /connections/clusters/{clusterId}:
+    put:
+      tags: [Catalog]
+      summary: Kubernetes 클러스터 연결 설정 및 secret reference 교체
+      description: 설정 변경 즉시 연결을 UNVERIFIED로 전환하며, 다시 검증하기 전에는 릴리스 admission에 사용할 수 없다.
+      operationId: updateClusterConnection
+      parameters:
+        - name: clusterId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateClusterConnectionRequest'}
+      responses:
+        '200':
+          description: 수정 후 미검증 상태의 클러스터 연결
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClusterConnection'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /connections/clusters/{clusterId}/validate:
     post:
       tags: [Catalog]
@@ -494,6 +520,32 @@ paths:
               schema: {$ref: '#/components/schemas/PrometheusConnectionValidation'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /connections/prometheus/{connectionId}:
+    put:
+      tags: [Catalog]
+      summary: Prometheus 연결 설정 및 secret reference 교체
+      description: 설정 변경 즉시 연결을 UNVERIFIED로 전환하며, 다시 검증하기 전에는 릴리스 admission에 사용할 수 없다.
+      operationId: updatePrometheusConnection
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreatePrometheusConnectionRequest'}
+      responses:
+        '200':
+          description: 수정 후 미검증 상태의 Prometheus 연결
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrometheusConnection'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /environments/{environmentId}/validate:
     post:
       tags: [Catalog]

@@ -23,6 +23,10 @@ public class ConnectionController {
         return ClusterResponse.from(service.createCluster(request.name(),request.apiServer(),request.allowedNamespaces(),request.secretRef(),principal.id()));
     }
     @GetMapping("/clusters") @PreAuthorize("hasRole('OPERATOR')") List<ClusterResponse> clusters(){return service.listClusters().stream().map(ClusterResponse::from).toList();}
+    @PutMapping("/clusters/{clusterId}") @PreAuthorize("hasRole('OPERATOR')")
+    ClusterResponse updateCluster(@PathVariable UUID clusterId,@Valid @RequestBody CreateClusterRequest request,@AuthenticationPrincipal UserAccountPrincipal principal){
+        return ClusterResponse.from(service.updateCluster(clusterId,request.name(),request.apiServer(),request.allowedNamespaces(),request.secretRef(),principal.id()));
+    }
     @PostMapping("/clusters/{clusterId}/validate") @PreAuthorize("hasRole('OPERATOR')")
     ClusterValidationResponse validateCluster(@PathVariable UUID clusterId,@AuthenticationPrincipal UserAccountPrincipal principal){
         return ClusterValidationResponse.from(clusterId,service.validateCluster(clusterId,principal.id()));
@@ -36,6 +40,10 @@ public class ConnectionController {
         return PrometheusResponse.from(service.createPrometheus(request.name(),request.baseUrl(),request.secretRef(),request.queryTimeoutSeconds(),principal.id()));
     }
     @GetMapping("/prometheus") @PreAuthorize("hasRole('OPERATOR')") List<PrometheusResponse> prometheus(){return service.listPrometheus().stream().map(PrometheusResponse::from).toList();}
+    @PutMapping("/prometheus/{connectionId}") @PreAuthorize("hasRole('OPERATOR')")
+    PrometheusResponse updatePrometheus(@PathVariable UUID connectionId,@Valid @RequestBody CreatePrometheusRequest request,@AuthenticationPrincipal UserAccountPrincipal principal){
+        return PrometheusResponse.from(service.updatePrometheus(connectionId,request.name(),request.baseUrl(),request.secretRef(),request.queryTimeoutSeconds(),principal.id()));
+    }
     @PostMapping("/prometheus/{connectionId}/validate") @PreAuthorize("hasRole('OPERATOR')")
     PrometheusValidationResponse validatePrometheus(@PathVariable UUID connectionId,@AuthenticationPrincipal UserAccountPrincipal principal){return PrometheusValidationResponse.from(connectionId,service.validatePrometheus(connectionId,principal.id()));}
 

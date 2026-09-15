@@ -36,6 +36,20 @@ public class ConnectionService {
         var now=clock.instant(); var value=prometheus.save(PrometheusConnection.create(name,baseUrl,secretRef,timeout,now));
         auditEvents.record(AuditEvent.connectionCreated("PROMETHEUS_CONNECTION",value.getId(),actorId,now)); return value;
     }
+    @Transactional
+    public ClusterConnection updateCluster(UUID id,String name,String apiServer,List<String> namespaces,String secretRef,UUID actorId){
+        var value=clusters.findById(id).orElseThrow(()->new NotFoundException("CLUSTER_CONNECTION_NOT_FOUND","Cluster connection not found"));
+        if(!value.getName().equals(name)&&clusters.existsByName(name)) throw new ConflictException("CLUSTER_NAME_ALREADY_EXISTS","Cluster connection name already exists");
+        value.update(name,apiServer,namespaces,secretRef);var now=clock.instant();
+        auditEvents.record(AuditEvent.connectionUpdated("CLUSTER_CONNECTION",id,actorId,now));return value;
+    }
+    @Transactional
+    public PrometheusConnection updatePrometheus(UUID id,String name,String baseUrl,String secretRef,int timeout,UUID actorId){
+        var value=prometheus.findById(id).orElseThrow(()->new NotFoundException("PROMETHEUS_CONNECTION_NOT_FOUND","Prometheus connection not found"));
+        if(!value.getName().equals(name)&&prometheus.existsByName(name)) throw new ConflictException("PROMETHEUS_NAME_ALREADY_EXISTS","Prometheus connection name already exists");
+        value.update(name,baseUrl,secretRef,timeout);var now=clock.instant();
+        auditEvents.record(AuditEvent.connectionUpdated("PROMETHEUS_CONNECTION",id,actorId,now));return value;
+    }
     @Transactional(readOnly=true) public List<ClusterConnection> listClusters(){return clusters.findAll(Sort.by("name"));}
     @Transactional(readOnly=true) public List<PrometheusConnection> listPrometheus(){return prometheus.findAll(Sort.by("name"));}
     @Transactional public ClusterValidationGateway.Result validateCluster(UUID clusterId,UUID actorId){
