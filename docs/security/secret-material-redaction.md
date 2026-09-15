@@ -16,4 +16,4 @@ record의 `bearerToken` 구성 요소에 `@JsonIgnore`를 적용한다. 애플�
 
 이 보호는 Jackson annotation을 존중하는 직렬화에 한정된다. annotation을 끄거나 다른 직렬화 라이브러리를 사용하거나 토큰 문자열을 직접 다른 DTO에 넣는 경우에는 적용되지 않는다. 모든 비밀 값의 직렬화를 전역 차단한 것으로 해석하지 않는다.
 
-이번 작업은 코드 수준 보강이다. 공개 데모 배포 이미지는 변경하지 않았으며, 운영 비밀 조회나 자격 증명 교체도 수행하지 않았다. 비밀 조회는 기존 `env:` 참조를 유지한다. Secrets Manager/Vault, SSO 및 GitHub Checks 활성화는 별도 작업이다.
+초기 작업은 코드 수준 보강이었다. 이후 [v0.51.0 배포 검증](../operations/security-hardening-v0.51.0.md)에서 공개 이미지 반영까지 확인했다. 운영 비밀 조회나 자격 증명 교체는 수행하지 않았다. 비밀 조회는 기존 `env:` 참조를 유지한다. Secrets Manager/Vault, SSO 및 GitHub Checks 활성화는 별도 작업이다.
