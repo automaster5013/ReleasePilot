@@ -93,12 +93,12 @@ def main():
         command.extend(
             [
                 "--batch-mode",
-                "-Dtest=AnalysisFlowIntegrationTests,AuditStorageIntegrationTests",
+                "-Dtest=AnalysisFlowIntegrationTests,AuditStorageIntegrationTests,AuditConcurrencyIntegrationTests",
                 "test",
             ]
         )
         print(
-            "Running 6 analysis flows and 11 audit storage checks: MySQL 8.4, Flyway enabled, Hibernate validate",
+            "Running 6 analysis flows, 11 audit storage checks and 2 concurrency checks: MySQL 8.4, Flyway enabled, Hibernate validate",
             flush=True,
         )
         subprocess.run(
