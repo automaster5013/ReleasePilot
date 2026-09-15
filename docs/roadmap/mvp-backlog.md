@@ -259,3 +259,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 54. 격리된 MySQL 백업·복원 훈련 자동화 — 완료 (2026-09-15, 실제 migration 22개·테이블 28개·합성 BINARY/Unicode/JSON/외래 키 데이터·gzip/SHA-256·손상 거부·전체 스키마/행/체크섬 비교·임시 자원 소유권 확인 cleanup·CI 연결; 운영 백업/RDS 전환과 구분)
 55. 공개 메트릭 Ingress 경계 차단 — 완료 (2026-09-15, actuator health Exact allowlist·회귀 4개·공개 metrics/info 404·헬스/API 200·경로 우회 표본 차단·내부 metrics 200·GitOps 동기화 검증)
 56. 비밀 전달 객체 문자열 노출 차단 — 완료 (2026-09-15, SecretMaterial toString 고정 마스킹·Optional/컬렉션/null/빈 값 회귀 3개·서버 전체 85개 테스트 통과; 코드 보강이며 공개 이미지 배포와 외부 비밀 관리자 활성화는 별도)
+57. 비밀 전달 객체 JSON 직렬화 보호 — 완료 (2026-09-15, Jackson JsonIgnore·직접/Map/List JSON 토큰 제외 회귀 2개·접근자와 Worker 전달 유지·서버 전체 87개 테스트 통과; 코드 보강이며 공개 이미지 배포는 별도)

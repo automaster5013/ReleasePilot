@@ -5,8 +5,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class SecretMaterialTests {
+    @Test
+    void jsonSerializationOmitsBearerToken() {
+        var material = new SecretResolver.SecretMaterial("test-only-sensitive-token");
+        var json = new ObjectMapper();
+        assertThat(json.writeValueAsString(material)).isEqualTo("{}");
+        assertThat(material.bearerToken()).isEqualTo("test-only-sensitive-token");
+    }
+
+    @Test
+    void nestedJsonSerializationOmitsBearerToken() {
+        var material = new SecretResolver.SecretMaterial("test-only-sensitive-token");
+        var json = new ObjectMapper();
+        assertThat(json.writeValueAsString(java.util.Map.of("secret", material)))
+                .isEqualTo("{\"secret\":{}}");
+        assertThat(json.writeValueAsString(List.of(material))).isEqualTo("[{}]");
+    }
+
     @Test
     void stringRepresentationDoesNotExposeBearerToken() {
         var material = new SecretResolver.SecretMaterial("test-only-sensitive-token");
