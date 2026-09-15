@@ -44,3 +44,13 @@ apps/analysis-worker/.venv/Scripts/ruff.exe check scripts/analysis_mysql_integra
 ```
 
 이번 시나리오의 repository와 sink는 mock이 아니며 실제 DB commit과 loopback HTTP 응답을 검증한다. 앞선 HTTP 단위 테스트의 repository mock 및 S3 SDK mock 검증과 구분한다. 테스트 서버는 원격 저장소의 영구 저장·중복 제거를 구현하지 않는다. 실제 외부 HTTP/AWS/S3 전달, 응답 유실/네트워크 장애, 프로세스·DB 재시작, DB commit 실패, 복수 Worker 중복 전송과 scheduler proxy 자동 실행은 미검증이다. 합성 데이터만 임시 DB에 commit하고 DB를 폐기하며 운영 데이터·전달 상태·기존 last_error와 외래 키는 변경하지 않았다. 새 운영 배포 없이 운영 전체 E2E 및 SSO/GitHub Checks 보류를 유지한다.
+
+## HTTP 수신 후 DB 롤백·멱등 재수신
+
+`AuditConcurrencyIntegrationTests.httpReceiverDeduplicatesRedeliveryAfterDatabaseRollback`는 실제 repository/Worker/HTTP sink와 메모리 객체 저장 규칙을 가진 loopback 수신 서버를 사용한다. 서버는 eventHash 멱등 키별 첫 요청을 한 객체로 저장하고 201을 반환하며 동일 요청의 재수신에는 객체를 추가하지 않고 200을 반환한다. 다른 envelope는 409로 거부하도록 테스트 수신 규칙을 구성했지만 충돌 분기는 이번 시나리오에서 실행하지 않는다.
+
+합성 감사 이벤트를 DB에 commit한 뒤 첫 HTTP 수신을 완료하고 DELIVERED를 SQL로 flush한다. 배치 트랜잭션을 명시적으로 rollback-only 처리하면 다음 트랜잭션에서 PENDING/attempts=0/오류·완료 시각 없음으로 조회되지만 수신 서버에는 객체가 남는다. 새 sink/Worker가 1초 뒤 동일 PUT 경로·멱등 키·본문을 다시 보내 200을 받은 후 DELIVERED를 commit한다. 실제 대상 요청 2회와 수신 객체 1개, 복구 완료 시각, 감사 체인 유효성·이벤트 수·head hash 유지를 확인한다. commit 이후 세 번째 tick에서는 HTTP 호출이 추가되지 않는다.
+
+H2 전체 verify 188개 및 MySQL 통합 26개(분석 6/감사 저장 14/트랜잭션·동시성 6)가 실패·오류·건너뜀 없이 통과했다. 위 실행 명령의 Flyway migration 22개·JSON 타입 5개 검사와 Ruff도 통과했다. 소유 임시 MySQL 컨테이너 `59479c7d05a3`의 loopback 바인딩을 확인하고, UUID label/기록된 컨테이너 ID 검증 후 컨테이너·익명 볼륨 cleanup과 잔여 컨테이너 없음 확인을 완료했다. HTTP 서버는 finally에서 stop한다.
+
+repository와 sink는 실제 구현이며 수신 저장은 테스트 서버의 메모리 map이다. 실제 외부 저장소의 영구 저장·중복 제거·충돌 처리, 응답 유실, 실제 DB 장애/commit 실패, 프로세스·DB 재시작/강제 종료와 복수 Worker를 증명하지 않는다. 수신 규칙이 동일 재시도를 성공으로 인정해야 DB 롤백 이후 재전송을 완료할 수 있다는 통합 계약 검증이다. exactly-once 전달이나 S3 412 복구 기능을 추가하지 않았다. 운영 데이터·전달 상태·기존 last_error 및 외래 키는 수정하지 않았고 실제 외부 HTTP/AWS/S3 호출과 새 운영 배포는 없다. 운영 전체 E2E 및 SSO/GitHub Checks 보류를 유지한다.

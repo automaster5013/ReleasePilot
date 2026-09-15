@@ -240,6 +240,67 @@ class AuditConcurrencyIntegrationTests {
 
     private record ArchiveRequest(String method,String path,String key,String body) {}
 
+    @Test
+    void httpReceiverDeduplicatesRedeliveryAfterDatabaseRollback() throws Exception {
+        var transaction=new TransactionTemplate(transactionManager);
+        var now=Instant.parse("2033-01-01T00:00:00Z");
+        var before=verifier.verify();
+        assertThat(before.valid()).isTrue();
+        var event=transaction.execute(status -> trail.record(event()));
+        var requests=java.util.Collections.synchronizedList(new ArrayList<ArchiveRequest>());
+        var stored=new java.util.concurrent.ConcurrentHashMap<String,ArchiveRequest>();
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/archive/",exchange -> {
+            try {
+                var request=new ArchiveRequest(exchange.getRequestMethod(),exchange.getRequestURI().getPath(),
+                        exchange.getRequestHeaders().getFirst("Idempotency-Key"),
+                        new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));
+                requests.add(request);
+                var previous=stored.putIfAbsent(request.key(),request);
+                // This test receiver accepts an identical retry, but rejects a conflicting envelope.
+                exchange.sendResponseHeaders(previous==null?201:previous.equals(request)?200:409,-1);
+            } finally {exchange.close();}
+        });
+        server.start();
+        try {
+            var endpoint=java.net.URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/archive/");
+            var sink=new HttpAuditArchiveSink(new tools.jackson.databind.ObjectMapper(),endpoint,"");
+            transaction.executeWithoutResult(status -> {
+                new AuditArchiveWorker(deliveries,events,sink,
+                        java.time.Clock.fixed(now,java.time.ZoneOffset.UTC)).tick();
+                deliveries.flush();
+                assertDelivery(event,AuditArchiveDelivery.Status.DELIVERED,0,null,now);
+                status.setRollbackOnly();
+            });
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(event,AuditArchiveDelivery.Status.PENDING,0,null,null);
+                assertThat(verifier.verify().valid()).isTrue();
+            });
+            assertThat(stored).containsKey(event.getEventHash());
+            var recoveredSink=new HttpAuditArchiveSink(new tools.jackson.databind.ObjectMapper(),endpoint,"");
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,recoveredSink,
+                    java.time.Clock.fixed(now.plusSeconds(1),java.time.ZoneOffset.UTC)).tick());
+            transaction.executeWithoutResult(status -> {
+                assertDelivery(event,AuditArchiveDelivery.Status.DELIVERED,0,null,now.plusSeconds(1));
+                var result=verifier.verify();
+                assertThat(result.valid()).isTrue();
+                assertThat(result.verifiedEvents()).isEqualTo(before.verifiedEvents()+1);
+                assertThat(result.headHash()).isEqualTo(event.getEventHash());
+            });
+            var targetRequests=requests.stream().filter(value -> value.key().equals(event.getEventHash())).toList();
+            assertThat(targetRequests).hasSize(2);
+            assertThat(targetRequests.get(0)).isEqualTo(targetRequests.get(1));
+            assertThat(targetRequests.get(0).method()).isEqualTo("PUT");
+            assertThat(targetRequests.get(0).path()).isEqualTo("/archive/"+event.getChainSequence()+"-"+event.getEventHash()+".json");
+            assertThat(stored.values().stream().filter(value -> value.key().equals(event.getEventHash())).toList())
+                    .containsExactly(targetRequests.get(0));
+            int requestCount=requests.size();
+            transaction.executeWithoutResult(status -> new AuditArchiveWorker(deliveries,events,recoveredSink,
+                    java.time.Clock.fixed(now.plusSeconds(2),java.time.ZoneOffset.UTC)).tick());
+            assertThat(requests).hasSize(requestCount);
+        } finally {server.stop(0);}
+    }
+
     private AuditArchiveDelivery deliveryFor(AuditEvent event) {
         return deliveries.findAll().stream().filter(value -> value.auditEventId().equals(event.getId()))
                 .findFirst().orElseThrow();
