@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { createLatestRequestGuard, createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+
+test("latest release request rejects delayed data, readiness and errors from older loads", async () => {
+  const guard = createLatestRequestGuard();
+  const first = guard.begin();
+  assert.equal(first(), true);
+  const second = guard.begin();
+  await Promise.resolve();
+  assert.equal(second(), true);
+  assert.equal(first(), false);
+  const third = guard.begin();
+  assert.equal(second(), false);
+  assert.equal(third(), true);
+});
 
 test("release mutation gate blocks same-tick submissions and recovers after failure", async () => {
   const gate = createMutationGate();

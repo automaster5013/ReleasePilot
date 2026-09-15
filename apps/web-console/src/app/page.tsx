@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -102,6 +102,7 @@ export default function Home() {
   const [catalogNotice, setCatalogNotice] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
   const requestInFlight = useRef(createMutationGate());
+  const latestReleaseLoad = useRef(createLatestRequestGuard());
   const [requestNotice, setRequestNotice] = useState("");
   const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
@@ -343,51 +344,80 @@ export default function Home() {
   }
 
   async function load(id: string) {
+    const isCurrent = latestReleaseLoad.current.begin();
     setError("");
-    const [releaseResponse, analysesResponse, auditResponse] = await Promise.all([
-      fetch(`/control-api/releases/${id}`, { credentials: "include" }),
-      fetch(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
-      fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" }),
-    ]);
-    if (!releaseResponse.ok || !analysesResponse.ok || !auditResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
-    const loadedRelease = await releaseResponse.json() as Release;
-    setRelease(loadedRelease);
+    setActiveId("");
+    setRelease(null);
+    setAnalyses([]);
+    setAuditEvents([]);
     setApprovalEnvironmentValidation(null);
-    setApprovalReadinessNotice(loadedRelease.status === "PENDING_APPROVAL" ? "환경 readiness를 확인하는 중…" : "");
-    if (loadedRelease.status === "PENDING_APPROVAL") {
-      try {
-        const validationResponse = await fetch(`/control-api/environments/${loadedRelease.environmentId}/validation-results/latest`, { credentials: "include" });
-        if (!validationResponse.ok) throw new Error();
-        setApprovalEnvironmentValidation(await validationResponse.json() as EnvironmentValidation);
-        setApprovalReadinessNotice("");
-      } catch {
-        setApprovalReadinessNotice("환경 readiness를 확인할 수 없어 승인을 차단했습니다.");
+    setApprovalReadinessNotice("환경 readiness를 확인하는 중…");
+    try {
+      const [releaseResponse, analysesResponse, auditResponse] = await Promise.all([
+        fetch(`/control-api/releases/${id}`, { credentials: "include" }),
+        fetch(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
+        fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" }),
+      ]);
+      if (!isCurrent()) return;
+      if (!releaseResponse.ok || !analysesResponse.ok || !auditResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
+      const [loadedRelease, loadedAnalyses, loadedAudit] = await Promise.all([
+        releaseResponse.json() as Promise<Release>,
+        analysesResponse.json(),
+        auditResponse.json() as Promise<{ items: AuditEventView[] }>,
+      ]);
+      if (!isCurrent()) return;
+      let validation: EnvironmentValidation | null = null;
+      let readinessNotice = "";
+      if (loadedRelease.status === "PENDING_APPROVAL") {
+        try {
+          const response = await fetch(`/control-api/environments/${loadedRelease.environmentId}/validation-results/latest`, { credentials: "include" });
+          if (!response.ok) throw new Error();
+          validation = await response.json() as EnvironmentValidation;
+          if (validation.environmentId !== loadedRelease.environmentId) throw new Error();
+        } catch {
+          validation = null;
+          readinessNotice = "환경 readiness를 확인할 수 없어 승인을 차단했습니다.";
+        }
       }
+      if (!isCurrent()) return;
+      setRelease(loadedRelease);
+      setApprovalEnvironmentValidation(validation);
+      setApprovalReadinessNotice(readinessNotice);
+      setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
+      setAnalyses(loadedAnalyses);
+      setAuditEvents(loadedAudit.items);
+      setActiveId(id);
+      setRecentReleases((current) => current.map((item) => item.id === id ? { ...item, status: loadedRelease.status } : item));
+    } catch (failure) {
+      if (isCurrent()) throw failure;
     }
-    setLive((current) => ({ ...current, releaseStatus: loadedRelease.status }));
-    setAnalyses(await analysesResponse.json());
-    setAuditEvents((await auditResponse.json() as { items: AuditEventView[] }).items);
-    setActiveId(id);
-    setRecentReleases((current) => current.map((item) => item.id === id ? { ...item, status: loadedRelease.status } : item));
   }
 
-  const refreshAudit = useCallback(async (id: string) => {
+  const refreshAudit = useCallback(async (id: string, isCurrent: () => boolean = () => true) => {
     const response = await fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" });
-    if (response.ok) setAuditEvents((await response.json() as { items: AuditEventView[] }).items);
+    if (response.ok) {
+      const page = await response.json() as { items: AuditEventView[] };
+      if (isCurrent()) setAuditEvents(page.items);
+    }
   }, []);
 
   useEffect(() => {
     if (!activeId) return;
+    let closed = false;
     const events = new EventSource(`/control-api/releases/${activeId}/events`, { withCredentials: true });
     events.addEventListener("release-state", async (event) => {
+      if (closed) return;
       setLive(JSON.parse((event as MessageEvent).data));
       setConnection("LIVE");
       const response = await fetch(`/control-api/releases/${activeId}/analyses`, { credentials: "include" });
-      if (response.ok) setAnalyses(await response.json());
-      await refreshAudit(activeId);
+      if (response.ok) {
+        const loaded = await response.json();
+        if (!closed) setAnalyses(loaded);
+      }
+      if (!closed) await refreshAudit(activeId, () => !closed);
     });
-    events.onerror = () => setConnection("RECONNECTING");
-    return () => events.close();
+    events.onerror = () => { if (!closed) setConnection("RECONNECTING"); };
+    return () => { closed = true; events.close(); };
   }, [activeId, refreshAudit]);
 
   const latest = analyses.at(-1);

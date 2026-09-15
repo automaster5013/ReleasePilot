@@ -137,6 +137,11 @@ export function createMutationGate() {
   };
 }
 
+export function createLatestRequestGuard() {
+  let generation = 0;
+  return { begin() { const request = ++generation; return () => request === generation; } };
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   const headers: Record<string, string> = { [csrf.headerName]: csrf.token };
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
