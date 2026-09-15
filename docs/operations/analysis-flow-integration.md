@@ -31,4 +31,19 @@ cd apps/control-plane
 ./mvnw.cmd --batch-mode verify
 ```
 
-이 검증은 backend 서비스/DB/Outbox 통합 테스트이며 전체 운영 E2E가 아니다. H2는 MySQL의 migration/JSON/locking 동작을 모두 대체하지 않는다. 실제 Prometheus 판정, Kubernetes 네트워크 mutation, 브라우저 전체 흐름은 이 테스트에서 검증하지 않는다. 공개 배포는 기존 v0.52.0이며 이번 매핑 보강은 아직 배포하지 않았다.
+이 검증은 backend 서비스/DB/Outbox 통합 테스트이며 전체 운영 E2E가 아니다. 실제 Prometheus 판정, Kubernetes 네트워크 mutation, 브라우저 전체 흐름은 이 테스트에서 검증하지 않는다. 공개 배포는 기존 v0.52.0이며 이번 매핑 보강은 아직 배포하지 않았다.
+
+## 실제 MySQL 후속 검증
+
+`python scripts/analysis_mysql_integration.py`는 Docker의 임시 MySQL 8.4에 같은 6개 시나리오를 실행한다. `mysql:8.4` 이미지를 미리 준비하고 Python/Docker/Java/Maven wrapper 실행 환경이 필요하다.
+
+```powershell
+docker pull mysql:8.4
+python scripts/analysis_mysql_integration.py
+```
+
+컨테이너 생성 직전 캐시의 image ID를 고정해 실행하고, 127.0.0.1의 임의 포트에만 연결한다. 전용 합성 DB/사용자와 일회용 테스트 비밀번호를 사용한다. Flyway를 켜고 Hibernate `validate`로 실제 migration 스키마를 검사한다. 로컬 실행에서 MySQL 8.4.11, migration 22개, 시나리오 6개가 통과했다. MySQL의 JSON_TYPE으로 정책 버전/스냅샷/명령/감사 객체와 분석 근거 배열의 실제 저장 타입도 검사한다. 성공한 migration 수가 저장소 migration 파일 수와 일치해야 통과한다.
+
+finally에서 기록한 컨테이너 ID와 UUID 소유권 label을 확인한 뒤 그 컨테이너 및 연결된 익명 볼륨만 삭제한다. 기존 컨테이너/사용자 볼륨을 사용하지 않는다. cleanup이 끝나야 PASS를 출력한다. 기존 mysql-restore-drill CI job에도 Java 21 및 실행 단계를 연결했다. H2 기본 전체 verify는 그대로 유지한다.
+
+로컬 loopback DB 연결의 TLS를 끈 설정은 이 임시 테스트에만 한정된다. 운영 DB TLS 정책을 바꾸지 않는다. MySQL 통합 검증도 외부 gateway는 mock이며 실제 운영 릴리스 전체 E2E를 완료한 것은 아니다.

@@ -107,3 +107,9 @@ jobs:
           python-version: '3.13'
       - run: docker pull mysql:8.4
       - run: python scripts/mysql_restore_drill.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: python scripts/analysis_mysql_integration.py

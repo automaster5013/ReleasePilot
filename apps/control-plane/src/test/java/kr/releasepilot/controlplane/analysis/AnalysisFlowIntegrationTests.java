@@ -21,7 +21,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:analysis-flow;MODE=MySQL;DB_CLOSE_DELAY=-1")
+@SpringBootTest(properties={
+        "spring.datasource.url=${ANALYSIS_TEST_JDBC_URL:jdbc:h2:mem:analysis-flow;MODE=MySQL;DB_CLOSE_DELAY=-1}",
+        "spring.datasource.username=${ANALYSIS_TEST_USERNAME:sa}",
+        "spring.datasource.password=${ANALYSIS_TEST_PASSWORD:}",
+        "spring.flyway.enabled=${ANALYSIS_TEST_FLYWAY:false}",
+        "spring.jpa.hibernate.ddl-auto=${ANALYSIS_TEST_DDL:create-drop}"})
 class AnalysisFlowIntegrationTests {
     @Autowired AnalysisJobProcessor analysis;
     @Autowired OutboxCommandProcessor dispatcher;
