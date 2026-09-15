@@ -52,8 +52,10 @@ GitOps 동기화를 중지하고 `infra/aws/terraform`에서 destroy 계획의 �
 
 - 데모 MySQL은 단일 StatefulSet/PVC이므로 다중 AZ 복구와 관리형 백업을 보장하지 않는다.
 - Grafana, Prometheus 서버와 Kubernetes API는 공개하지 않는다. 다만 Control Plane의
-  `/actuator/prometheus`는 현재 인증 없이 접근 가능하고 AWS Ingress가 `/actuator`를 라우팅한다.
-  공개 콘솔의 정제된 판정 증거와 이 scrape endpoint의 공개 범위를 구분하며, 운영 전환 시 접근 통제가 필요하다.
+  Control Plane의 `/actuator/prometheus`는 내부 서비스에서 인증 없이 접근 가능하지만 AWS Ingress는
+  `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`만 Exact 경로로 전달한다.
+  공개 `/actuator/prometheus`와 `/actuator/info`는 Web Console의 404로 차단된다. 운영 전환 시에는
+  내부 모니터링의 네트워크 범위와 인증도 별도로 검토한다.
 - 공개 방문자에게는 VIEWER demo session을 제공한다. 조직 OIDC/SSO와 역할별 운영 UI는 구현돼 있지만,
   기본값은 `OIDC_ENABLED=false`이며 공급자 등록·client secret·내부 계정/프로젝트 권한 연결이 필요하다.
   활성화 절차는 [인증 문서](../security/authentication-and-demo-access.md)를 따른다. 저장소 정의만으로

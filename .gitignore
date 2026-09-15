@@ -31,5 +31,7 @@ infra/aws/terraform/*.tfplan
 infra/aws/terraform/crash.log
 
 # Generated test and coverage output
+__pycache__/
+*.py[cod]
 coverage/
 *.log
