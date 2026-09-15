@@ -55,6 +55,8 @@ class ConnectionApiTests {
             .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/connections/prometheus").with(authentication(auth("ROLE_VIEWER"))))
             .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/connections/clusters").with(authentication(auth("ROLE_VIEWER"))))
+            .andExpect(status().isForbidden());
     }
     @Test void operatorCanValidateOneOrAllClustersAndMissingSecretFailsClosed()throws Exception{
         var created=mvc.perform(post("/api/v1/connections/clusters").with(authentication(auth("ROLE_OPERATOR"))).with(csrf())

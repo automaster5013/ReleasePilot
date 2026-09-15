@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, SessionUser } from "./session-management.mts";
-import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, PrometheusConnection, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
+import { approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, connectionValidationLabel, CsrfToken, EnvironmentValidation, environmentAllowsRelease, environmentValidationSummary, mutationHeaders, PrometheusConnection, ReleaseDraft, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateReleaseDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -103,6 +103,7 @@ export default function Home() {
   const operationInFlight = useRef(false);
   const [authenticationProviders, setAuthenticationProviders] = useState<AuthenticationProviders>({ oidc: false, loginUrl: null });
   const [prometheusConnections, setPrometheusConnections] = useState<PrometheusConnection[]>([]);
+  const [clusterConnections, setClusterConnections] = useState<ClusterConnection[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState("");
   const [connectionNotice, setConnectionNotice] = useState("");
 
@@ -171,6 +172,12 @@ export default function Home() {
     setPrometheusConnections(await response.json() as PrometheusConnection[]);
   }, []);
 
+  const refreshClusterConnections = useCallback(async () => {
+    const response = await fetch("/control-api/connections/clusters", { credentials: "include" });
+    if (!response.ok) throw new Error("Kubernetes 연결 목록을 불러올 수 없습니다.");
+    setClusterConnections(await response.json() as ClusterConnection[]);
+  }, []);
+
   useEffect(() => {
     if (!canManageConnections(sessionUser?.roles ?? [])) return;
     const controller = new AbortController();
@@ -178,6 +185,16 @@ export default function Home() {
       .then((response) => response.ok ? response.json() as Promise<PrometheusConnection[]> : Promise.reject())
       .then(setPrometheusConnections)
       .catch((failure: Error) => { if (failure.name !== "AbortError") setConnectionNotice("Prometheus 연결 목록을 불러올 수 없습니다."); });
+    return () => controller.abort();
+  }, [sessionUser]);
+
+  useEffect(() => {
+    if (!canManageConnections(sessionUser?.roles ?? [])) return;
+    const controller = new AbortController();
+    fetch("/control-api/connections/clusters", { credentials: "include", signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<ClusterConnection[]> : Promise.reject())
+      .then(setClusterConnections)
+      .catch((failure: Error) => { if (failure.name !== "AbortError") setConnectionNotice("Kubernetes 연결 목록을 불러올 수 없습니다."); });
     return () => controller.abort();
   }, [sessionUser]);
 
@@ -455,6 +472,25 @@ export default function Home() {
     }
   }
 
+  async function validateClusterConnection(connectionId: string) {
+    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId) return;
+    setConnectionBusyId(connectionId);
+    setConnectionNotice("");
+    try {
+      const response = await fetch(`/control-api/connections/clusters/${connectionId}/validate`, {
+        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      });
+      const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
+      if (!response.ok) throw new Error("Kubernetes 연결 검증 요청이 거부되었습니다.");
+      await refreshClusterConnections();
+      setConnectionNotice(result?.status === "ACTIVE" ? "Kubernetes 연결 검증을 통과했습니다." : `Kubernetes 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
+    } catch (failure) {
+      setConnectionNotice((failure as Error).message);
+    } finally {
+      setConnectionBusyId("");
+    }
+  }
+
   async function operate(action: "promote" | "pause" | "resume" | "abort") {
     if (!activeId || operationInFlight.current) return;
     const reason = window.prompt(`${action} 조작 사유를 입력하세요.`)?.trim();
@@ -556,7 +592,10 @@ export default function Home() {
           {requestNotice && <p role="status">{requestNotice}</p>}
         </details>}
         {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
-          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">Prometheus 연결</h2></div><button type="button" onClick={() => void refreshPrometheusConnections()} disabled={Boolean(connectionBusyId)}>새로고침</button></header>
+          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></header>
+          <h3>Kubernetes clusters</h3>
+          {clusterConnections.length ? <div className={sessionStyles.connectionList}>{clusterConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.apiServer}</code><small data-status={item.status}>{connectionValidationLabel(item)} · namespaces {item.allowedNamespaces.join(", ")}</small></div><button type="button" onClick={() => void validateClusterConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Kubernetes 연결이 없습니다.</p>}
+          <h3>Prometheus</h3>
           {prometheusConnections.length ? <div className={sessionStyles.connectionList}>{prometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === item.id ? "검증 중…" : "연결 검증"}</button></article>)}</div> : <p className={sessionStyles.sessionEmpty}>등록된 Prometheus 연결이 없습니다.</p>}
           {connectionNotice && <p className={sessionStyles.sessionNotice} role="status">{connectionNotice}</p>}
         </section>}

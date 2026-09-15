@@ -3,6 +3,7 @@
 .connections > header { display: flex; justify-content: space-between; align-items: end; padding: 20px 26px; border-bottom: 1px solid #293730; }
 .connections header p { color: #3adea3; font: 650 11px monospace; letter-spacing: .14em; }
 .connections h2 { margin-top: 7px; }
+.connections h3 { margin: 0; padding: 12px 26px; border-top: 1px solid #293730; color: #67b997; font: 650 10px monospace; letter-spacing: .1em; text-transform: uppercase; }
 .connections button { border: 1px solid #496158; background: transparent; color: #d8e8e1; padding: 9px 12px; font-weight: 700; cursor: pointer; }
 .connections button:disabled { opacity: .35; cursor: wait; }
 .connectionList article { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 26px; border-top: 1px solid #293730; }

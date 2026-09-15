@@ -235,3 +235,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 30. PrometheusConnection 검증 lifecycle — 완료 (2026-09-15, ready·query 검사·상태/시각 전이·안정 failure code·감사 기록)
 31. Prometheus readiness 릴리스 admission — 완료 (2026-09-15, 요청·승인·Rollout 시작에서 ACTIVE/6시간 신선도 강제·UI 복구 안내)
 32. Prometheus 연결 재검증 Web Console — 완료 (2026-09-15, OPERATOR 전용 목록·신선도 표시·CSRF 재검증·VIEWER 조회 차단)
+33. Kubernetes 연결 재검증 Web Console — 완료 (2026-09-15, OPERATOR 전용 목록·namespace 범위·신선도 표시·CSRF 재검증·VIEWER 조회 차단)

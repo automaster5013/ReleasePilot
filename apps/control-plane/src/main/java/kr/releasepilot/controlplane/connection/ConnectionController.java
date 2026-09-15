@@ -22,7 +22,7 @@ public class ConnectionController {
     ClusterResponse createCluster(@Valid @RequestBody CreateClusterRequest request,@AuthenticationPrincipal UserAccountPrincipal principal){
         return ClusterResponse.from(service.createCluster(request.name(),request.apiServer(),request.allowedNamespaces(),request.secretRef(),principal.id()));
     }
-    @GetMapping("/clusters") List<ClusterResponse> clusters(){return service.listClusters().stream().map(ClusterResponse::from).toList();}
+    @GetMapping("/clusters") @PreAuthorize("hasRole('OPERATOR')") List<ClusterResponse> clusters(){return service.listClusters().stream().map(ClusterResponse::from).toList();}
     @PostMapping("/clusters/{clusterId}/validate") @PreAuthorize("hasRole('OPERATOR')")
     ClusterValidationResponse validateCluster(@PathVariable UUID clusterId,@AuthenticationPrincipal UserAccountPrincipal principal){
         return ClusterValidationResponse.from(clusterId,service.validateCluster(clusterId,principal.id()));

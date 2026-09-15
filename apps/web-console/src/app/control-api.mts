@@ -6,6 +6,7 @@ export type AuditEventView = { id: string; eventType: string; actorType: string;
 export type AuditChainVerification = { valid: boolean; verifiedEvents: number; failedEventId: string | null; headHash: string };
 export type EnvironmentValidation = { environmentId: string; status: string; checkedAt: string; validUntil: string; checks: { code: string; outcome: string; message: string }[] };
 export type PrometheusConnection = { id: string; name: string; baseUrl: string; status: string; lastValidatedAt: string | null; queryTimeoutSeconds: number };
+export type ClusterConnection = { id: string; name: string; apiServer: string; allowedNamespaces: string[]; status: string; lastValidatedAt: string | null };
 
 export function selectableCatalogItems<T extends CatalogItem>(items: T[], activeStatuses = ["ACTIVE"]) {
   return items.filter((item) => activeStatuses.includes(item.status));
@@ -48,7 +49,7 @@ export function canManageConnections(roles: string[]) {
   return roles.includes("OPERATOR");
 }
 
-export function connectionValidationLabel(connection: PrometheusConnection, now = Date.now()) {
+export function connectionValidationLabel(connection: Pick<PrometheusConnection, "status" | "lastValidatedAt">, now = Date.now()) {
   if (connection.status !== "ACTIVE") return `${connection.status} · validation required`;
   const validatedAt = connection.lastValidatedAt ? Date.parse(connection.lastValidatedAt) : Number.NaN;
   if (!Number.isFinite(validatedAt) || validatedAt <= now - 6 * 60 * 60 * 1000) return "ACTIVE · validation expired";

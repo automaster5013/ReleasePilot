@@ -113,6 +113,12 @@ test("Prometheus connection management is operator-only and surfaces stale valid
   assert.match(connectionValidationLabel({ ...base, status: "ACTIVE", lastValidatedAt: "2026-09-15T11:00:00Z" }, Date.parse("2026-09-15T12:00:00Z")), /^ACTIVE · validated /);
 });
 
+test("Kubernetes connections share the same fail-closed freshness label", () => {
+  const cluster = { status: "ACTIVE", lastValidatedAt: "2026-09-15T03:00:00Z" };
+  assert.equal(connectionValidationLabel(cluster, Date.parse("2026-09-15T10:00:00Z")), "ACTIVE · validation expired");
+  assert.match(connectionValidationLabel(cluster, Date.parse("2026-09-15T04:00:00Z")), /^ACTIVE · validated /);
+});
+
 test("release draft validation fails closed before mutation", () => {
   const valid = {
     serviceId: "123e4567-e89b-42d3-a456-426614174000",
