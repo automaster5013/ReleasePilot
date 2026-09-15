@@ -12,7 +12,7 @@ public class OutboxCommand {
     @Column(name = "aggregate_id", nullable = false) private UUID aggregateId;
     @Column(name = "correlation_id") private UUID correlationId;
     @Column(name = "command_type", nullable = false, length = 60) private String commandType;
-    @Column(name = "payload_json", nullable = false, columnDefinition = "json") private String payloadJson;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON) @Column(name = "payload_json", nullable = false, columnDefinition = "json") private String payloadJson;
     @Column(name = "idempotency_key", nullable = false, unique = true, length = 128) private String idempotencyKey;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private OutboxCommandStatus status;
     @Column(nullable = false) private int attempts;

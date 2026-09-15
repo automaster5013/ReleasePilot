@@ -28,7 +28,7 @@ public class AuditEvent {
     private Instant occurredAt;
     @Column(name = "correlation_id", nullable = false)
     private UUID correlationId;
-    @Column(name = "payload_json", nullable = false, columnDefinition = "json")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON) @Column(name = "payload_json", nullable = false, columnDefinition = "json")
     private String payloadJson;
     @Column(name = "chain_sequence", unique = true)
     private Long chainSequence;
