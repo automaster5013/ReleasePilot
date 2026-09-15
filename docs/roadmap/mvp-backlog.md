@@ -256,3 +256,4 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 51. 공개 데모 CSP bootstrap 차단 수정 — 완료 (2026-09-15, 요청별 nonce·동적 렌더링·no-store·production script 정책 유지·보안 회귀 3개·v0.49.0 배포와 데모 진입 재검증; 실제 릴리스 상세 E2E는 빈 데이터로 미검증)
 52. 세션 복원 상단 상태 표시 일치 — 완료 (2026-09-15, 인증 세션 기반 표시·로그아웃/stream 상태 분리·회귀 2개·v0.50.0 배포와 브라우저 새로고침 재검증)
 53. 격리된 웹 브라우저 E2E 자동화 — 완료 (2026-09-15, production standalone·Chromium·API fixture·로그인/복원/상세/근거/감사/조회 거부/VIEWER 제한 4개 시나리오·3회 반복 통과·CI와 실패 artifact 연결; 실제 backend/운영 E2E와 구분)
+54. 격리된 MySQL 백업·복원 훈련 자동화 — 완료 (2026-09-15, 실제 migration 22개·테이블 28개·합성 BINARY/Unicode/JSON/외래 키 데이터·gzip/SHA-256·손상 거부·전체 스키마/행/체크섬 비교·임시 자원 소유권 확인 cleanup·CI 연결; 운영 백업/RDS 전환과 구분)

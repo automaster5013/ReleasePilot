@@ -95,3 +95,14 @@ jobs:
           python -c "import pathlib,yaml;
           yaml.safe_load(pathlib.Path('api/openapi/releasepilot-v1.yaml').read_text());
           yaml.safe_load(pathlib.Path('config/observability/query-templates-v1.yaml').read_text())"
+
+  mysql-restore-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: docker pull mysql:8.4
+      - run: python scripts/mysql_restore_drill.py
