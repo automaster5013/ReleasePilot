@@ -414,6 +414,17 @@ test("@a11y viewer pointer targets meet the 24px minimum at 320px", async ({ pag
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer keyboard focus is not obscured at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "불러오기", exact: true }).click();
+  const result = await inspectTabFocusVisibility(page, 80);
+  expect(result.visited).toBeGreaterThan(0);
+  expect(result.obscured).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
 async function reachByTab(page: Page, accessibleName: string, tagName: string) {
   await page.locator("body").focus();
   for (let index = 0; index < 40; index++) {
@@ -429,4 +440,42 @@ async function reachByTab(page: Page, accessibleName: string, tagName: string) {
     }
   }
   throw new Error(`Keyboard focus did not reach ${accessibleName}`);
+}
+
+async function inspectTabFocusVisibility(page: Page, limit: number) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const seen = new Set<string>();
+  const obscured: Array<{ name: string; tag: string; reason: string }> = [];
+  for (let index = 0; index < limit; index++) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(500);
+    const result = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element || element === document.body) return null;
+      const rect = element.getBoundingClientRect();
+      const name = (element.getAttribute("aria-label") || element.textContent || element.getAttribute("name") || "").trim();
+      const focusable = Array.from(document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+      const fingerprint = `${element.tagName}:${focusable.indexOf(element)}:${element.id}`;
+      const left = Math.max(0, rect.left);
+      const right = Math.min(innerWidth, rect.right);
+      const top = Math.max(0, rect.top);
+      const bottom = Math.min(innerHeight, rect.bottom);
+      if (right <= left || bottom <= top) return { fingerprint, name, tag: element.tagName, visible: false, topmost: false };
+      const topmost = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+      return {
+        fingerprint,
+        name,
+        tag: element.tagName,
+        visible: true,
+        topmost: Boolean(topmost && (topmost === element || element.contains(topmost))),
+      };
+    });
+    if (!result) break;
+    if (seen.has(result.fingerprint)) break;
+    seen.add(result.fingerprint);
+    if (!result.visible || !result.topmost) {
+      obscured.push({ name: result.name, tag: result.tag, reason: result.visible ? "covered" : "outside viewport" });
+    }
+  }
+  return { visited: seen.size, obscured };
 }
