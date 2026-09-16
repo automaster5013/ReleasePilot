@@ -895,6 +895,32 @@ test("@a11y OPERATOR connection status errors preserve trigger focus", async ({ 
   expect(state.unexpected).toEqual([]);
 });
 
+test("@a11y OPERATOR connection edit errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { csrfBody: null, connections: true });
+  await page.goto("/");
+  page.on("dialog", (dialog) => dialog.accept(dialog.defaultValue()));
+
+  const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+  const clusterEdit = cluster.getByRole("button", { name: "편집", exact: true });
+  await clusterEdit.focus();
+  await clusterEdit.press("Enter");
+  let alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(clusterEdit).toBeFocused();
+
+  const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+  const prometheusEdit = prometheus.getByRole("button", { name: "편집", exact: true });
+  await prometheusEdit.focus();
+  await prometheusEdit.press("Enter");
+  alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(prometheusEdit).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
