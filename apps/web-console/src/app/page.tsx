@@ -796,6 +796,24 @@ export default function Home() {
     finally { setConnectionBusyId(""); }
   }
 
+  async function refreshConnections(trigger: HTMLElement) {
+    if (connectionBusyId) return;
+    setConnectionActionError("");
+    setConnectionBusyId("refresh");
+    setConnectionNotice("");
+    try {
+      await Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]);
+      setConnectionNotice("외부 연결 목록을 새로고침했습니다.");
+    } catch (failure) {
+      const message = (failure as Error).message;
+      setConnectionActionError(message);
+      setConnectionNotice(message);
+      restoreFocusAfterRender(trigger);
+    } finally {
+      setConnectionBusyId("");
+    }
+  }
+
   async function loadConnectionAudit(aggregateType: "CLUSTER_CONNECTION" | "PROMETHEUS_CONNECTION", connectionId: string, trigger: HTMLElement) {
     if (connectionAuditBusy) return;
     if (connectionAuditId === connectionId) { setConnectionAuditId(""); setConnectionAuditEvents([]); return; }
@@ -953,7 +971,7 @@ export default function Home() {
           {requestNotice && <p role="status" aria-live="polite" aria-atomic="true">{requestNotice}</p>}
         </details>}
         {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
-          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><div className={sessionStyles.connectionActions}><button type="button" onClick={(event) => void validateAllConnections("clusters", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-clusters" ? "Kubernetes 검증 중…" : "Kubernetes 전체 검증"}</button><button type="button" onClick={(event) => void validateAllConnections("prometheus", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-prometheus" ? "Prometheus 검증 중…" : "Prometheus 전체 검증"}</button><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></div></header>
+          <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><div className={sessionStyles.connectionActions}><button type="button" onClick={(event) => void validateAllConnections("clusters", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-clusters" ? "Kubernetes 검증 중…" : "Kubernetes 전체 검증"}</button><button type="button" onClick={(event) => void validateAllConnections("prometheus", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-prometheus" ? "Prometheus 검증 중…" : "Prometheus 전체 검증"}</button><button type="button" onClick={(event) => void refreshConnections(event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "refresh" ? "새로고침 중…" : "새로고침"}</button></div></header>
           <details className={sessionStyles.connectionCreate}><summary>NEW CONNECTION <span>Operator workflow</span></summary><div className={sessionStyles.connectionForms}>
             <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input {...connectionFieldAccessibility("cluster", "name")} required maxLength={100} value={clusterDraft.name} onChange={(event) => updateClusterDraft("name", event.target.value)} /></label><label>API server<input {...connectionFieldAccessibility("cluster", "apiServer")} required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => updateClusterDraft("apiServer", event.target.value)} /></label><label>Allowed namespaces<input {...connectionFieldAccessibility("cluster", "namespaces")} required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => updateClusterDraft("namespaces", event.target.value)} /></label><label>Secret reference<input {...connectionFieldAccessibility("cluster", "secretRef")} required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => updateClusterDraft("secretRef", event.target.value)} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
             <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input {...connectionFieldAccessibility("prometheus", "name")} required maxLength={100} value={prometheusDraft.name} onChange={(event) => updatePrometheusDraft("name", event.target.value)} /></label><label>Base URL<input {...connectionFieldAccessibility("prometheus", "baseUrl")} required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => updatePrometheusDraft("baseUrl", event.target.value)} /></label><label>Secret reference <small>선택 사항</small><input {...connectionFieldAccessibility("prometheus", "secretRef")} maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => updatePrometheusDraft("secretRef", event.target.value)} /></label><label>Query timeout seconds<input {...connectionFieldAccessibility("prometheus", "queryTimeoutSeconds")} required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => updatePrometheusDraft("queryTimeoutSeconds", event.target.value)} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>

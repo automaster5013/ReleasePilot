@@ -247,12 +247,14 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
   const audit: object[] = [];
   let csrfRequests = 0;
+  let clusterListRequests = 0;
+  let prometheusListRequests = 0;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -297,8 +299,16 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       if (options.connectionAuditFailure && ["CLUSTER_CONNECTION", "PROMETHEUS_CONNECTION"].includes(aggregateType ?? "")) return json({ code: "AUDIT_UNAVAILABLE" }, 503);
       return json({ items: audit });
     }
-    if (path === "/connections/clusters") return json(options.connections ? [{ id: "cluster-role", name: "Role cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN", status: "ACTIVE", lastValidatedAt: new Date().toISOString() }] : []);
-    if (path === "/connections/prometheus") return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: options.disabledPrometheus ? "DISABLED" : "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
+    if (path === "/connections/clusters") {
+      clusterListRequests++;
+      if (options.connectionRefreshFailure && clusterListRequests > 1) return json({ code: "CONNECTIONS_UNAVAILABLE" }, 503);
+      return json(options.connections ? [{ id: "cluster-role", name: "Role cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN", status: "ACTIVE", lastValidatedAt: new Date().toISOString() }] : []);
+    }
+    if (path === "/connections/prometheus") {
+      prometheusListRequests++;
+      if (options.connectionRefreshFailure && prometheusListRequests > 1) return json({ code: "CONNECTIONS_UNAVAILABLE" }, 503);
+      return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: options.disabledPrometheus ? "DISABLED" : "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
+    }
     if (path === "/projects") return json({ items: [{ id: "project-role", name: "Role project", key: "role", status: "ACTIVE" }] });
     if (path === "/projects/project-role/services") return json({ items: [{ id: serviceId, name: "Role service", key: "role", status: "ACTIVE" }] });
     if (path === `/services/${serviceId}/environments`) return json({ items: [{ id: environmentId, name: "Role environment", status: "ACTIVE", strategy: "CANARY" }] });
@@ -946,6 +956,21 @@ test("@a11y OPERATOR connection audit errors preserve trigger focus", async ({ p
   await expect(alert).toHaveAttribute("aria-live", "assertive");
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(prometheusAudit).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR connection refresh errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionRefreshFailure: true });
+  await page.goto("/");
+
+  const refresh = page.getByRole("button", { name: "새로고침", exact: true });
+  await refresh.focus();
+  await refresh.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: /연결 목록을 불러올 수 없습니다/ });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(refresh).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
