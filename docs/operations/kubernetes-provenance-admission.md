@@ -17,3 +17,5 @@ webhook은 replica 2개, `failurePolicy: Fail`, PDB `minAvailable: 1`로 운영�
 2026-09-16 GitOps 소유권 전환 검증에서 기존 Helm release Secret 7개를 로컬 작업 디렉터리에 백업한 후 제거했다. `helm list -n artifact-attestations`가 비어 있는 상태에서도 두 Application은 Synced/Healthy를 유지했다. Argo CD가 관리하는 `policy-controller-webhook-logging` ConfigMap을 삭제하자 다른 UID로 자동 재생성됐고 webhook은 2/2 Ready를 유지했다. 현재 서명 digest는 계속 허용되고 전환 이전 미서명 digest는 계속 거부됐다. 백업 파일은 저장소에 포함하지 않으며 복구의 기준은 Git의 Application과 values 선언이다.
 
 같은 날 `releasepilot-platform` 상위 Application을 부트스트랩해 `releasepilot-demo`, `artifact-policy-controller`, `artifact-trust-policies`를 app-of-apps 구조로 인계했다. `artifact-trust-policies` Application 객체를 삭제하자 상위 앱이 새 UID와 tracking ID로 자동 재생성했고 정책 CR은 중단 없이 유지됐다. 상위 앱을 포함한 네 Application은 모두 Synced/Healthy로 복구됐다.
+
+상위 앱 복구는 `infra/aws/platform/bootstrap-gitops.ps1`에 자동화했다. 스크립트는 Application CRD Established, 상위 앱 적용, 네 Application의 Synced/Healthy를 제한 시간 안에 순서대로 검사하며 실패 시 종료한다. 운영 검증에서 상위 앱을 삭제한 동안 하위 앱 세 개가 정상 상태를 유지했고, 스크립트 재실행으로 상위 앱이 새 UID로 복원됐다.
