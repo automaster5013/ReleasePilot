@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -293,7 +293,8 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     if (path === "/session/active") return json({ items: [] });
     if (path === "/audit-events/verify") return json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
     if (path === "/audit-events") return json({ items: audit });
-    if (path === "/connections/clusters" || path === "/connections/prometheus") return json([]);
+    if (path === "/connections/clusters") return json(options.connections ? [{ id: "cluster-role", name: "Role cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN", status: "ACTIVE", lastValidatedAt: new Date().toISOString() }] : []);
+    if (path === "/connections/prometheus") return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
     if (path === "/projects") return json({ items: [{ id: "project-role", name: "Role project", key: "role", status: "ACTIVE" }] });
     if (path === "/projects/project-role/services") return json({ items: [{ id: serviceId, name: "Role service", key: "role", status: "ACTIVE" }] });
     if (path === `/services/${serviceId}/environments`) return json({ items: [{ id: environmentId, name: "Role environment", status: "ACTIVE", strategy: "CANARY" }] });
@@ -816,6 +817,31 @@ test("@a11y OPERATOR connection registration errors preserve submit focus", asyn
   await expect(alert).toHaveAttribute("aria-live", "assertive");
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(prometheusSubmit).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR connection validation errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { csrfBody: null, connections: true });
+  await page.goto("/");
+
+  const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+  const clusterValidate = cluster.getByRole("button", { name: "연결 검증", exact: true });
+  await clusterValidate.focus();
+  await clusterValidate.press("Enter");
+  let alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(clusterValidate).toBeFocused();
+
+  const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+  const prometheusValidate = prometheus.getByRole("button", { name: "연결 검증", exact: true });
+  await prometheusValidate.focus();
+  await prometheusValidate.press("Enter");
+  alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(prometheusValidate).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
