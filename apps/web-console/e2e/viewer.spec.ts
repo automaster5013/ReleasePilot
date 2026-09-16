@@ -345,6 +345,27 @@ test("@a11y viewer high contrast mode reflows without clipping controls", async 
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer supports WCAG text spacing at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.addStyleTag({ content: `
+    * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; }
+    p { margin-bottom: 2em !important; }
+  ` });
+  const loadButton = page.getByRole("button", { name: "불러오기", exact: true });
+  await expect(page.getByRole("combobox", { name: "최근 릴리스" })).toBeVisible();
+  await expect(loadButton).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await loadButton.scrollIntoViewIfNeeded();
+  const box = await loadButton.boundingBox();
+  expect(box).toBeTruthy();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+  expect(await loadButton.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+  expect(unexpected).toEqual([]);
+});
+
 async function reachByTab(page: Page, accessibleName: string, tagName: string) {
   await page.locator("body").focus();
   for (let index = 0; index < 40; index++) {

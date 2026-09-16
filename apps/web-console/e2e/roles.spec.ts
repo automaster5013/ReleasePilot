@@ -568,4 +568,26 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(focusVisible).toBe(true);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} supports WCAG text spacing at 320px`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    await page.addStyleTag({ content: `
+      * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; }
+      p { margin-bottom: 2em !important; }
+    ` });
+    const actionName = role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Promote";
+    const action = page.getByRole("button", { name: actionName, exact: true });
+    await expect(action).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await action.scrollIntoViewIfNeeded();
+    const box = await action.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+    expect(await action.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    expect(state.unexpected).toEqual([]);
+  });
 }
