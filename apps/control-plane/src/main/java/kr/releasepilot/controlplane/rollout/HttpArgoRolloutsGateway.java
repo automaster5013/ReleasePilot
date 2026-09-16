@@ -56,6 +56,20 @@ public class HttpArgoRolloutsGateway implements ArgoRolloutsGateway {
             var current = send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + request.bearerToken()).header("Accept", "application/json").GET().build());
             requireSuccess(current, "read"); JsonNode rollout=json.readTree(current.body());String uid=requiredText(rollout.path("metadata"),"uid");String rv=requiredText(rollout.path("metadata"),"resourceVersion");
             if(!request.expectedUid().equals(uid))throw new IllegalStateException("Rollout UID does not match execution");
+            if (request.action() == Action.PROMOTE && request.expectedPolicyStepIndex() >= 0) {
+                var status = rollout.path("status");
+                int nativeStep = logicalCanaryStep(rollout.path("spec").path("strategy").path("canary").path("steps"), status.path("currentStepIndex").asInt(0));
+                if (nativeStep > request.expectedPolicyStepIndex() || "Healthy".equals(status.path("phase").asText()))
+                    return new ObservedRollout(uid, rv);
+                boolean policyPause = false;
+                for (var condition : status.path("pauseConditions")) {
+                    String reason = condition.path("reason").asText();
+                    if ("CanaryPauseStep".equals(reason) || "BlueGreenPause".equals(reason)) policyPause = true;
+                }
+                if (nativeStep < request.expectedPolicyStepIndex() || !"Paused".equals(status.path("phase").asText())
+                        || rollout.path("spec").path("paused").asBoolean(false) || !policyPause)
+                    throw new IllegalStateException("ROLLOUT_NOT_AT_POLICY_PAUSE");
+            }
             boolean statusAction=request.action()==Action.ABORT||request.action()==Action.PROMOTE;String path=request.action()==Action.ABORT?"/status/abort":request.action()==Action.PROMOTE?"/status/pauseConditions":"/spec/paused";Object value=request.action()==Action.PROMOTE?java.util.List.of():request.action()!=Action.RESUME;
             String patch=json.writeValueAsString(new Object[]{new PatchOperation("test","/metadata/uid",uid),new PatchOperation("test","/metadata/resourceVersion",rv),new ObjectPatchOperation("add",path,value)});
             URI patchUri=statusAction?URI.create(uri+"/status"):uri;var updated=send(HttpRequest.newBuilder(patchUri).timeout(Duration.ofSeconds(10)).header("Authorization","Bearer "+request.bearerToken()).header("Accept","application/json").header("Content-Type","application/json-patch+json").method("PATCH",HttpRequest.BodyPublishers.ofString(patch)).build());

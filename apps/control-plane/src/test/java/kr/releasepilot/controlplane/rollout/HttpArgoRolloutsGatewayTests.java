@@ -106,6 +106,21 @@ class HttpArgoRolloutsGatewayTests {
         assertThat(patches).hasValue(0);
     }
 
+    @Test void repeatedPromotionCannotClearTheFollowingPolicyPause() throws Exception {
+        var patches = new AtomicInteger();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/apis/argoproj.io/v1alpha1/namespaces/demo/rollouts/checkout", exchange -> {
+            if ("PATCH".equals(exchange.getRequestMethod())) patches.incrementAndGet();
+            respond(exchange, 200, rollout("12", "sidecar", "new")
+                    .replace("\"spec\":", "\"status\":{\"phase\":\"Paused\",\"currentStepIndex\":3},\"spec\":")
+                    .replace("\"template\":", "\"strategy\":{\"canary\":{\"steps\":[{\"setWeight\":20},{\"pause\":{}},{\"setWeight\":100},{\"pause\":{}}]}},\"template\":"));
+        }); server.start();
+        var request = new ArgoRolloutsGateway.ControlRequest("http://127.0.0.1:" + server.getAddress().getPort(),
+                "token", "demo", "checkout", "rollout-uid", ArgoRolloutsGateway.Action.PROMOTE, 0);
+        new HttpArgoRolloutsGateway(HttpClient.newHttpClient(), new ObjectMapper()).control(request);
+        assertThat(patches).hasValue(0);
+    }
+
     private ArgoRolloutsGateway.StartRequest request(String image) { return new ArgoRolloutsGateway.StartRequest("http://127.0.0.1:" + server.getAddress().getPort(), "token", "demo", "checkout", "checkout", image); }
     private String rollout(String resourceVersion, String sidecarImage, String appImage) { return "{\"metadata\":{\"uid\":\"rollout-uid\",\"resourceVersion\":\""+resourceVersion+"\"},\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"sidecar\",\"image\":\""+sidecarImage+"\"},{\"name\":\"checkout\",\"image\":\""+appImage+"\"}]}}}}"; }
     private void respond(com.sun.net.httpserver.HttpExchange exchange, int status, String body) throws java.io.IOException { byte[] bytes=body.getBytes(StandardCharsets.UTF_8);exchange.getResponseHeaders().set("Content-Type","application/json");exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);exchange.close(); }

@@ -9,7 +9,7 @@ class RolloutAnalysisGateTests {
  @Test void onlyCompletedPassForCurrentStepAuthorizesPromotion() {
   var steps=mock(RolloutStepRepository.class);var jobs=mock(AnalysisJobRepository.class);
   var now=Instant.now();var execution=RolloutExecution.pending(UUID.randomUUID(),UUID.randomUUID(),"demo","app","digest",now);
-  var step=RolloutStep.pending(execution.getId(),0,20,60);
+  var step=RolloutStep.pending(execution.getId(),0,20,60);step.start(now);
   when(steps.findByExecutionIdOrderByStepIndexAsc(execution.getId())).thenReturn(List.of(step));
   var gate=new RolloutAnalysisGate(steps,jobs);
   when(jobs.findByStepIdIn(List.of(step.getId()))).thenReturn(List.of());

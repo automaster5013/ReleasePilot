@@ -13,6 +13,8 @@ public class RolloutAnalysisGate {
         int index = execution.getCurrentStepIndex();
         if (index >= definitions.size()) throw new IllegalStateException("ROLLOUT_ANALYSIS_PASS_REQUIRED");
         var step = definitions.get(index);
+        if (step.getStatus() != RolloutStepStatus.RUNNING && step.getStatus() != RolloutStepStatus.EVALUATING)
+            throw new IllegalStateException("ROLLOUT_ANALYSIS_PASS_REQUIRED");
         boolean passed = jobs.findByStepIdIn(java.util.List.of(step.getId())).stream()
                 .anyMatch(job -> job.getStatus() == AnalysisJobStatus.COMPLETED && job.getVerdict() == AnalysisVerdict.PASS);
         if (!passed) throw new IllegalStateException("ROLLOUT_ANALYSIS_PASS_REQUIRED");

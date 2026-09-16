@@ -13,7 +13,11 @@ public interface ArgoRolloutsGateway {
     }
     record ObservedRollout(String uid, String resourceVersion) {}
     record ControlRequest(String apiServer, String bearerToken, String namespace, String rolloutName,
-                          String expectedUid, Action action) {}
+                          String expectedUid, Action action, int expectedPolicyStepIndex) {
+        public ControlRequest(String apiServer, String bearerToken, String namespace, String rolloutName, String expectedUid, Action action) {
+            this(apiServer, bearerToken, namespace, rolloutName, expectedUid, action, -1);
+        }
+    }
     enum Action { PROMOTE, PAUSE, RESUME, ABORT }
     record ObserveRequest(String apiServer,String bearerToken,String namespace,String rolloutName,String containerName){}
     record Observation(String uid,String resourceVersion,String phase,int currentStepIndex,String image,
