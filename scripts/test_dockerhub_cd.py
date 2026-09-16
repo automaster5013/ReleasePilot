@@ -169,6 +169,21 @@ class DockerHubCDTests(unittest.TestCase):
                 application["spec"]["syncPolicy"]["automated"],
                 {"prune": True, "selfHeal": True},
             )
+            self.assertIn(
+                "CreateNamespace=true",
+                application["spec"]["syncPolicy"]["syncOptions"],
+            )
+        policy_app = yaml.safe_load(
+            (ROOT / "deploy/argocd/artifact-policy-controller.yaml").read_text()
+        )
+        self.assertIn(
+            "RespectIgnoreDifferences=true",
+            policy_app["spec"]["syncPolicy"]["syncOptions"],
+        )
+        self.assertEqual(
+            {rule["kind"] for rule in policy_app["spec"]["ignoreDifferences"]},
+            {"MutatingWebhookConfiguration", "ValidatingWebhookConfiguration"},
+        )
 
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
