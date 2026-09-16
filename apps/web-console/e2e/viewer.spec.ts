@@ -332,6 +332,19 @@ test("@a11y viewer primary controls are reachable with visible keyboard focus", 
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer high contrast mode reflows without clipping controls", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.emulateMedia({ forcedColors: "active" });
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await expect(page.getByRole("combobox", { name: "최근 릴리스" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "불러오기", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await reachByTab(page, "불러오기", "BUTTON");
+  expect(await page.getByRole("button", { name: "불러오기", exact: true }).evaluate((element) => element.matches(":focus-visible"))).toBe(true);
+  expect(unexpected).toEqual([]);
+});
+
 async function reachByTab(page: Page, accessibleName: string, tagName: string) {
   await page.locator("body").focus();
   for (let index = 0; index < 40; index++) {

@@ -542,4 +542,30 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(reached).toBe(true);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} high contrast mode reflows without clipping controls`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.emulateMedia({ forcedColors: "active" });
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const actionName = role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Promote";
+    const action = page.getByRole("button", { name: actionName, exact: true });
+    await expect(action).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await action.scrollIntoViewIfNeeded();
+    const box = await action.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+    await page.locator("body").focus();
+    let focusVisible = false;
+    for (let index = 0; index < 100; index++) {
+      await page.keyboard.press("Tab");
+      focusVisible = await action.evaluate((element) => element === document.activeElement && element.matches(":focus-visible"));
+      if (focusVisible) break;
+    }
+    expect(focusVisible).toBe(true);
+    expect(state.unexpected).toEqual([]);
+  });
 }
