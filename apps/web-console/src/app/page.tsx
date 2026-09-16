@@ -150,7 +150,8 @@ export default function Home() {
     return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); document.removeEventListener("visibilitychange", tick); };
   }, [sessionUser]);
 
-  const refreshAuditIntegrity = useCallback(async () => {
+  const refreshAuditIntegrity = useCallback(async (trigger: HTMLElement | null = null) => {
+    if (trigger) setError("");
     setAuditIntegrityBusy(true);
     try {
       const response = await fetch("/control-api/audit-events/verify", { credentials: "include" });
@@ -158,6 +159,8 @@ export default function Home() {
       setAuditIntegrity(await response.json() as AuditChainVerification);
     } catch {
       setAuditIntegrity(null);
+      setError("감사 체인을 검증할 수 없습니다.");
+      if (trigger) restoreFocusAfterRender(trigger);
     } finally {
       setAuditIntegrityBusy(false);
     }
@@ -1005,7 +1008,7 @@ export default function Home() {
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>
         <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Route 범위와 Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric / Route</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={`${item.metric_key}:${item.route ?? "global"}`}><span><strong>{item.metric_key}</strong>{item.route && <small className={styles.route}>{item.importance ?? "STANDARD"} · {item.route}</small>}<small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
-        <section className={auditStyles.timeline} aria-labelledby="audit-title"><header><div><p>AUDIT TIMELINE</p><h2 id="audit-title">릴리스 변경 기록</h2></div><div className={auditStyles.summary}><span>{auditEvents.length} events</span>{canVerifyAudit(sessionUser?.roles ?? []) && <button type="button" onClick={() => void refreshAuditIntegrity()} disabled={auditIntegrityBusy} data-valid={auditIntegrity?.valid ?? "unknown"}>{auditIntegrityBusy ? "Verifying…" : auditIntegrity ? auditIntegrityLabel(auditIntegrity) : "Verification unavailable"}</button>}</div></header>{canVerifyAudit(sessionUser?.roles ?? []) && auditIntegrity && !auditIntegrity.valid && <p className={auditStyles.integrityAlert} role="alert" aria-live="assertive" aria-atomic="true">감사 체인 검증에 실패했습니다. 자동 승격을 중지하고 이벤트 {auditIntegrity.failedEventId ?? "unknown"}부터 조사하세요.</p>}{auditEvents.length ? <ol>{auditEvents.map((event) => <li key={event.id}><i /><div><strong>{auditEventLabel(event)}</strong><small>correlation {event.correlationId.slice(0, 12)}…{event.chainSequence ? ` · chain #${event.chainSequence}` : ""}</small></div><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("ko-KR")}</time></li>)}</ol> : <p className={auditStyles.empty}>{activeId ? "기록된 감사 이벤트가 없습니다." : "릴리스를 선택하면 변경 기록을 확인할 수 있습니다."}</p>}</section>
+        <section className={auditStyles.timeline} aria-labelledby="audit-title"><header><div><p>AUDIT TIMELINE</p><h2 id="audit-title">릴리스 변경 기록</h2></div><div className={auditStyles.summary}><span>{auditEvents.length} events</span>{canVerifyAudit(sessionUser?.roles ?? []) && <button type="button" onClick={(event) => void refreshAuditIntegrity(event.currentTarget)} disabled={auditIntegrityBusy} data-valid={auditIntegrity?.valid ?? "unknown"}>{auditIntegrityBusy ? "Verifying…" : auditIntegrity ? auditIntegrityLabel(auditIntegrity) : "Verification unavailable"}</button>}</div></header>{canVerifyAudit(sessionUser?.roles ?? []) && auditIntegrity && !auditIntegrity.valid && <p className={auditStyles.integrityAlert} role="alert" aria-live="assertive" aria-atomic="true">감사 체인 검증에 실패했습니다. 자동 승격을 중지하고 이벤트 {auditIntegrity.failedEventId ?? "unknown"}부터 조사하세요.</p>}{auditEvents.length ? <ol>{auditEvents.map((event) => <li key={event.id}><i /><div><strong>{auditEventLabel(event)}</strong><small>correlation {event.correlationId.slice(0, 12)}…{event.chainSequence ? ` · chain #${event.chainSequence}` : ""}</small></div><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("ko-KR")}</time></li>)}</ol> : <p className={auditStyles.empty}>{activeId ? "기록된 감사 이벤트가 없습니다." : "릴리스를 선택하면 변경 기록을 확인할 수 있습니다."}</p>}</section>
         <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
           <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={() => void revokeOtherSessions()} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}

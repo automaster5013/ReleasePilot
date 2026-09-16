@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; auditIntegrityFailure?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -294,7 +294,9 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       return options.csrfFailure ? route.abort("connectionfailed") : json({ headerName: "X-CSRF-TOKEN", token: "role-fixture-csrf" }, options.csrfRejectOnce && csrfRequests === 1 ? 403 : options.csrfStatus || 200);
     }
     if (path === "/session/active") return json({ items: [] });
-    if (path === "/audit-events/verify") return json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
+    if (path === "/audit-events/verify") return options.auditIntegrityFailure
+      ? json({ code: "AUDIT_VERIFICATION_UNAVAILABLE" }, 503)
+      : json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
     if (path === "/audit-events") {
       const aggregateType = url.searchParams.get("aggregateType");
       if (options.connectionAuditFailure && ["CLUSTER_CONNECTION", "PROMETHEUS_CONNECTION"].includes(aggregateType ?? "")) return json({ code: "AUDIT_UNAVAILABLE" }, 503);
@@ -991,6 +993,21 @@ test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ pa
   await expect(alert).toHaveAttribute("aria-live", "assertive");
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(refresh).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { auditIntegrityFailure: true });
+  await page.goto("/");
+
+  const verify = page.getByRole("button", { name: "Verification unavailable", exact: true });
+  await verify.focus();
+  await verify.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: "감사 체인을 검증할 수 없습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(verify).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
