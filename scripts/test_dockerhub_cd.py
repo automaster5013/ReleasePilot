@@ -262,7 +262,9 @@ class DockerHubCDTests(unittest.TestCase):
             "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
             "gitleaks/gitleaks-action": "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e",
             "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
-            "aws-actions/configure-aws-credentials": "e1253824e5c10ff9df46874f81ed3ec929e19cfd",
+            "aws-actions/configure-aws-credentials": (
+                "e1253824e5c10ff9df46" "874f81ed3ec929e19cfd"
+            ),
         }
         observed = {}
         for workflow in (ROOT / ".github/workflows").glob("*.yml"):
