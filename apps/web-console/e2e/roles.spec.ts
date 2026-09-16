@@ -846,6 +846,29 @@ test("@a11y OPERATOR connection validation errors preserve trigger focus", async
   expect(state.unexpected).toEqual([]);
 });
 
+test("@a11y OPERATOR bulk connection validation errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { csrfBody: null, connections: true });
+  await page.goto("/");
+
+  const clusterValidateAll = page.getByRole("button", { name: "Kubernetes 전체 검증", exact: true });
+  await clusterValidateAll.focus();
+  await clusterValidateAll.press("Enter");
+  let alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(clusterValidateAll).toBeFocused();
+
+  const prometheusValidateAll = page.getByRole("button", { name: "Prometheus 전체 검증", exact: true });
+  await prometheusValidateAll.focus();
+  await prometheusValidateAll.press("Enter");
+  alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(prometheusValidateAll).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
