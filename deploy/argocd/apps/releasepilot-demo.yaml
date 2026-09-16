@@ -8,6 +8,12 @@ spec:
     targetRevision: main
     path: deploy/overlays/aws-demo
   destination: { server: https://kubernetes.default.svc, namespace: releasepilot }
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: mysql
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[]?.status
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions: [CreateNamespace=true]
