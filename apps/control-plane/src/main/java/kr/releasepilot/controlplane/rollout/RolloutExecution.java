@@ -72,7 +72,7 @@ public class RolloutExecution {
         else {if(status!=RolloutExecutionStatus.RUNNING&&status!=RolloutExecutionStatus.PAUSED)throw new IllegalStateException("Execution cannot be aborted");status=RolloutExecutionStatus.ABORTED;finishedAt=now;}
         lastObservedResourceVersion=resourceVersion;
     }
-    public void observed(String resourceVersion,int stepIndex){lastObservedResourceVersion=resourceVersion;if(stepIndex>currentStepIndex)currentStepIndex=stepIndex;}
+    public void observed(String resourceVersion,int stepIndex){lastObservedResourceVersion=resourceVersion;}
     public void succeeded(Instant now){if(status!=RolloutExecutionStatus.RUNNING)throw new IllegalStateException("Execution is not running");status=RolloutExecutionStatus.SUCCEEDED;finishedAt=now;}
     public void failed(Instant now){if(status==RolloutExecutionStatus.SUCCEEDED||status==RolloutExecutionStatus.ABORTED)return;status=RolloutExecutionStatus.FAILED;finishedAt=now;}
 }

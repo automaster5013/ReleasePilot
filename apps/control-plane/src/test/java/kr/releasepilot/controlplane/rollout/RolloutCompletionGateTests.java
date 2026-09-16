@@ -30,6 +30,7 @@ class RolloutCompletionGateTests {
   when(steps.findByExecutionIdOrderByStepIndexAsc(execution.getId())).thenReturn(List.of(first,last));
   var reconciler=new RolloutStateReconciler(executions,releases,artifacts,environments,clusters,secrets,argo,Clock.fixed(now,ZoneOffset.UTC),checks,steps);
   reconciler.reconcileActive();assertThat(release.getStatus()).isEqualTo(ReleaseStatus.RUNNING);
+  assertThat(execution.getCurrentStepIndex()).isZero();
   last.pass(now);reconciler.reconcileActive();assertThat(release.getStatus()).isEqualTo(ReleaseStatus.SUCCEEDED);
  }
 }
