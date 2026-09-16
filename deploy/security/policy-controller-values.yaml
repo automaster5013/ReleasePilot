@@ -1,0 +1,6 @@
+webhook:
+  replicaCount: 2
+  failurePolicy: Fail
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1

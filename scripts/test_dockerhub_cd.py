@@ -112,6 +112,15 @@ class DockerHubCDTests(unittest.TestCase):
             "true",
         )
 
+    def test_cluster_admission_webhook_is_fail_closed_and_redundant(self):
+        values = yaml.safe_load(
+            (ROOT / "deploy/security/policy-controller-values.yaml").read_text()
+        )["webhook"]
+        self.assertEqual(values["replicaCount"], 2)
+        self.assertEqual(values["failurePolicy"], "Fail")
+        self.assertTrue(values["podDisruptionBudget"]["enabled"])
+        self.assertEqual(values["podDisruptionBudget"]["minAvailable"], 1)
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")

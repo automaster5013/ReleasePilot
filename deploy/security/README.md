@@ -6,7 +6,8 @@ ReleasePilot 운영 namespace는 GitHub artifact attestation이 유효한 Docker
 helm upgrade policy-controller --install --atomic --create-namespace `
   --namespace artifact-attestations `
   oci://ghcr.io/sigstore/helm-charts/policy-controller `
-  --version 0.10.5
+  --version 0.10.5 `
+  --values deploy/security/policy-controller-values.yaml
 
 helm upgrade trust-policies --install --atomic `
   --namespace artifact-attestations `
