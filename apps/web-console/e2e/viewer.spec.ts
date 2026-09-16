@@ -473,6 +473,15 @@ test("@a11y viewer announces session connection status without moving focus", as
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer status messages use a consistent polite atomic contract", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  const statuses = page.locator('[role="status"]');
+  expect(await statuses.count()).toBeGreaterThan(0);
+  expect(await statuses.evaluateAll((elements) => elements.filter((element) => element.getAttribute("aria-live") !== "polite" || element.getAttribute("aria-atomic") !== "true").map((element) => element.textContent?.trim()))).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();

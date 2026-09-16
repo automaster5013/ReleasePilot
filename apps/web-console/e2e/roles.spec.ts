@@ -697,6 +697,16 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     await expect(status.locator("i")).toHaveAttribute("aria-hidden", "true");
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} status messages use a consistent polite atomic contract`, async ({ page }) => {
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const statuses = page.locator('[role="status"]');
+    expect(await statuses.count()).toBeGreaterThan(0);
+    expect(await statuses.evaluateAll((elements) => elements.filter((element) => element.getAttribute("aria-live") !== "polite" || element.getAttribute("aria-atomic") !== "true").map((element) => element.textContent?.trim()))).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {
