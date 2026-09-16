@@ -802,15 +802,15 @@ export default function Home() {
   }
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} aria-labelledby="control-room-title">
       <a className={styles.skipLink} href="#main-content" tabIndex={0}>본문으로 건너뛰기</a>
-      <nav className={styles.nav}>
+      <nav className={styles.nav} aria-label="주요 탐색 및 계정 제어">
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
         <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <>{authenticationProviders.oidc && authenticationProviders.loginUrl && <button onClick={() => void logout(true)} disabled={logoutBusy}>계정 변경</button>}<button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button></>}</div>
       </nav>
       <section className={styles.shell} id="main-content" tabIndex={-1}>
         <header className={styles.topline}>
-          <div><p>RELEASE OPERATIONS</p><h1>Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
+          <div><p>RELEASE OPERATIONS</p><h1 id="control-room-title">Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
           <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy}>불러오기</button><button type="button" className={browserStyles.refresh} onClick={() => void refreshReleases()} disabled={!sessionUser || releaseListBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
         </header>
         {error && <p className={styles.error} role="alert">{error}</p>}

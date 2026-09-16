@@ -678,6 +678,16 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(await page.evaluate(() => location.hash)).toBe("#main-content");
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} exposes a titled landmark hierarchy`, async ({ page }) => {
+    const state = await fixture(page, role);
+    await page.goto("/");
+    await expect(page).toHaveTitle("ReleasePilot — Safe delivery control plane");
+    await expect(page.getByRole("main")).toHaveAccessibleName("Progressive delivery control room");
+    await expect(page.getByRole("navigation", { name: "주요 탐색 및 계정 제어" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Progressive delivery control room" })).toHaveCount(1);
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {

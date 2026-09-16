@@ -454,6 +454,16 @@ test("@a11y viewer can bypass repeated navigation with the skip link", async ({ 
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer exposes a titled landmark hierarchy", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await expect(page).toHaveTitle("ReleasePilot — Safe delivery control plane");
+  await expect(page.getByRole("main")).toHaveAccessibleName("Progressive delivery control room");
+  await expect(page.getByRole("navigation", { name: "주요 탐색 및 계정 제어" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Progressive delivery control room" })).toHaveCount(1);
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
