@@ -660,6 +660,24 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(result.failures).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} can bypass repeated navigation with the skip link`, async ({ page }) => {
+    const state = await fixture(page, role);
+    await page.goto("/");
+    await page.evaluate(() => {
+      document.body.tabIndex = -1;
+      document.body.focus();
+    });
+    await page.keyboard.press("Tab");
+    const skipLink = page.locator('a[href="#main-content"]');
+    await expect(skipLink).toHaveAccessibleName("본문으로 건너뛰기");
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main-content")).toBeFocused();
+    expect(await page.evaluate(() => location.hash)).toBe("#main-content");
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {

@@ -436,6 +436,24 @@ test("@a11y viewer keyboard focus indicator meets WCAG 2.4.13 minimum", async ({
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer can bypass repeated navigation with the skip link", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.evaluate(() => {
+    document.body.tabIndex = -1;
+    document.body.focus();
+  });
+  await page.keyboard.press("Tab");
+  const skipLink = page.locator('a[href="#main-content"]');
+  await expect(skipLink).toHaveAccessibleName("본문으로 건너뛰기");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
+  expect(await page.evaluate(() => location.hash)).toBe("#main-content");
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
