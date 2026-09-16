@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: artifact-trust-policies
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: ghcr.io/github/artifact-attestations-helm-charts
+      chart: trust-policies
+      targetRevision: v0.7.0
+      helm:
+        releaseName: trust-policies
+        valueFiles:
+          - $values/deploy/security/github-attestation-policy-values.yaml
+    - repoURL: https://github.com/automaster5013/ReleasePilot.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: artifact-attestations
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

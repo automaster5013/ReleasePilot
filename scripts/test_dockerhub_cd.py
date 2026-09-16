@@ -133,6 +133,43 @@ class DockerHubCDTests(unittest.TestCase):
                 {"control-plane": "policy-controller-webhook"},
             )
 
+    def test_cluster_admission_is_managed_by_pinned_argocd_apps(self):
+        expected = {
+            "artifact-policy-controller.yaml": (
+                "ghcr.io/sigstore/helm-charts",
+                "policy-controller",
+                "0.10.5",
+                "$values/deploy/security/policy-controller-values.yaml",
+            ),
+            "artifact-trust-policies.yaml": (
+                "ghcr.io/github/artifact-attestations-helm-charts",
+                "trust-policies",
+                "v0.7.0",
+                "$values/deploy/security/github-attestation-policy-values.yaml",
+            ),
+        }
+        for filename, (repo, chart, version, values_file) in expected.items():
+            application = yaml.safe_load((ROOT / "deploy/argocd" / filename).read_text())
+            chart_source, values_source = application["spec"]["sources"]
+            self.assertEqual(chart_source["repoURL"], repo)
+            self.assertEqual(chart_source["chart"], chart)
+            self.assertEqual(chart_source["targetRevision"], version)
+            self.assertEqual(chart_source["helm"]["valueFiles"], [values_file])
+            self.assertEqual(values_source["ref"], "values")
+            self.assertEqual(values_source["targetRevision"], "main")
+            self.assertEqual(
+                values_source["repoURL"],
+                "https://github.com/automaster5013/ReleasePilot.git",
+            )
+            self.assertEqual(
+                application["spec"]["destination"]["namespace"],
+                "artifact-attestations",
+            )
+            self.assertEqual(
+                application["spec"]["syncPolicy"]["automated"],
+                {"prune": True, "selfHeal": True},
+            )
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")
