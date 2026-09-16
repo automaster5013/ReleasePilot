@@ -22,12 +22,12 @@
 .connectionAudit small { color: #81958d; text-align: right; }
 .connectionCreate { border-bottom: 1px solid #293730; }
 .connectionCreate summary { padding: 14px 26px; cursor: pointer; color: #3adea3; font: 650 10px monospace; letter-spacing: .1em; }
-.connectionCreate summary span { margin-left: 9px; color: #71847c; letter-spacing: normal; }
+.connectionCreate summary span { margin-left: 9px; color: #82968e; letter-spacing: normal; }
 .connectionForms { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 0 26px 22px; }
 .connectionForms form { display: grid; gap: 10px; padding: 14px; border: 1px solid #293730; background: #0b1210; }
 .connectionForms form > strong { color: #67b997; }
 .connectionForms label { display: grid; gap: 5px; color: #9eb0a9; font-size: 11px; }
-.connectionForms label small { color: #71847c; }
+.connectionForms label small { color: #82968e; }
 .connectionForms input { min-width: 0; border: 1px solid #344740; background: #111a18; color: #e2eee9; padding: 9px 10px; }
 .connectionForms form > button { justify-self: start; background: #3adea3; color: #07100d; border: 0; }
 .sessions > header { display: flex; justify-content: space-between; align-items: end; padding: 24px 26px; border-bottom: 1px solid #293730; }
@@ -56,7 +56,7 @@
 .approvalContext span { color: #789087; font: 650 10px monospace; letter-spacing: .08em; }
 .approvalContext strong { overflow-wrap: anywhere; }
 .approvalContext small { color: #7f938b; overflow-wrap: anywhere; }
-.approvalContext a { color: #67b997; }
+.approvalContext a { color: #67b997; text-decoration: underline; text-underline-offset: 2px; }
 .approvalContext ul { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; list-style: none; padding: 0; margin: 0; }
 .approvalContext li { display: grid; gap: 4px; padding: 10px; border: 1px solid #293730; }
 .approvalContext li strong { font-size: 11px; }
@@ -65,7 +65,7 @@
 .releaseRequest summary span { margin-left: 10px; color: #7f938b; letter-spacing: normal; }
 .releaseRequest form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 4px 24px 24px; }
 .releaseRequest label { display: grid; gap: 7px; color: #9eb0a9; font-size: 12px; }
-.releaseRequest label small { color: #71847c; }
+.releaseRequest label small { color: #82968e; }
 .releaseRequest input, .releaseRequest textarea, .releaseRequest select { min-width: 0; border: 1px solid #344740; background: #0b1210; color: #e2eee9; padding: 11px 12px; font: inherit; }
 .releaseRequest select:disabled { opacity: .45; }
 .releaseRequest textarea { min-height: 88px; resize: vertical; }
@@ -84,7 +84,7 @@
 .environmentValidation li[data-outcome="FAIL"] > b { color: #ffacb0; }
 .environmentValidation li span { display: grid; gap: 3px; }
 .environmentValidation li span strong { font-size: 11px; }
-.environmentValidation li span small { color: #71847c; }
+.environmentValidation li span small { color: #82968e; }
 .environmentAudit { display: grid; gap: 5px; margin-top: 12px; padding-top: 11px; border-top: 1px solid #293730; }
 .environmentAudit > strong { color: #67b997; font: 650 9px monospace; letter-spacing: .1em; }
 .environmentAudit > span { color: #81958d; font: 10px monospace; }

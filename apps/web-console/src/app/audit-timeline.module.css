@@ -12,6 +12,6 @@
 .timeline li { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: start; padding: 16px 26px; border-top: 1px solid #293730; }
 .timeline li i { width: 9px; height: 9px; margin-top: 4px; border: 2px solid #3adea3; border-radius: 50%; box-shadow: 0 0 0 4px #3adea319; }
 .timeline li div { display: grid; gap: 5px; }
-.timeline li small, .timeline time { color: #71847c; font: 10px monospace; }
+.timeline li small, .timeline time { color: #82968e; font: 10px monospace; }
 .empty { margin: 0; padding: 20px 26px; border-top: 1px solid #293730; }
 @media(max-width: 600px) { .timeline > header { align-items: flex-start; flex-direction: column; gap: 14px; } .summary { align-items: flex-start; flex-direction: column; } .timeline li { grid-template-columns: 16px 1fr; } .timeline time { grid-column: 2; } }

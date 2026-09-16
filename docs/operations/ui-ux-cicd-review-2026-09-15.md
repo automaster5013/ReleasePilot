@@ -8,6 +8,8 @@
 
 후속 [역할별 UI 인수 검증](role-ui-acceptance.md)에서 Developer 요청, Approver 승인·거부·만료·자기 승인 오류, Operator 네 가지 조작·사유 취소 fixture E2E 11개를 추가했다. 역할 세션은 fixture이며 실제 SSO/backend/운영 전체 E2E 및 전체 접근성 검수를 대신하지 않는다.
 
+후속 [역할별 Web Console 접근성 검수](role-ui-accessibility.md)에서 네 역할의 WCAG A·AA 자동 검사와 핵심 조작의 Tab 도달·visible focus를 CI에 추가하고, 발견된 명암비와 링크 구분 결함을 수정했다. 실제 스크린 리더와 다중 브라우저 수동 검수는 계속 별도다.
+
 ## 확인 결과
 
 - 공개 UI: 데모 로그인, 새로고침 후 VIEWER 세션 복원, 변경 버튼 비활성화, 빈 최근 릴리스 목록을 브라우저에서 확인했다.

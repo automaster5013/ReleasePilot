@@ -1,4 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 const origin = "http://127.0.0.1:3100";
 const createdAt = "2026-09-15T00:00:00Z";
@@ -311,3 +312,39 @@ test("denied release does not leave the previous target actionable", async ({ pa
   await assertViewer(page);
   expect(unexpected).toEqual([]);
 });
+
+test("viewer screen meets automated WCAG A and AA checks", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "불러오기", exact: true }).click();
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) }))).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
+test("viewer primary controls are reachable with visible keyboard focus", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await reachByTab(page, "최근 릴리스", "SELECT");
+  await reachByTab(page, "불러오기", "BUTTON");
+  expect(unexpected).toEqual([]);
+});
+
+async function reachByTab(page: Page, accessibleName: string, tagName: string) {
+  await page.locator("body").focus();
+  for (let index = 0; index < 40; index++) {
+    await page.keyboard.press("Tab");
+    const active = await page.evaluate(() => ({
+      name: (document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent || "").trim(),
+      tag: document.activeElement?.tagName || "",
+      outline: getComputedStyle(document.activeElement as Element).outlineStyle,
+    }));
+    if (active.tag === tagName && active.name.includes(accessibleName)) {
+      expect(active.outline).not.toBe("none");
+      return;
+    }
+  }
+  throw new Error(`Keyboard focus did not reach ${accessibleName}`);
+}

@@ -1,4 +1,5 @@
 import { expect, Page, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 const origin = "http://127.0.0.1:3100";
 const serviceId = "11111111-1111-4111-8111-111111111111";
@@ -505,3 +506,40 @@ test("account switch ends the current session before opening SSO sign-in", async
   await page.getByRole("button", { name: "계정 변경", exact: true }).click();
   await expect(page.getByRole("heading", { name: "다른 계정으로 로그인" })).toBeVisible();
 });
+
+for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
+  test(`${role} screen meets automated WCAG A and AA checks`, async ({ page }) => {
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(results.violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) }))).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
+
+  test(`${role} primary action is reachable with visible keyboard focus`, async ({ page }) => {
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const action = role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Promote";
+    await page.locator("body").focus();
+    let reached = false;
+    for (let index = 0; index < 80; index++) {
+      await page.keyboard.press("Tab");
+      const active = await page.evaluate(() => ({
+        name: (document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent || "").trim(),
+        tag: document.activeElement?.tagName || "",
+        outline: getComputedStyle(document.activeElement as Element).outlineStyle,
+      }));
+      if (active.tag === "BUTTON" && active.name === action) {
+        expect(active.outline).not.toBe("none");
+        reached = true;
+        break;
+      }
+    }
+    expect(reached).toBe(true);
+    expect(state.unexpected).toEqual([]);
+  });
+}
