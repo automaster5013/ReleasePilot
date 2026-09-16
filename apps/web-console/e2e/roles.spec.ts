@@ -265,13 +265,14 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     const json = (body: unknown, code = 200) => route.fulfill({ status: code, contentType: "application/json", body: JSON.stringify(body) });
     if (request.method() !== "GET") {
       const sessionMutation = role === "OPERATOR" && path === "/session/revoke-others";
-      const permitted = request.method() === "POST" && (
+      const individualSessionMutation = role === "OPERATOR" && request.method() === "DELETE" && path === "/session/active/other-session";
+      const permitted = (request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
         (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation))
-      );
+      )) || individualSessionMutation;
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          (!sessionMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
+          (!sessionMutation && !individualSessionMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
@@ -1029,6 +1030,22 @@ test("@a11y OPERATOR revoke other sessions errors preserve trigger focus", async
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(revoke).toBeFocused();
   expect(state.mutations).toEqual([{ path: "/session/revoke-others", body: null }]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR individual session revoke errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { activeSessions: true, failure: "SESSION_REVOKE_REJECTED" });
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.goto("/");
+
+  const revoke = page.getByRole("button", { name: "종료", exact: true });
+  await revoke.focus();
+  await revoke.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: "세션 종료 요청이 거부되었습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(revoke).toBeFocused();
+  expect(state.mutations).toEqual([{ path: "/session/active/other-session", body: null }]);
   expect(state.unexpected).toEqual([]);
 });
 

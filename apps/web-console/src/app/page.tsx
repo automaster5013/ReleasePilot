@@ -355,8 +355,9 @@ export default function Home() {
     setActiveSessions(body.items);
   }
 
-  async function revokeSession(session: ActiveSession) {
+  async function revokeSession(session: ActiveSession, trigger: HTMLElement | null = null) {
     if (!window.confirm(session.current ? "현재 세션을 종료하시겠습니까?" : "선택한 세션을 종료하시겠습니까?")) return;
+    setError("");
     setSessionBusy(true);
     setSessionNotice("");
     try {
@@ -375,7 +376,8 @@ export default function Home() {
         setSessionNotice("선택한 세션을 종료했습니다.");
       }
     } catch (failure) {
-      setSessionNotice((failure as Error).message);
+      setError((failure as Error).message);
+      restoreFocusAfterRender(trigger);
     } finally {
       setSessionBusy(false);
     }
@@ -1016,7 +1018,7 @@ export default function Home() {
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}
           {sessionUser && !sessionUser.demo && authenticationProviders.oidc && <p className={sessionStyles.sessionEmpty}>로그아웃하면 ReleasePilot 세션이 종료됩니다. 다른 계정으로 로그인하려면 상단의 계정 변경을 선택하고 원하는 이메일과 비밀번호로 인증하세요. 조직 SSO도 매번 로그인 화면을 표시합니다.</p>}
           {sessionUser?.demo && <p className={sessionStyles.sessionEmpty}>공유 데모에서는 다른 방문자의 연결을 보호하기 위해 세션 관리가 비활성화됩니다.</p>}
-          {canManageSessions(sessionUser) && <div className={sessionStyles.sessionList}>{activeSessions.map((item) => <article key={item.reference}><div><strong>{item.current ? "현재 세션" : "활성 세션"}</strong><code>{item.reference}</code><small>최근 사용 {formatSessionTime(item.lastAccessedAt)} · 만료 {formatSessionTime(item.expiresAt)}</small></div><button onClick={() => void revokeSession(item)} disabled={sessionBusy}>{item.current ? "로그아웃" : "종료"}</button></article>)}</div>}
+          {canManageSessions(sessionUser) && <div className={sessionStyles.sessionList}>{activeSessions.map((item) => <article key={item.reference}><div><strong>{item.current ? "현재 세션" : "활성 세션"}</strong><code>{item.reference}</code><small>최근 사용 {formatSessionTime(item.lastAccessedAt)} · 만료 {formatSessionTime(item.expiresAt)}</small></div><button onClick={(event) => void revokeSession(item, event.currentTarget)} disabled={sessionBusy}>{item.current ? "로그아웃" : "종료"}</button></article>)}</div>}
           {sessionNotice && <p className={sessionStyles.sessionNotice} role="status" aria-live="polite" aria-atomic="true">{sessionNotice}</p>}
         </section>
       </section>
