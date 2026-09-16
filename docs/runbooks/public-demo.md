@@ -15,7 +15,7 @@
 4. 출력된 명령으로 kubeconfig를 설정하고 `infra/aws/platform/bootstrap.ps1`을 실행한다.
 5. GitHub Actions 변수 `AWS_RELEASE_ROLE_ARN`을 OIDC 배포 역할 ARN으로 설정한다.
 6. `v*` 태그 workflow가 세 이미지를 ECR에 push하고 main의 AWS overlay를 digest로 갱신하는지 확인한다.
-7. `kubectl apply -k deploy/argocd`로 상위 `releasepilot-platform` Application을 적용하고 상위 앱과 세 하위 앱이 main을 Synced/Healthy로 표시하는지 확인한다.
+7. `infra/aws/platform/bootstrap-gitops.ps1`을 실행한다. 스크립트가 상위 `releasepilot-platform` Application을 적용하고 상위 앱과 세 하위 앱이 main을 Synced/Healthy로 표시할 때까지 확인한다.
 
 ## 검증
 

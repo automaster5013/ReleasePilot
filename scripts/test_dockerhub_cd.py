@@ -218,6 +218,24 @@ class DockerHubCDTests(unittest.TestCase):
             int(trust["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"]),
         )
 
+    def test_platform_bootstrap_installs_and_waits_for_gitops_root(self):
+        bootstrap = (
+            ROOT / "infra/aws/platform/bootstrap-gitops.ps1"
+        ).read_text()
+        self.assertIn("condition=Established", bootstrap)
+        self.assertIn("kubectl apply -k $ArgoDirectory", bootstrap)
+        for application in (
+            "releasepilot-platform",
+            "releasepilot-demo",
+            "artifact-policy-controller",
+            "artifact-trust-policies",
+        ):
+            self.assertIn(f'"{application}"', bootstrap)
+        self.assertIn('if ($State -eq "Synced,Healthy")', bootstrap)
+        self.assertIn("throw", bootstrap)
+        platform = (ROOT / "infra/aws/platform/bootstrap.ps1").read_text()
+        self.assertIn('& "$PSScriptRoot/bootstrap-gitops.ps1"', platform)
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")

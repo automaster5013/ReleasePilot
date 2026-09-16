@@ -22,4 +22,5 @@ kubectl apply -f "$PSScriptRoot/external-dns.yaml"
 kubectl -n ingress-nginx annotate service ingress-nginx-controller external-dns.alpha.kubernetes.io/hostname="$Domain" --overwrite
 kubectl create namespace releasepilot --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n releasepilot create secret generic releasepilot-runtime --from-literal="DATABASE_PASSWORD=$DatabasePassword" --from-literal="MYSQL_ROOT_PASSWORD=$MysqlRootPassword" --dry-run=client -o yaml | kubectl apply -f -
-Write-Output "Platform installed. Wait for the load balancer, DNS record and certificate, then apply the Argo CD Application."
+& "$PSScriptRoot/bootstrap-gitops.ps1"
+Write-Output "Platform and ReleasePilot GitOps applications installed. Wait for the load balancer, DNS record and certificate."
