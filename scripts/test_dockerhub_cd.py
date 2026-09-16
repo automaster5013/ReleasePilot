@@ -149,7 +149,7 @@ class DockerHubCDTests(unittest.TestCase):
             ),
         }
         for filename, (repo, chart, version, values_file) in expected.items():
-            application = yaml.safe_load((ROOT / "deploy/argocd" / filename).read_text())
+            application = yaml.safe_load((ROOT / "deploy/argocd/apps" / filename).read_text())
             chart_source, values_source = application["spec"]["sources"]
             self.assertEqual(chart_source["repoURL"], repo)
             self.assertEqual(chart_source["chart"], chart)
@@ -174,7 +174,7 @@ class DockerHubCDTests(unittest.TestCase):
                 application["spec"]["syncPolicy"]["syncOptions"],
             )
         policy_app = yaml.safe_load(
-            (ROOT / "deploy/argocd/artifact-policy-controller.yaml").read_text()
+            (ROOT / "deploy/argocd/apps/artifact-policy-controller.yaml").read_text()
         )
         self.assertIn(
             "RespectIgnoreDifferences=true",
@@ -183,6 +183,39 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertEqual(
             {rule["kind"] for rule in policy_app["spec"]["ignoreDifferences"]},
             {"MutatingWebhookConfiguration", "ValidatingWebhookConfiguration"},
+        )
+
+    def test_argocd_applications_are_managed_by_platform_root(self):
+        root = yaml.safe_load(
+            (ROOT / "deploy/argocd/releasepilot-platform.yaml").read_text()
+        )
+        self.assertEqual(root["metadata"]["namespace"], "argocd")
+        self.assertEqual(root["spec"]["source"]["path"], "deploy/argocd/apps")
+        self.assertEqual(root["spec"]["destination"]["namespace"], "argocd")
+        self.assertEqual(
+            root["spec"]["syncPolicy"]["automated"],
+            {"prune": True, "selfHeal": True},
+        )
+        children = yaml.safe_load(
+            (ROOT / "deploy/argocd/apps/kustomization.yaml").read_text()
+        )["resources"]
+        self.assertEqual(
+            set(children),
+            {
+                "releasepilot-demo.yaml",
+                "artifact-policy-controller.yaml",
+                "artifact-trust-policies.yaml",
+            },
+        )
+        controller = yaml.safe_load(
+            (ROOT / "deploy/argocd/apps/artifact-policy-controller.yaml").read_text()
+        )
+        trust = yaml.safe_load(
+            (ROOT / "deploy/argocd/apps/artifact-trust-policies.yaml").read_text()
+        )
+        self.assertLess(
+            int(controller["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"]),
+            int(trust["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"]),
         )
 
     def test_deployment_supports_disable_switch_and_checks_current_head(self):

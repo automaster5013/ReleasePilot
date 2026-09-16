@@ -5,15 +5,15 @@ ReleasePilot 운영 namespace는 GitHub artifact attestation이 유효한 Docker
 Argo CD Application은 OCI Helm chart 버전과 이 디렉터리의 values 파일을 함께 선언한다. 클러스터를 복구하거나 새로 부트스트랩할 때 policy-controller를 먼저 적용하고 Healthy/Synced 상태를 확인한 뒤 trust policy를 적용한다.
 
 ```powershell
-kubectl apply -f deploy/argocd/artifact-policy-controller.yaml
+kubectl apply -f deploy/argocd/apps/artifact-policy-controller.yaml
 kubectl wait --for=jsonpath='{.status.health.status}'=Healthy `
   application/artifact-policy-controller -n argocd --timeout=5m
-kubectl apply -f deploy/argocd/artifact-trust-policies.yaml
+kubectl apply -f deploy/argocd/apps/artifact-trust-policies.yaml
 kubectl wait --for=jsonpath='{.status.health.status}'=Healthy `
   application/artifact-trust-policies -n argocd --timeout=5m
 ```
 
-설치 후 리소스 수명주기는 Argo CD가 담당한다. 수동 `helm upgrade`를 함께 실행하지 않는다. `deploy/argocd/kustomization.yaml`은 이미 준비된 클러스터에서 모든 Application 선언을 한 번에 등록하는 부트스트랩 진입점이다.
+설치 후 리소스 수명주기는 Argo CD가 담당한다. 수동 `helm upgrade`를 함께 실행하지 않는다. 일반 부트스트랩에서는 `kubectl apply -k deploy/argocd`로 상위 `releasepilot-platform` Application 하나만 등록한다. 상위 앱이 `deploy/argocd/apps`의 하위 Application을 생성·복구하며 policy-controller가 trust policy보다 먼저 동기화된다.
 
 기존 수동 Helm 설치에서 전환할 때는 두 Argo CD Application이 모두 `Synced/Healthy`이고 admission 검증이 성공한 뒤 Helm release Secret만 백업·제거한다. `helm uninstall`은 운영 리소스를 삭제하므로 전환 절차에 사용하지 않는다. 전환 후 `helm list -n artifact-attestations`는 비어 있어야 한다.
 
