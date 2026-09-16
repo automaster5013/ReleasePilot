@@ -45,6 +45,7 @@ class DockerHubCDTests(unittest.TestCase):
 
     def test_deployment_commit_does_not_trigger_publication_loop(self):
         self.assertIn("deploy/**", self.workflow["on"]["push"]["paths-ignore"])
+        self.assertEqual(self.workflow["concurrency"]["group"], "dockerhub-cd-main")
         self.assertEqual(self.workflow["concurrency"]["cancel-in-progress"], "false")
 
 
