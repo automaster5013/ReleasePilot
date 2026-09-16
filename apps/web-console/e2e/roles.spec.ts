@@ -614,4 +614,28 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(motion.offenders).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} pointer targets meet the 24px minimum at 320px`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const undersized = await page.locator("button, input, select, a[href]").evaluateAll((elements) =>
+      elements.flatMap((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const visible = style.visibility !== "hidden" && style.display !== "none" && rect.width > 0 && rect.height > 0;
+        const inlineLink = element.tagName === "A" && style.display === "inline";
+        if (!visible || inlineLink || (rect.width >= 24 && rect.height >= 24)) return [];
+        return [{
+          element: element.tagName,
+          name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("name") || "",
+          width: Math.round(rect.width * 10) / 10,
+          height: Math.round(rect.height * 10) / 10,
+        }];
+      }),
+    );
+    expect(undersized).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }

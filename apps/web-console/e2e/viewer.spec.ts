@@ -390,6 +390,30 @@ test("@a11y viewer honors reduced motion preferences", async ({ page }) => {
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer pointer targets meet the 24px minimum at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "불러오기", exact: true }).click();
+  const undersized = await page.locator("button, input, select, a[href]").evaluateAll((elements) =>
+    elements.flatMap((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const visible = style.visibility !== "hidden" && style.display !== "none" && rect.width > 0 && rect.height > 0;
+      const inlineLink = element.tagName === "A" && style.display === "inline";
+      if (!visible || inlineLink || (rect.width >= 24 && rect.height >= 24)) return [];
+      return [{
+        element: element.tagName,
+        name: element.getAttribute("aria-label") || element.textContent?.trim() || element.getAttribute("name") || "",
+        width: Math.round(rect.width * 10) / 10,
+        height: Math.round(rect.height * 10) / 10,
+      }];
+    }),
+  );
+  expect(undersized).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
 async function reachByTab(page: Page, accessibleName: string, tagName: string) {
   await page.locator("body").focus();
   for (let index = 0; index < 40; index++) {
