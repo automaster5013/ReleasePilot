@@ -120,6 +120,18 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertEqual(values["failurePolicy"], "Fail")
         self.assertTrue(values["podDisruptionBudget"]["enabled"])
         self.assertEqual(values["podDisruptionBudget"]["minAvailable"], 1)
+        required = values["affinity"]["podAntiAffinity"][
+            "requiredDuringSchedulingIgnoredDuringExecution"
+        ]
+        self.assertEqual(
+            {term["topologyKey"] for term in required},
+            {"kubernetes.io/hostname", "topology.kubernetes.io/zone"},
+        )
+        for term in required:
+            self.assertEqual(
+                term["labelSelector"]["matchLabels"],
+                {"control-plane": "policy-controller-webhook"},
+            )
 
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]

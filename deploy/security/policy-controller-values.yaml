@@ -4,3 +4,14 @@ webhook:
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              control-plane: policy-controller-webhook
+          topologyKey: kubernetes.io/hostname
+        - labelSelector:
+            matchLabels:
+              control-plane: policy-controller-webhook
+          topologyKey: topology.kubernetes.io/zone

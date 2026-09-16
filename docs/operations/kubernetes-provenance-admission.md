@@ -8,4 +8,6 @@ Docker Hub CD가 발급한 GitHub artifact attestation을 EKS admission 단계�
 
 이 정책은 새 Pod 생성·변경 admission을 검사한다. 이미 실행 중인 Pod를 소급 종료하지 않으며, registry 가용성이나 Sigstore 검증 서비스 장애가 발생하면 새 ReleasePilot Pod admission이 fail-closed 될 수 있다. 긴급 중단 절차는 먼저 namespace label을 제거하는 것이며 Helm release 삭제는 그 다음 단계다. 정책 범위나 MySQL 이미지를 변경할 때는 새 예외를 포괄 wildcard로 추가하지 않고 정확한 registry 경계를 검토한다.
 
-webhook은 replica 2개, `failurePolicy: Fail`, PDB `minAvailable: 1`로 운영한다. 2026-09-16 한 webhook Pod를 강제 삭제한 직후 현재 서명 digest의 server-side dry-run admission이 성공했고, 대체 Pod가 준비되어 다시 2/2가 됐다. 현재 EKS Auto Mode 노드는 하나이므로 이는 webhook 프로세스/Pod 장애 내구성 검증이며 노드·가용 영역 장애 내구성을 뜻하지 않는다. 노드 수준 고가용성에는 두 노드 이상과 required topology 분산, 비용·용량 정책 검토가 추가로 필요하다.
+webhook은 replica 2개, `failurePolicy: Fail`, PDB `minAvailable: 1`로 운영한다. required pod anti-affinity가 hostname과 zone을 모두 사용하므로 두 replica는 서로 다른 노드와 가용 영역에 배치된다. 2026-09-16 EKS Auto Mode가 `ap-northeast-2a`와 `ap-northeast-2c`에 노드를 준비한 뒤, 한 준비 상태 webhook 노드를 cordon하고 해당 Pod를 제거했다. 남은 zone의 replica가 현재 서명 digest admission을 계속 성공시켰고 대체 replica가 반대 zone에서 준비된 뒤 cordon을 해제했다. 최종 replica는 다시 2/2이며 이전 미서명 digest는 계속 거부됐다.
+
+기존 두 replica가 이미 모든 사용 가능한 zone을 점유한 상태에서 처음 zone required affinity를 추가하면 Deployment의 surge Pod가 스케줄되지 않을 수 있다. 최초 전환에서는 운영 Rollout이 모두 Healthy임을 확인한 뒤 webhook Deployment를 잠시 0으로 축소하고 Helm atomic upgrade로 새 replica 2개를 생성했다. 이 구간에는 기존 서비스는 계속 실행되지만 `failurePolicy: Fail` 때문에 새 Pod admission이 일시 차단된다. 이후 동일 affinity를 유지하는 일반 재시작과 Pod 교체에는 이 전환 절차가 필요하지 않다.
