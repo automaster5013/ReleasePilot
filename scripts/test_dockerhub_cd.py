@@ -89,6 +89,29 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertIn("gh attestation verify", verify["run"])
         self.assertIn("$GITHUB_REPOSITORY", verify["run"])
 
+    def test_cluster_admission_policy_is_repository_scoped(self):
+        values = yaml.safe_load(
+            (ROOT / "deploy/security/github-attestation-policy-values.yaml").read_text()
+        )["policy"]
+        self.assertTrue(values["enabled"])
+        self.assertEqual(values["organization"], "automaster5013")
+        self.assertEqual(values["repository"], "ReleasePilot")
+        self.assertEqual(
+            values["images"],
+            ["index.docker.io/automaster5013/releasepilot-**"],
+        )
+        self.assertEqual(
+            values["exemptImages"],
+            ["index.docker.io/library/mysql**"],
+        )
+        namespace = yaml.safe_load(
+            (ROOT / "deploy/base/namespace.yaml").read_text()
+        )
+        self.assertEqual(
+            namespace["metadata"]["labels"]["policy.sigstore.dev/include"],
+            "true",
+        )
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")

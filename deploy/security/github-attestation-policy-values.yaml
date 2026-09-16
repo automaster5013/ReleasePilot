@@ -1,0 +1,8 @@
+policy:
+  enabled: true
+  organization: automaster5013
+  repository: ReleasePilot
+  images:
+    - index.docker.io/automaster5013/releasepilot-**
+  exemptImages:
+    - index.docker.io/library/mysql**
