@@ -29,3 +29,12 @@ npm run test:e2e
 
 자동 검사는 인지적 사용성, 실제 스크린 리더 발화 순서와 모든 브라우저·보조기기 조합을
 완전히 대체하지 않는다. 운영 SSO와 실제 backend를 포함한 수동 스크린 리더 검수는 별도다.
+
+## 운영 반영
+
+- GitHub CI `35068309624`와 Docker Hub CD `35068309888`이 성공했다.
+- 변경 감지는 Web Console 하나만 게시했고, 취약점 차단과 provenance 검증 후 GitOps commit
+  `dd8d02f`가 digest `sha256:e8d8105b1f98cee8b8ff6c8072bfa2557516ac8496054d5d7a69425dd0d93274`를 반영했다.
+- 두 Canary 승인 단계를 거쳐 Web Console 새 Pod 2개가 재시작 없이 Healthy가 됐다.
+- 세 Rollout은 모두 2/2 Healthy, 네 Argo CD Application은 Synced/Healthy이며 공개 루트,
+  Web health, Control Plane readiness는 HTTP 200이다.
