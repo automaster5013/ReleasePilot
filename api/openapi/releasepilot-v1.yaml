@@ -1186,6 +1186,11 @@ components:
           format: uuid
         displayName:
           type: string
+        username:
+          type: string
+        email:
+          type: [string, "null"]
+          description: Email of the authenticated SSO identity, when available.
         roles:
           type: array
           uniqueItems: true
