@@ -62,6 +62,33 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertEqual(scan["with"]["ignore-unfixed"], "true")
         self.assertEqual(scan["with"]["severity"], "CRITICAL")
 
+    def test_verified_provenance_blocks_digest_artifact(self):
+        publish = self.jobs["publish"]
+        self.assertEqual(
+            publish["permissions"],
+            {
+                "contents": "read",
+                "id-token": "write",
+                "attestations": "write",
+                "packages": "write",
+            },
+        )
+        steps = publish["steps"]
+        scan_index = next(index for index, step in enumerate(steps) if step.get("name") == "Block fixable critical vulnerabilities")
+        attest_index = next(index for index, step in enumerate(steps) if step.get("name") == "Attest published image provenance")
+        verify_index = next(index for index, step in enumerate(steps) if step.get("name") == "Verify provenance before GitOps")
+        record_index = next(index for index, step in enumerate(steps) if step.get("name") == "Record pinned image")
+        self.assertLess(scan_index, attest_index)
+        self.assertLess(attest_index, verify_index)
+        self.assertLess(verify_index, record_index)
+        attest = steps[attest_index]
+        self.assertEqual(attest["uses"], "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6")
+        self.assertEqual(attest["with"]["push-to-registry"], "true")
+        self.assertIn("steps.build.outputs.digest", attest["with"]["subject-digest"])
+        verify = steps[verify_index]
+        self.assertIn("gh attestation verify", verify["run"])
+        self.assertIn("$GITHUB_REPOSITORY", verify["run"])
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")

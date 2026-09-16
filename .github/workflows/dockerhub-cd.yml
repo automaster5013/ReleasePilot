@@ -44,6 +44,11 @@ jobs:
   publish:
     needs: [validate, changes]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
@@ -71,6 +76,17 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL
+      - name: Attest published image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: index.docker.io/automaster5013/releasepilot-${{ matrix.name }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Verify provenance before GitOps
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: index.docker.io/automaster5013/releasepilot-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY"
       - name: Record pinned image
         env:
           IMAGE_NAME: ${{ matrix.name }}
