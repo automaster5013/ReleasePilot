@@ -15,3 +15,5 @@ webhook은 replica 2개, `failurePolicy: Fail`, PDB `minAvailable: 1`로 운영�
 클러스터 외부 부트스트랩 대상은 `releasepilot-platform` Application 하나다. 이 상위 앱은 하위 Application 세 개를 Git에서 조정하며 sync wave로 `artifact-policy-controller`를 `artifact-trust-policies`보다 먼저 적용한다. 이후 하위 Application의 spec drift나 삭제, chart 재렌더링은 automated prune과 self-heal 정책이 복구한다.
 
 2026-09-16 GitOps 소유권 전환 검증에서 기존 Helm release Secret 7개를 로컬 작업 디렉터리에 백업한 후 제거했다. `helm list -n artifact-attestations`가 비어 있는 상태에서도 두 Application은 Synced/Healthy를 유지했다. Argo CD가 관리하는 `policy-controller-webhook-logging` ConfigMap을 삭제하자 다른 UID로 자동 재생성됐고 webhook은 2/2 Ready를 유지했다. 현재 서명 digest는 계속 허용되고 전환 이전 미서명 digest는 계속 거부됐다. 백업 파일은 저장소에 포함하지 않으며 복구의 기준은 Git의 Application과 values 선언이다.
+
+같은 날 `releasepilot-platform` 상위 Application을 부트스트랩해 `releasepilot-demo`, `artifact-policy-controller`, `artifact-trust-policies`를 app-of-apps 구조로 인계했다. `artifact-trust-policies` Application 객체를 삭제하자 상위 앱이 새 UID와 tracking ID로 자동 재생성했고 정책 CR은 중단 없이 유지됐다. 상위 앱을 포함한 네 Application은 모두 Synced/Healthy로 복구됐다.
