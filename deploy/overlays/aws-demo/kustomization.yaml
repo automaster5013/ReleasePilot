@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: releasepilot
-resources: [../../base, ingress.yaml, issuer.yaml, network-policy.yaml, storage-class.yaml]
+resources: [../../base, ingress.yaml, issuer.yaml, network-policy.yaml, storage-class.yaml, deployment-verifier-rbac.yaml]
 images:
   - name: control-plane
     newName: automaster5013/releasepilot-control-plane

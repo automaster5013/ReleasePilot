@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: releasepilot-deploy-verifier
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts"]
+    resourceNames: ["control-plane", "analysis-worker", "web-console"]
+    verbs: ["get"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    resourceNames: ["releasepilot-demo"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: releasepilot-deploy-verifier
+subjects:
+  - kind: Group
+    name: releasepilot-deploy-verifier
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: releasepilot-deploy-verifier
+  apiGroup: rbac.authorization.k8s.io

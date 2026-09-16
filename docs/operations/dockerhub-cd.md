@@ -16,7 +16,9 @@ push 실행은 두 commit 사이의 변경 경로로 게시 matrix를 생성한�
 
 사용자가 기존 AWS/Argo CD 배포를 지정했으므로 aws-demo overlay 자동 갱신을 기본 활성화한다. repository variable DOCKERHUB_AUTO_DEPLOY=false로 중단할 수 있다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.
 
-GitOps 갱신 뒤 `verify-deployment`는 AWS OIDC release 역할로 EKS에 접속한다. 이 역할은 `eks:DescribeCluster`와 `releasepilot`·`argocd` 네임스페이스의 AmazonEKSViewPolicy만 가지며 Kubernetes mutation 권한은 없다. 선택 게시된 Rollout의 spec image가 게시 digest와 일치하고 phase가 Paused 또는 Healthy이며 updated replica가 하나 이상인지, Argo CD가 Synced인지, 공개 readiness가 HTTP 성공인지 최대 15분 동안 확인한다. 성공은 수동 Canary 승인 경계까지 안전하게 도달했다는 뜻이며 50% 이후 승격 완료를 뜻하지 않는다.
+GitOps 갱신 뒤 `verify-deployment`는 AWS OIDC release 역할로 EKS에 접속한다. IAM 신뢰 조건은 같은 저장소의 `refs/tags/v*`와 `refs/heads/main`으로 제한한다. 역할은 `eks:DescribeCluster`와 전용 `releasepilot-deploy-verifier` 그룹만 가진다. GitOps RBAC는 이 그룹에 세 운영 Rollout 이름과 `releasepilot-demo` Application 이름에 대한 `get`만 부여하며 list/watch 및 Kubernetes mutation 권한은 없다. 선택 게시된 Rollout의 spec image가 게시 digest와 일치하고 phase가 Paused 또는 Healthy이며 updated replica가 하나 이상인지, Argo CD가 Synced인지, 공개 readiness가 HTTP 성공인지 최대 15분 동안 확인한다. 성공은 수동 Canary 승인 경계까지 안전하게 도달했다는 뜻이며 50% 이후 승격 완료를 뜻하지 않는다.
+
+첫 run 35053467003은 기존 IAM 신뢰 정책이 태그만 허용해 OIDC assume 단계에서 fail-closed 됐다. main subject를 추가하고 CRD 전용 읽기 RBAC를 적용한 failed-job 재실행은 `verify-deployment`를 포함해 성공했다. 게시와 GitOps가 이미 성공한 상태에서 검증 실패가 전체 CD 실패로 표시됐고, 권한 수정 후 동일 artifact/digest를 재검증했다.
 
 2026-09-16: GitHub Secrets 두 개 등록 후 run 34998468081의 재실행에서 CI 6개 및 세 이미지 게시가 성공했다. Docker Hub API로 소스 SHA 9800909c5d868b497eca75628b74cf75432f3688의 세 태그 active/digest를 확인했다. 자동배포 변수는 미활성 상태로 update-gitops는 skipped다. 배포 대상 확인이 필요하며 운영 배포 완료는 클러스터 상태로 별도 확인해야 한다.
 
