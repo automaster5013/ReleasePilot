@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin the three ReleasePilot images in a Kustomize overlay by digest."""
+"""Pin one or more ReleasePilot images in a Kustomize overlay by digest."""
 
 from pathlib import Path
 import re
@@ -19,9 +19,9 @@ def main() -> None:
             raise SystemExit(f"invalid digest for {name}: {digest}")
         digests[name] = (repository, digest)
 
-    required = {"control-plane", "analysis-worker", "web-console"}
-    if set(digests) != required:
-        raise SystemExit(f"digest set must be exactly {sorted(required)}")
+    allowed = {"control-plane", "analysis-worker", "web-console"}
+    if not digests or not set(digests) <= allowed:
+        raise SystemExit(f"digest set must be a non-empty subset of {sorted(allowed)}")
 
     text = overlay_file.read_text(encoding="utf-8")
     for name, (repository, digest) in digests.items():

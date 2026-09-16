@@ -6,6 +6,7 @@ on:
       - 'apps/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/dockerhub-cd.yml'
+      - 'scripts/select_dockerhub_images.py'
       - 'scripts/update_releasepilot_images.py'
   workflow_dispatch:
 permissions:
@@ -18,19 +19,34 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: select
+        name: Select changed image inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            matrix="$(python scripts/select_dockerhub_images.py --all)"
+          else
+            git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA" > changed-paths.txt
+            matrix="$(python scripts/select_dockerhub_images.py changed-paths.txt)"
+          fi
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
   publish:
-    needs: validate
+    needs: [validate, changes]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: control-plane
-            context: apps/control-plane
-          - name: analysis-worker
-            context: apps/analysis-worker
-          - name: web-console
-            context: apps/web-console
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v4

@@ -8,6 +8,8 @@ GitHub Actions repository secrets에 DOCKERHUB_USERNAME=automaster5013 및 쓰�
 
 자동 게시 push 경로는 `apps/**`, 재사용 CI/CD workflow 두 개, GitOps 이미지 갱신 스크립트로 제한한다. 문서, 배포 digest commit, 계약 테스트만 바뀐 push는 일반 CI로 검증하되 동일 애플리케이션 이미지를 다시 빌드·게시하지 않는다. `workflow_dispatch` 수동 전체 게이트·게시 기능은 유지한다.
 
+push 실행은 두 commit 사이의 변경 경로로 게시 matrix를 생성한다. `apps/control-plane`, `apps/analysis-worker`, `apps/web-console` 중 바뀐 구성요소만 게시하며 CI/CD workflow 또는 이미지 선택·GitOps 갱신 스크립트 변경은 안전한 전체 게시를 선택한다. 수동 실행과 새 브랜치의 영(0) before SHA도 전체 게시한다. 부분 게시 artifact에는 변경된 digest만 포함되고 갱신 스크립트는 해당 Kustomize image entry만 교체해 나머지 digest를 보존한다.
+
 경로 제한을 도입한 source commit `02e8d48`은 CI run 35051379879와 Docker Hub CD run 35051380078을 통과했고 GitOps commit `9261450`으로 세 운영 Rollout이 Healthy 2/2가 됐다. 이 문단만 추가하는 후속 docs-only commit에서는 일반 CI만 생성되고 Docker Hub CD 실행이 생성되지 않는지 확인한다.
 
 사용자가 기존 AWS/Argo CD 배포를 지정했으므로 aws-demo overlay 자동 갱신을 기본 활성화한다. repository variable DOCKERHUB_AUTO_DEPLOY=false로 중단할 수 있다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.

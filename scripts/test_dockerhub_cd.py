@@ -2,8 +2,11 @@
 
 import unittest
 from pathlib import Path
+import subprocess
+import tempfile
 
 import yaml
+from scripts.select_dockerhub_images import select
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,7 +21,7 @@ class DockerHubCDTests(unittest.TestCase):
 
     def test_ci_gate_cannot_be_bypassed(self):
         self.assertEqual(self.jobs["validate"]["uses"], "./.github/workflows/ci.yml")
-        self.assertEqual(self.jobs["publish"]["needs"], "validate")
+        self.assertEqual(set(self.jobs["publish"]["needs"]), {"validate", "changes"})
         self.assertEqual(self.jobs["update-gitops"]["needs"], "publish")
         for job in self.jobs.values():
             self.assertNotIn("continue-on-error", job)
@@ -26,10 +29,12 @@ class DockerHubCDTests(unittest.TestCase):
 
     def test_all_services_publish_source_sha_and_digest(self):
         publish = self.jobs["publish"]
-        self.assertEqual(
-            {entry["name"] for entry in publish["strategy"]["matrix"]["include"]},
-            {"control-plane", "analysis-worker", "web-console"},
-        )
+        self.assertEqual(publish["strategy"]["matrix"], "${{ fromJSON(needs.changes.outputs.matrix) }}")
+        selector = str(self.jobs["changes"])
+        self.assertIn("select_dockerhub_images.py", selector)
+        self.assertIn("workflow_dispatch", selector)
+        self.assertIn("git", selector)
+        self.assertIn("diff", selector)
         build = next(step for step in publish["steps"] if step.get("id") == "build")
         self.assertIn("${{ github.sha }}", build["with"]["tags"])
         self.assertEqual(build["with"]["push"], "true")
@@ -51,6 +56,7 @@ class DockerHubCDTests(unittest.TestCase):
                 "apps/**",
                 ".github/workflows/ci.yml",
                 ".github/workflows/dockerhub-cd.yml",
+                "scripts/select_dockerhub_images.py",
                 "scripts/update_releasepilot_images.py",
             },
         )
@@ -58,6 +64,49 @@ class DockerHubCDTests(unittest.TestCase):
             self.assertNotIn(excluded, paths)
         self.assertEqual(self.workflow["concurrency"]["group"], "dockerhub-cd-main")
         self.assertEqual(self.workflow["concurrency"]["cancel-in-progress"], "false")
+
+    def test_change_selector_limits_component_and_expands_global_inputs(self):
+        self.assertEqual(
+            select({"apps/analysis-worker/src/releasepilot_analysis_worker/main.py"}),
+            {"include": [{"name": "analysis-worker", "context": "apps/analysis-worker"}]},
+        )
+        expected = {"control-plane", "analysis-worker", "web-console"}
+        for paths, select_all in (
+            ({".github/workflows/ci.yml"}, False),
+            ({"scripts/update_releasepilot_images.py"}, False),
+            (set(), True),
+        ):
+            self.assertEqual({item["name"] for item in select(paths, select_all)["include"]}, expected)
+        with self.assertRaises(ValueError):
+            select({"docs/operations/dockerhub-cd.md"})
+
+    def test_partial_digest_update_preserves_other_images(self):
+        overlay = """images:
+  - name: control-plane
+    newName: old/control
+    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - name: analysis-worker
+    newName: old/worker
+    digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  - name: web-console
+    newName: old/web
+    digest: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            digest_file = root / "digests.txt"
+            overlay_file = root / "kustomization.yaml"
+            digest_file.write_text("web-console=new/web@sha256:" + "d" * 64 + "\n")
+            overlay_file.write_text(overlay)
+            subprocess.run(
+                ["python", str(ROOT / "scripts/update_releasepilot_images.py"), str(digest_file), str(overlay_file)],
+                check=True,
+            )
+            updated = overlay_file.read_text()
+        self.assertIn("newName: new/web", updated)
+        self.assertIn("digest: sha256:" + "d" * 64, updated)
+        self.assertIn("newName: old/control", updated)
+        self.assertIn("newName: old/worker", updated)
 
 
 if __name__ == "__main__":
