@@ -366,6 +366,30 @@ test("@a11y viewer supports WCAG text spacing at 320px", async ({ page }) => {
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer honors reduced motion preferences", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const unexpected = await isolateApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "불러오기", exact: true }).click();
+  const motion = await page.evaluate(() => {
+    const elements = [document.documentElement, ...Array.from(document.querySelectorAll("body *"))];
+    return {
+      preference: matchMedia("(prefers-reduced-motion: reduce)").matches,
+      rootScrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+      offenders: elements.flatMap((element) => {
+        const style = getComputedStyle(element);
+        const animation = style.animationName !== "none" && parseFloat(style.animationDuration) > 0.01;
+        const transition = style.transitionProperty !== "none" && parseFloat(style.transitionDuration) > 0.01;
+        return animation || transition ? [element.tagName] : [];
+      }),
+    };
+  });
+  expect(motion.preference).toBe(true);
+  expect(motion.rootScrollBehavior).toBe("auto");
+  expect(motion.offenders).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
 async function reachByTab(page: Page, accessibleName: string, tagName: string) {
   await page.locator("body").focus();
   for (let index = 0; index < 40; index++) {

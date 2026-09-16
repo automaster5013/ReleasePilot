@@ -590,4 +590,28 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(await action.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} honors reduced motion preferences`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const motion = await page.evaluate(() => {
+      const elements = [document.documentElement, ...Array.from(document.querySelectorAll("body *"))];
+      return {
+        preference: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        rootScrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+        offenders: elements.flatMap((element) => {
+          const style = getComputedStyle(element);
+          const animation = style.animationName !== "none" && parseFloat(style.animationDuration) > 0.01;
+          const transition = style.transitionProperty !== "none" && parseFloat(style.transitionDuration) > 0.01;
+          return animation || transition ? [element.tagName] : [];
+        }),
+      };
+    });
+    expect(motion.preference).toBe(true);
+    expect(motion.rootScrollBehavior).toBe("auto");
+    expect(motion.offenders).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }
