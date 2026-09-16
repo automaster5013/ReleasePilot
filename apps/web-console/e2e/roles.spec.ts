@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -294,7 +294,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     if (path === "/audit-events/verify") return json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
     if (path === "/audit-events") return json({ items: audit });
     if (path === "/connections/clusters") return json(options.connections ? [{ id: "cluster-role", name: "Role cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN", status: "ACTIVE", lastValidatedAt: new Date().toISOString() }] : []);
-    if (path === "/connections/prometheus") return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
+    if (path === "/connections/prometheus") return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: options.disabledPrometheus ? "DISABLED" : "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
     if (path === "/projects") return json({ items: [{ id: "project-role", name: "Role project", key: "role", status: "ACTIVE" }] });
     if (path === "/projects/project-role/services") return json({ items: [{ id: serviceId, name: "Role service", key: "role", status: "ACTIVE" }] });
     if (path === `/services/${serviceId}/environments`) return json({ items: [{ id: environmentId, name: "Role environment", status: "ACTIVE", strategy: "CANARY" }] });
@@ -865,6 +865,32 @@ test("@a11y OPERATOR bulk connection validation errors preserve trigger focus", 
   await expect(alert).toHaveAttribute("aria-live", "assertive");
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(prometheusValidateAll).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR connection status errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { csrfBody: null, connections: true, disabledPrometheus: true });
+  await page.goto("/");
+
+  const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+  const clusterDisable = cluster.getByRole("button", { name: "비활성화", exact: true });
+  page.once("dialog", (dialog) => dialog.accept());
+  await clusterDisable.focus();
+  await clusterDisable.press("Enter");
+  let alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(clusterDisable).toBeFocused();
+
+  const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+  const prometheusEnable = prometheus.getByRole("button", { name: "재활성화", exact: true });
+  await prometheusEnable.focus();
+  await prometheusEnable.press("Enter");
+  alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(prometheusEnable).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
