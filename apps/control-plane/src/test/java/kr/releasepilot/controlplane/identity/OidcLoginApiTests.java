@@ -50,7 +50,9 @@ class OidcLoginApiTests {
 
         mvc.perform(get("/oauth2/authorization/releasepilot"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("https://idp.example/authorize?")));
+                .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("https://idp.example/authorize?")))
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("prompt=login")))
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("state=")));
     }
     @Test
     @org.springframework.transaction.annotation.Transactional
