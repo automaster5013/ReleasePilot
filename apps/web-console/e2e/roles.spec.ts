@@ -508,7 +508,7 @@ test("account switch ends the current session before opening SSO sign-in", async
 });
 
 for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
-  test(`${role} screen meets automated WCAG A and AA checks`, async ({ page }) => {
+  test(`@a11y ${role} screen meets automated WCAG A and AA checks`, async ({ page }) => {
     const state = await fixture(page, role);
     if (role === "DEVELOPER") await fillRequest(page);
     else await load(page);
@@ -519,7 +519,7 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(state.unexpected).toEqual([]);
   });
 
-  test(`${role} primary action is reachable with visible keyboard focus`, async ({ page }) => {
+  test(`@a11y ${role} primary action is reachable with visible keyboard focus`, async ({ page }) => {
     const state = await fixture(page, role);
     if (role === "DEVELOPER") await fillRequest(page);
     else await load(page);

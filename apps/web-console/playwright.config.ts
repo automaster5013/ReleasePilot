@@ -13,7 +13,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox-a11y", grep: /@a11y/, use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit-a11y", grep: /@a11y/, use: { ...devices["Desktop Safari"] } },
+  ],
   webServer: {
     command: "node scripts/start-e2e.mjs",
     url: "http://127.0.0.1:3100/health",

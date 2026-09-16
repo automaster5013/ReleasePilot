@@ -313,7 +313,7 @@ test("denied release does not leave the previous target actionable", async ({ pa
   expect(unexpected).toEqual([]);
 });
 
-test("viewer screen meets automated WCAG A and AA checks", async ({ page }) => {
+test("@a11y viewer screen meets automated WCAG A and AA checks", async ({ page }) => {
   const unexpected = await isolateApi(page);
   await login(page);
   await page.getByRole("button", { name: "불러오기", exact: true }).click();
@@ -324,7 +324,7 @@ test("viewer screen meets automated WCAG A and AA checks", async ({ page }) => {
   expect(unexpected).toEqual([]);
 });
 
-test("viewer primary controls are reachable with visible keyboard focus", async ({ page }) => {
+test("@a11y viewer primary controls are reachable with visible keyboard focus", async ({ page }) => {
   const unexpected = await isolateApi(page);
   await login(page);
   await reachByTab(page, "최근 릴리스", "SELECT");
