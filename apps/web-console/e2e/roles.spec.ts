@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -255,6 +255,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
   let csrfRequests = 0;
   let clusterListRequests = 0;
   let prometheusListRequests = 0;
+  let releaseListRequests = 0;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -313,7 +314,11 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     if (path === "/projects/project-role/services") return json({ items: [{ id: serviceId, name: "Role service", key: "role", status: "ACTIVE" }] });
     if (path === `/services/${serviceId}/environments`) return json({ items: [{ id: environmentId, name: "Role environment", status: "ACTIVE", strategy: "CANARY" }] });
     if (path === `/environments/${environmentId}/validation-results/latest`) return json({ environmentId, status: "ACTIVE", checkedAt: new Date().toISOString(), validUntil: options.stale ? "2020-01-01T00:00:00Z" : "2099-01-01T00:00:00Z", checks: [{ code: "FIXTURE_READY", outcome: "PASS", message: "Isolated readiness" }] });
-    if (path === "/releases") return json({ items: [{ id: "role-release", version: "v-role", status, createdAt: new Date().toISOString(), context: { serviceName: "Role service", environmentName: "Role environment" } }] });
+    if (path === "/releases") {
+      releaseListRequests++;
+      if (options.releaseRefreshFailure && releaseListRequests > 1) return json({ code: "RELEASES_UNAVAILABLE" }, 503);
+      return json({ items: [{ id: "role-release", version: "v-role", status, createdAt: new Date().toISOString(), context: { serviceName: "Role service", environmentName: "Role environment" } }] });
+    }
     if (path === "/releases/role-release/analyses") return json([]);
     if (path === "/releases/role-release/events") return route.fulfill({ contentType: "text/event-stream", body: `event: release-state\ndata: ${JSON.stringify({ releaseStatus: status, steps: [] })}\n\n` });
     if (path === "/releases/role-release") return json({ id: "role-release", environmentId, version: "v-role", status, createdAt: new Date().toISOString(), imageRepository: "example.invalid/role", imageDigest: `sha256:${"a".repeat(64)}`, changeSummary: "Role fixture", commitSha: "a".repeat(40), pipelineUrl: "https://example.invalid/role", context: { serviceName: "Role service", environmentName: "Role environment" }, requester: { displayName: "Other requester", username: "other" }, policySnapshot: { name: "Role policy", checksum: "role-policy", definition: { strategy: "CANARY", steps: [], metrics: [] } } });
@@ -968,6 +973,21 @@ test("@a11y OPERATOR connection refresh errors preserve trigger focus", async ({
   await refresh.focus();
   await refresh.press("Enter");
   const alert = page.getByRole("alert").filter({ hasText: /연결 목록을 불러올 수 없습니다/ });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(refresh).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { releaseRefreshFailure: true });
+  await page.goto("/");
+
+  const refresh = page.getByRole("button", { name: "최근 릴리스 새로고침", exact: true });
+  await refresh.focus();
+  await refresh.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: "최근 릴리스를 불러올 수 없습니다." });
   await expect(alert).toHaveAttribute("aria-live", "assertive");
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(refresh).toBeFocused();

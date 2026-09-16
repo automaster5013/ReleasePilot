@@ -172,7 +172,8 @@ export default function Home() {
     }
   }, []);
 
-  const refreshReleases = useCallback(async () => {
+  const refreshReleases = useCallback(async (trigger: HTMLElement | null = null) => {
+    if (trigger) setError("");
     setReleaseListBusy(true);
     try {
       const response = await fetch("/control-api/releases?limit=20", { credentials: "include" });
@@ -182,6 +183,7 @@ export default function Home() {
       setReleaseId((current) => current || page.items[0]?.id || "");
     } catch {
       setError("최근 릴리스를 불러올 수 없습니다.");
+      if (trigger) restoreFocusAfterRender(trigger);
     } finally {
       setReleaseListBusy(false);
     }
@@ -947,7 +949,7 @@ export default function Home() {
       <section className={styles.shell} id="main-content" tabIndex={-1}>
         <header className={styles.topline}>
           <div><p>RELEASE OPERATIONS</p><h1 id="control-room-title">Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
-          <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy}>불러오기</button><button type="button" className={browserStyles.refresh} onClick={() => void refreshReleases()} disabled={!sessionUser || releaseListBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
+          <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy}>불러오기</button><button type="button" className={browserStyles.refresh} onClick={(event) => void refreshReleases(event.currentTarget)} disabled={!sessionUser || releaseListBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
         </header>
         {error && <p id={activeReleaseValidationIssue ? "release-request-error" : undefined} className={styles.error} role="alert" aria-live="assertive" aria-atomic="true">{error}</p>}
         {!release && <p className={styles.sampleNotice} role="note">예시 화면입니다. 아래 릴리스 상태와 판정 근거는 샘플 데이터이며 실제 운영 결과가 아닙니다. 실제 데이터를 확인하려면 최근 릴리스를 선택해 불러오세요.</p>}
