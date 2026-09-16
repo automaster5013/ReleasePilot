@@ -486,3 +486,22 @@ for (const role of ["OPERATOR", "DEVELOPER", "APPROVER"] as const) {
     await expect(identity).toContainText(role);
   });
 }
+
+test("account switch ends the current session before opening SSO sign-in", async ({ page }) => {
+  await fixture(page, "APPROVER");
+  let loggedOut = false;
+  await page.route("**/control-api/session/providers", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ oidc: true, loginUrl: "/oauth2/authorization/releasepilot" }) }));
+  await page.route("**/control-api/session/logout", route => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().headers()["x-csrf-token"]).toBe("role-fixture-csrf");
+    loggedOut = true;
+    return route.fulfill({ status: 204 });
+  });
+  await page.route("**/oauth2/authorization/releasepilot", route => {
+    expect(loggedOut).toBe(true);
+    return route.fulfill({ contentType: "text/html", body: "<meta charset=\"utf-8\"><h1>다른 계정으로 로그인</h1>" });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "계정 변경", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "다른 계정으로 로그인" })).toBeVisible();
+});

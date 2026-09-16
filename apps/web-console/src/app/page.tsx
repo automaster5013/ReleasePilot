@@ -283,7 +283,7 @@ export default function Home() {
     return () => controller.abort();
   }, [releaseDraft.environmentId, sessionUser]);
 
-  async function logout() {
+  async function logout(changeAccount = false) {
     if (logoutInFlight.current) return;
     logoutInFlight.current = true;
     setLogoutBusy(true);
@@ -294,8 +294,7 @@ export default function Home() {
       });
       if (!response.ok) throw new Error("로그아웃하지 못했습니다. 다시 시도해 주세요.");
       // A full document navigation discards authenticated state and pending requests.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign("/");
+      window.location.assign(changeAccount && authenticationProviders.loginUrl ? authenticationProviders.loginUrl : "/");
     } catch (failure) {
       setError((failure as Error).message);
       logoutInFlight.current = false;
@@ -806,7 +805,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button>}</div>
+        <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <>{authenticationProviders.oidc && authenticationProviders.loginUrl && <button onClick={() => void logout(true)} disabled={logoutBusy}>계정 변경</button>}<button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button></>}</div>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>
@@ -871,7 +870,7 @@ export default function Home() {
         <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
           <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={() => void revokeOtherSessions()} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}
-          {sessionUser && !sessionUser.demo && authenticationProviders.oidc && <p className={sessionStyles.sessionEmpty}>로그아웃하면 ReleasePilot 세션이 종료됩니다. Cognito 로그인 상태는 유지될 수 있어 조직 SSO를 다시 선택하면 비밀번호 입력 없이 로그인될 수 있습니다.</p>}
+          {sessionUser && !sessionUser.demo && authenticationProviders.oidc && <p className={sessionStyles.sessionEmpty}>로그아웃하면 ReleasePilot 세션이 종료됩니다. 다른 계정으로 로그인하려면 상단의 계정 변경을 선택하고 원하는 이메일과 비밀번호로 인증하세요. 조직 SSO도 매번 로그인 화면을 표시합니다.</p>}
           {sessionUser?.demo && <p className={sessionStyles.sessionEmpty}>공유 데모에서는 다른 방문자의 연결을 보호하기 위해 세션 관리가 비활성화됩니다.</p>}
           {canManageSessions(sessionUser) && <div className={sessionStyles.sessionList}>{activeSessions.map((item) => <article key={item.reference}><div><strong>{item.current ? "현재 세션" : "활성 세션"}</strong><code>{item.reference}</code><small>최근 사용 {formatSessionTime(item.lastAccessedAt)} · 만료 {formatSessionTime(item.expiresAt)}</small></div><button onClick={() => void revokeSession(item)} disabled={sessionBusy}>{item.current ? "로그아웃" : "종료"}</button></article>)}</div>}
           {sessionNotice && <p className={sessionStyles.sessionNotice} role="status">{sessionNotice}</p>}

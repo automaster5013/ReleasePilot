@@ -47,7 +47,12 @@ public class SecurityConfiguration {
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
         if (oidcEnabled && clientRegistrations.getIfAvailable() != null) {
+            var authorizationRequests = new org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver(
+                    clientRegistrations.getObject(), "/oauth2/authorization");
+            authorizationRequests.setAuthorizationRequestCustomizer(builder ->
+                    builder.additionalParameters(parameters -> parameters.put("prompt", "login")));
             http.oauth2Login(oauth -> oauth
+                    .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(authorizationRequests))
                     .successHandler(oidcSuccessHandler)
                     .failureHandler(new SimpleUrlAuthenticationFailureHandler("/?loginError=oidc")));
         }
