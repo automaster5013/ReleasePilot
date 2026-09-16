@@ -125,6 +125,7 @@ export default function Home() {
   const [clusterConnections, setClusterConnections] = useState<ClusterConnection[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState("");
   const [connectionNotice, setConnectionNotice] = useState("");
+  const [connectionCreateError, setConnectionCreateError] = useState("");
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
   const [prometheusDraft, setPrometheusDraft] = useState<PrometheusConnectionDraft>(emptyPrometheusDraft);
   const [connectionValidationIssue, setConnectionValidationIssue] = useState<{ kind: "cluster"; field: keyof ClusterConnectionDraft; message: string } | { kind: "prometheus"; field: keyof PrometheusConnectionDraft; message: string } | null>(null);
@@ -633,9 +634,11 @@ export default function Home() {
 
   async function createClusterConnection(event: FormEvent) {
     event.preventDefault();
+    const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const validation = clusterConnectionDraftIssue(clusterDraft);
-    if (validation) { setConnectionValidationIssue({ kind: "cluster", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="cluster-${validation.field}"]`)); return; }
+    if (validation) { setConnectionCreateError(""); setConnectionValidationIssue({ kind: "cluster", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="cluster-${validation.field}"]`)); return; }
     setConnectionValidationIssue(null);
+    setConnectionCreateError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
       const response = await fetch("/control-api/connections/clusters", {
@@ -645,7 +648,12 @@ export default function Home() {
       const problem = await response.json().catch(() => null) as { detail?: string } | null;
       if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 등록이 거부되었습니다.");
       setClusterDraft(emptyClusterDraft); await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
-    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    } catch (failure) {
+      const message = (failure as Error).message;
+      setConnectionCreateError(message);
+      setConnectionNotice(message);
+      restoreFocusAfterRender(trigger);
+    }
     finally { setConnectionCreateBusy(false); }
   }
 
@@ -653,6 +661,7 @@ export default function Home() {
     setClusterDraft((current) => ({ ...current, [field]: value }));
     if (connectionValidationIssue?.kind === "cluster" && connectionValidationIssue.field === field) {
       setConnectionValidationIssue(null);
+      setConnectionCreateError("");
       setConnectionNotice("");
     }
   }
@@ -661,15 +670,18 @@ export default function Home() {
     setPrometheusDraft((current) => ({ ...current, [field]: value }));
     if (connectionValidationIssue?.kind === "prometheus" && connectionValidationIssue.field === field) {
       setConnectionValidationIssue(null);
+      setConnectionCreateError("");
       setConnectionNotice("");
     }
   }
 
   async function createPrometheusConnection(event: FormEvent) {
     event.preventDefault();
+    const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const validation = prometheusConnectionDraftIssue(prometheusDraft);
-    if (validation) { setConnectionValidationIssue({ kind: "prometheus", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="prometheus-${validation.field}"]`)); return; }
+    if (validation) { setConnectionCreateError(""); setConnectionValidationIssue({ kind: "prometheus", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="prometheus-${validation.field}"]`)); return; }
     setConnectionValidationIssue(null);
+    setConnectionCreateError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
       const response = await fetch("/control-api/connections/prometheus", {
@@ -679,7 +691,12 @@ export default function Home() {
       const problem = await response.json().catch(() => null) as { detail?: string } | null;
       if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 등록이 거부되었습니다.");
       setPrometheusDraft(emptyPrometheusDraft); await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
-    } catch (failure) { setConnectionNotice((failure as Error).message); }
+    } catch (failure) {
+      const message = (failure as Error).message;
+      setConnectionCreateError(message);
+      setConnectionNotice(message);
+      restoreFocusAfterRender(trigger);
+    }
     finally { setConnectionCreateBusy(false); }
   }
 
@@ -857,6 +874,7 @@ export default function Home() {
     "aria-errormessage": activeReleaseValidationIssue?.field === field ? "release-request-error" : undefined,
   });
   const activeConnectionValidationIssue = connectionValidationIssue?.message === connectionNotice ? connectionValidationIssue : null;
+  const activeConnectionCreateError = connectionCreateError === connectionNotice;
   const connectionFieldAccessibility = (kind: "cluster" | "prometheus", field: keyof ClusterConnectionDraft | keyof PrometheusConnectionDraft) => ({
     "data-connection-field": `${kind}-${field}`,
     "aria-invalid": activeConnectionValidationIssue?.kind === kind && activeConnectionValidationIssue.field === field || undefined,
@@ -908,7 +926,7 @@ export default function Home() {
           <h3>Prometheus</h3>
           <ConnectionFilters query={prometheusQuery} filter={prometheusFilter} label="Prometheus 연결" onQuery={setPrometheusQuery} onFilter={setPrometheusFilter} />
           {filteredPrometheusConnections.length ? <div className={sessionStyles.connectionList}>{filteredPrometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void editPrometheusConnection(item)} disabled={Boolean(connectionBusyId)}>편집</button><button type="button" onClick={() => void setConnectionEnabled("prometheus", item)} disabled={Boolean(connectionBusyId)}>{item.status === "DISABLED" ? "재활성화" : "비활성화"}</button><button type="button" onClick={() => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId) || item.status === "DISABLED"}>{connectionBusyId === item.id ? "처리 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>{prometheusConnections.length ? "검색 조건에 맞는 Prometheus 연결이 없습니다." : "등록된 Prometheus 연결이 없습니다."}</p>}
-          {connectionNotice && <p id={activeConnectionValidationIssue ? "connection-form-error" : undefined} className={sessionStyles.sessionNotice} role={activeConnectionValidationIssue ? "alert" : "status"} aria-live={activeConnectionValidationIssue ? "assertive" : "polite"} aria-atomic="true">{connectionNotice}</p>}
+          {connectionNotice && <p id={activeConnectionValidationIssue ? "connection-form-error" : undefined} className={sessionStyles.sessionNotice} role={activeConnectionValidationIssue || activeConnectionCreateError ? "alert" : "status"} aria-live={activeConnectionValidationIssue || activeConnectionCreateError ? "assertive" : "polite"} aria-atomic="true">{connectionNotice}</p>}
         </section>}
         <section className={styles.grid}>
           <article className={styles.releaseCard}>

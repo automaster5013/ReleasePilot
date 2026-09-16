@@ -788,6 +788,38 @@ test("@a11y OPERATOR connection validation identifies and focuses invalid fields
   expect(state.unexpected).toEqual([]);
 });
 
+test("@a11y OPERATOR connection registration errors preserve submit focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { csrfBody: null });
+  await page.goto("/");
+  await page.getByText("NEW CONNECTION", { exact: false }).click();
+
+  const clusterForm = page.locator("form").filter({ has: page.getByText("Kubernetes cluster", { exact: true }) });
+  await clusterForm.getByLabel("Name", { exact: true }).fill("Production cluster");
+  await clusterForm.getByLabel("API server", { exact: true }).fill("https://cluster.example");
+  await clusterForm.getByLabel("Allowed namespaces", { exact: true }).fill("releasepilot");
+  await clusterForm.getByLabel("Secret reference", { exact: true }).fill("env:KUBERNETES_TOKEN");
+  const clusterSubmit = clusterForm.getByRole("button", { name: "Cluster 등록", exact: true });
+  await clusterSubmit.focus();
+  await clusterSubmit.press("Enter");
+  let alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(clusterSubmit).toBeFocused();
+
+  const prometheusForm = page.locator("form").filter({ has: page.getByText("Prometheus", { exact: true }) });
+  await prometheusForm.getByLabel("Name", { exact: true }).fill("Production metrics");
+  await prometheusForm.getByLabel("Base URL", { exact: true }).fill("https://metrics.example");
+  const prometheusSubmit = prometheusForm.getByRole("button", { name: "Prometheus 등록", exact: true });
+  await prometheusSubmit.focus();
+  await prometheusSubmit.press("Enter");
+  alert = page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(prometheusSubmit).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
