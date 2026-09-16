@@ -10,6 +10,8 @@ GitHub Actions repository secrets에 DOCKERHUB_USERNAME=automaster5013 및 쓰�
 
 실제 fail-closed 검증에서 source commit `5e063d1`의 Docker Hub CD run 35054627588은 control-plane의 Tomcat 11.0.24와 analysis-worker Debian 이미지의 perl-base에서 수정 가능한 CRITICAL 취약점을 발견해 GitOps 전에 실패했다. Tomcat 11.0.25 고정과 Debian 보안 업데이트를 적용한 source commit `3201c8e`는 CI run 35055102360과 Docker Hub CD run 35055102462를 통과했다. GitOps commit `43c49e5`가 두 새 digest를 반영했고, Canary 경계 자동 검증 성공 뒤 수동 전체 승격하여 두 Rollout과 기존 web-console이 모두 Healthy 2/2, Argo CD Synced/Healthy, 공개 readiness HTTP 200임을 확인했다.
 
+취약점 검사를 통과한 각 digest에는 `actions/attest` v4의 검증된 commit SHA로 GitHub Actions OIDC 기반 build provenance를 생성해 Docker Hub OCI registry에 게시한다. 이어서 `gh attestation verify`가 `automaster5013/ReleasePilot` 저장소를 발급 주체로 같은 digest를 검증해야 digest artifact를 생성한다. publish job에는 contents read, id-token write, attestations write, packages write만 부여한다. source commit `5490a53`의 CI run 35056609472와 Docker Hub CD run 35056609769에서 세 이미지의 attest/verify가 모두 성공했고, GitOps commit `6287d64` 반영과 Canary 경계 확인 뒤 수동 승격하여 세 Rollout Healthy 2/2, Argo CD Synced/Healthy, 공개 readiness HTTP 200을 확인했다. 현재 강제 지점은 CD의 GitOps 이전이며, 클러스터에서 임의의 수동 이미지 변경까지 거부하는 admission policy는 아직 설치하지 않았다.
+
 자동 게시 push 경로는 `apps/**`, 재사용 CI/CD workflow 두 개, GitOps 이미지 갱신 스크립트로 제한한다. 문서, 배포 digest commit, 계약 테스트만 바뀐 push는 일반 CI로 검증하되 동일 애플리케이션 이미지를 다시 빌드·게시하지 않는다. `workflow_dispatch` 수동 전체 게이트·게시 기능은 유지한다.
 
 push 실행은 두 commit 사이의 변경 경로로 게시 matrix를 생성한다. `apps/control-plane`, `apps/analysis-worker`, `apps/web-console` 중 바뀐 구성요소만 게시하며 CI/CD workflow 또는 이미지 선택·GitOps 갱신 스크립트 변경은 안전한 전체 게시를 선택한다. 수동 실행과 새 브랜치의 영(0) before SHA도 전체 게시한다. 부분 게시 artifact에는 변경된 digest만 포함되고 갱신 스크립트는 해당 Kustomize image entry만 교체해 나머지 digest를 보존한다.
