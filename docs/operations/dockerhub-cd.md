@@ -1,10 +1,12 @@
 # Docker Hub CI/CD
 
-main push 또는 수동 실행 → 같은 commit의 재사용 CI 6개 검증 → 세 서비스 이미지 병렬 게시 → 선택적 GitOps digest 갱신.
+이미지 입력 경로의 main push 또는 수동 실행 → 같은 commit의 재사용 CI 6개 검증 → 세 서비스 이미지 병렬 게시 → 선택적 GitOps digest 갱신.
 
 GitHub Actions repository secrets에 DOCKERHUB_USERNAME=automaster5013 및 쓰기 권한 PAT인 DOCKERHUB_TOKEN을 등록한다. 토큰은 채팅이나 Git 파일에 저장하지 않는다. Docker Hub에 releasepilot-control-plane, releasepilot-analysis-worker, releasepilot-web-console 저장소를 준비한다. 기존 AWS 노드가 인증 없이 pull하려면 public 저장소가 필요하며 private 사용 시 별도 imagePullSecret을 구성해야 한다.
 
 태그는 소스 commit SHA이며 배포는 게시 결과의 sha256 digest로 고정한다. 세 게시 job 성공 전에는 배포 파일을 갱신하지 않는다. `dockerhub-cd-main` concurrency group은 실행을 직렬화하고 실행 중 작업을 취소하지 않는다. 오래된 소스의 배포는 main HEAD 검사로 건너뛰며 동일 digest는 commit을 만들지 않는다. 배포 파일만 바뀐 push는 새 Docker Hub CD를 실행하지 않는다. 기존 ECR release workflow는 유지된다. 병행 ECR release와 Docker Hub 배포는 운영 시 조정해야 한다.
+
+자동 게시 push 경로는 `apps/**`, 재사용 CI/CD workflow 두 개, GitOps 이미지 갱신 스크립트로 제한한다. 문서, 배포 digest commit, 계약 테스트만 바뀐 push는 일반 CI로 검증하되 동일 애플리케이션 이미지를 다시 빌드·게시하지 않는다. `workflow_dispatch` 수동 전체 게이트·게시 기능은 유지한다.
 
 사용자가 기존 AWS/Argo CD 배포를 지정했으므로 aws-demo overlay 자동 갱신을 기본 활성화한다. repository variable DOCKERHUB_AUTO_DEPLOY=false로 중단할 수 있다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.
 

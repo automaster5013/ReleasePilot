@@ -2,7 +2,11 @@ name: Docker Hub CD
 on:
   push:
     branches: [main]
-    paths-ignore: ['deploy/**']
+    paths:
+      - 'apps/**'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/dockerhub-cd.yml'
+      - 'scripts/update_releasepilot_images.py'
   workflow_dispatch:
 permissions:
   contents: read

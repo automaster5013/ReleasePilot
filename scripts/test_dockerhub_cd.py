@@ -44,7 +44,18 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertIn("git diff --cached --quiet", command)
 
     def test_deployment_commit_does_not_trigger_publication_loop(self):
-        self.assertIn("deploy/**", self.workflow["on"]["push"]["paths-ignore"])
+        paths = set(self.workflow["on"]["push"]["paths"])
+        self.assertEqual(
+            paths,
+            {
+                "apps/**",
+                ".github/workflows/ci.yml",
+                ".github/workflows/dockerhub-cd.yml",
+                "scripts/update_releasepilot_images.py",
+            },
+        )
+        for excluded in ("docs/**", "deploy/**", "scripts/test_dockerhub_cd.py"):
+            self.assertNotIn(excluded, paths)
         self.assertEqual(self.workflow["concurrency"]["group"], "dockerhub-cd-main")
         self.assertEqual(self.workflow["concurrency"]["cancel-in-progress"], "false")
 
