@@ -23,11 +23,12 @@ spec:
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       jsonPointers:
-        - /webhooks/0/clientConfig/caBundle
+        # policy-controller expands the chart's bootstrap webhook at runtime.
+        - /webhooks
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       jsonPointers:
-        - /webhooks/0/clientConfig/caBundle
+        - /webhooks
   syncPolicy:
     automated:
       prune: true

@@ -15,4 +15,6 @@ kubectl wait --for=jsonpath='{.status.health.status}'=Healthy `
 
 설치 후 리소스 수명주기는 Argo CD가 담당한다. 수동 `helm upgrade`를 함께 실행하지 않는다. `deploy/argocd/kustomization.yaml`은 이미 준비된 클러스터에서 모든 Application 선언을 한 번에 등록하는 부트스트랩 진입점이다.
 
+policy-controller는 chart가 만든 최소 webhook 정의에 인증서, rules, selector를 런타임에 채운다. Argo CD는 해당 두 webhook의 `webhooks` 배열을 drift 비교에서 제외하고 chart values, Deployment, RBAC, CRD 및 나머지 리소스를 계속 조정한다. `failurePolicy: Fail`과 replica/PDB/affinity는 저장소 테스트와 운영 검증에서 별도로 확인한다.
+
 두 Helm release와 webhook Pod가 준비된 뒤에만 `releasepilot` namespace의 `policy.sigstore.dev/include=true` label을 적용한다. 저장소의 namespace manifest가 이 label을 유지한다. 장애 시 label을 제거하면 새 Pod admission 강제를 중단할 수 있으며, controller나 trust policy 삭제보다 먼저 수행한다.
