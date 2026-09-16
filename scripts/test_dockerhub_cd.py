@@ -2,6 +2,7 @@
 
 import unittest
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -252,6 +253,30 @@ class DockerHubCDTests(unittest.TestCase):
         for line in platform.splitlines():
             if "kubectl apply" in line:
                 self.assertNotIn("https://", line)
+
+    def test_all_external_github_actions_are_commit_pinned(self):
+        node24_actions = {
+            "actions/checkout": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+            "actions/setup-java": "b6effb05e454b25005698d916606bdc6ffcbf961",
+            "actions/setup-node": "a0853c24544627f65ddf259abe73b1d18a591444",
+            "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
+            "gitleaks/gitleaks-action": "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e",
+            "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
+        }
+        observed = {}
+        for workflow in (ROOT / ".github/workflows").glob("*.yml"):
+            for reference in re.findall(r"uses:\s*([^\s#]+)", workflow.read_text()):
+                if reference.startswith("./"):
+                    continue
+                action, revision = reference.rsplit("@", 1)
+                self.assertRegex(
+                    revision,
+                    r"^[0-9a-f]{40}$",
+                    f"{workflow.name}: {reference} must use an immutable commit",
+                )
+                observed.setdefault(action, set()).add(revision)
+        for action, revision in node24_actions.items():
+            self.assertEqual(observed.get(action), {revision})
 
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
