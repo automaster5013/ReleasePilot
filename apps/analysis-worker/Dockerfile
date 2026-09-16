@@ -1,5 +1,8 @@
 FROM ghcr.io/astral-sh/uv:0.12.13 AS uv
 FROM python:3.14-slim
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /uvx /bin/
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
