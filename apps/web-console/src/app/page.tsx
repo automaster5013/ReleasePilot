@@ -525,11 +525,12 @@ export default function Home() {
     updateDraft("environmentId", value);
   }
 
-  async function revalidateEnvironment() {
+  async function revalidateEnvironment(trigger: HTMLElement | null = null) {
     if (!releaseDraft.environmentId || !canRevalidateEnvironment(sessionUser?.roles ?? []) || environmentValidationBusy || requestBusy) return;
     if (!requestInFlight.current.tryAcquire()) return;
     const environmentId = releaseDraft.environmentId;
     const isCurrent = latestEnvironmentValidation.current.begin();
+    setError("");
     setEnvironmentValidation(null);
     setEnvironmentValidationBusy(true); setEnvironmentValidationNotice("환경 재검증 중에는 릴리스를 요청할 수 없습니다.");
     try {
@@ -543,7 +544,11 @@ export default function Home() {
       setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
       await refreshEnvironmentAudit(result.environmentId);
     } catch (failure) {
-      if (isCurrent() && selectedEnvironmentId.current === environmentId) setEnvironmentValidationNotice((failure as Error).message);
+      if (isCurrent() && selectedEnvironmentId.current === environmentId) {
+        setEnvironmentValidationNotice("");
+        setError((failure as Error).message);
+        restoreFocusAfterRender(trigger);
+      }
     } finally {
       requestInFlight.current.release();
       setEnvironmentValidationBusy(false);
@@ -966,7 +971,7 @@ export default function Home() {
             <label>Project<select required value={projectId} onChange={(event) => selectProject(event.target.value)}><option value="">{projects.length ? "프로젝트 선택" : "활성 프로젝트 없음"}</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Service<select {...releaseFieldAccessibility("serviceId")} required disabled={!projectId} value={releaseDraft.serviceId} onChange={(event) => selectService(event.target.value)}><option value="">{projectId && !services.length ? "활성 서비스 없음" : "서비스 선택"}</option>{services.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.key})</option>)}</select></label>
             <label>Environment<select {...releaseFieldAccessibility("environmentId")} required disabled={!releaseDraft.serviceId} value={releaseDraft.environmentId} onChange={(event) => selectEnvironment(event.target.value)}><option value="">{releaseDraft.serviceId && !environments.length ? "검증된 환경 없음" : "검증된 환경 선택"}</option>{environments.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.strategy}</option>)}</select></label>
-            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation, connectionClock)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={() => void revalidateEnvironment()} disabled={environmentValidationBusy || requestBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")} · 유효 기한 {new Date(environmentValidation.validUntil).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <div className={sessionStyles.environmentAudit}><strong>REVALIDATION HISTORY</strong>{environmentAuditEvents.length ? environmentAuditEvents.map((event) => <span key={event.id}>{auditEventLabel(event)} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</span>) : <span>기록된 재검증 이력이 없습니다.</span>}</div>}</section>}
+            {releaseDraft.environmentId && <section className={sessionStyles.environmentValidation} aria-live="polite"><header><strong>ENVIRONMENT READINESS</strong><div>{environmentValidation && <span data-status={environmentValidation.status}>{environmentValidation.status} · {environmentValidationSummary(environmentValidation, connectionClock)}</span>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <button type="button" onClick={(event) => void revalidateEnvironment(event.currentTarget)} disabled={environmentValidationBusy || requestBusy}>{environmentValidationBusy ? "재검증 중…" : "지금 재검증"}</button>}</div></header>{environmentValidation ? <><small>최근 점검 {new Date(environmentValidation.checkedAt).toLocaleString("ko-KR")} · 유효 기한 {new Date(environmentValidation.validUntil).toLocaleString("ko-KR")}</small><ul>{environmentValidation.checks.map((check) => <li key={check.code} data-outcome={check.outcome}><b>{check.outcome}</b><span><strong>{check.code}</strong><small>{check.message}</small></span></li>)}</ul></> : <p>{environmentValidationNotice || "최신 점검 결과를 불러오는 중…"}</p>}{environmentValidationNotice && environmentValidation && <p>{environmentValidationNotice}</p>}{canRevalidateEnvironment(sessionUser?.roles ?? []) && <div className={sessionStyles.environmentAudit}><strong>REVALIDATION HISTORY</strong>{environmentAuditEvents.length ? environmentAuditEvents.map((event) => <span key={event.id}>{auditEventLabel(event)} · {new Date(event.occurredAt).toLocaleString("ko-KR")} · chain #{event.chainSequence ?? "—"}</span>) : <span>기록된 재검증 이력이 없습니다.</span>}</div>}</section>}
             <label>Version<input {...releaseFieldAccessibility("version")} required maxLength={100} value={releaseDraft.version} onChange={(event) => updateDraft("version", event.target.value)} placeholder="v1.2.3" /></label>
             <label>Image repository<input {...releaseFieldAccessibility("imageRepository")} required maxLength={500} value={releaseDraft.imageRepository} onChange={(event) => updateDraft("imageRepository", event.target.value)} placeholder="registry.example/team/app" /></label>
             <label className={sessionStyles.wide}>Image digest<input {...releaseFieldAccessibility("imageDigest")} required pattern="sha256:[a-f0-9]{64}" value={releaseDraft.imageDigest} onChange={(event) => updateDraft("imageDigest", event.target.value)} placeholder="sha256:…" /></label>

@@ -266,13 +266,14 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     if (request.method() !== "GET") {
       const sessionMutation = role === "OPERATOR" && path === "/session/revoke-others";
       const individualSessionMutation = role === "OPERATOR" && request.method() === "DELETE" && path === "/session/active/other-session";
+      const environmentValidationMutation = role === "OPERATOR" && path === `/environments/${environmentId}/validate`;
       const permitted = (request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
-        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation))
+        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation))
       )) || individualSessionMutation;
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          (!sessionMutation && !individualSessionMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
+          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
@@ -1046,6 +1047,21 @@ test("@a11y OPERATOR individual session revoke errors preserve trigger focus", a
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(revoke).toBeFocused();
   expect(state.mutations).toEqual([{ path: "/session/active/other-session", body: null }]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR environment revalidation errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { failure: "ENVIRONMENT_VALIDATION_REJECTED" });
+  await fillRequest(page);
+
+  const revalidate = page.getByRole("button", { name: "지금 재검증", exact: true });
+  await revalidate.focus();
+  await revalidate.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: "환경 재검증 요청이 거부되었습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(revalidate).toBeFocused();
+  expect(state.mutations).toEqual([{ path: `/environments/${environmentId}/validate`, body: null }]);
   expect(state.unexpected).toEqual([]);
 });
 
