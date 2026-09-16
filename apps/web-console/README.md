@@ -30,6 +30,8 @@ npm run dev
 
 `http://localhost:3000`에서 확인합니다. `/health`는 컨테이너 probe용 JSON 응답을 제공합니다.
 
+main의 web-console 입력 변경은 Docker Hub CD에서 web-console 이미지만 다시 게시하고 해당 GitOps digest만 갱신합니다.
+
 ## 검사
 
 ```powershell
