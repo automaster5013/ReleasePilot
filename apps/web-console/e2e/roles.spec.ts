@@ -722,6 +722,20 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(state.mutations).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} error announcements preserve the triggering control focus`, async ({ page }) => {
+    const state = await fixture(page, role, { csrfBody: null });
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const button = page.getByRole("button", { name: role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Abort", exact: true });
+    if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Accessibility focus fixture"));
+    await button.focus();
+    await button.press("Enter");
+    await expect(page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." })).toBeVisible();
+    await expect(button).toBeFocused();
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {

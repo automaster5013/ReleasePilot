@@ -494,6 +494,18 @@ test("@a11y viewer error messages use a consistent assertive atomic contract", a
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer error announcements preserve the triggering control focus", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await page.route("**/control-api/session/demo", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "{broken"}));
+  await page.goto("/");
+  const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+  await button.focus();
+  await button.press("Enter");
+  await expect(page.locator('[role="alert"]').filter({ hasText: /\S/ }).first()).toBeVisible();
+  await expect(button).toBeFocused();
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();

@@ -31,6 +31,14 @@ type Analysis = {
   reasonCode: string | null;
   evidence: Evidence[];
 };
+
+function restoreFocusAfterRender(element: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (element?.isConnected && !(element instanceof HTMLButtonElement && element.disabled)) element.focus();
+    });
+  });
+}
 type PolicyStep = { weight: number; minimumObservationSeconds: number };
 type PolicyMetric = { key: string; threshold: number; comparison?: string; route?: string; importance?: string };
 type Release = {
@@ -283,7 +291,7 @@ export default function Home() {
     return () => controller.abort();
   }, [releaseDraft.environmentId, sessionUser]);
 
-  async function logout(changeAccount = false) {
+  async function logout(changeAccount = false, trigger: HTMLElement | null = null) {
     if (logoutInFlight.current) return;
     logoutInFlight.current = true;
     setLogoutBusy(true);
@@ -299,11 +307,13 @@ export default function Home() {
       setError((failure as Error).message);
       logoutInFlight.current = false;
       setLogoutBusy(false);
+      restoreFocusAfterRender(trigger);
     }
   }
 
-  async function startDemo() {
+  async function startDemo(trigger: HTMLElement | null = null) {
     if (demoBusy) return;
+    let failed = true;
     setDemoBusy(true);
     setError("");
     try {
@@ -315,10 +325,12 @@ export default function Home() {
     setAuditIntegrity(null);
     setCanOperate(session.user.roles.includes("OPERATOR"));
     await refreshReleases();
+    failed = false;
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
       setDemoBusy(false);
+      if (failed) restoreFocusAfterRender(trigger);
     }
   }
 
@@ -525,6 +537,7 @@ export default function Home() {
 
   async function requestRelease(event: FormEvent) {
     event.preventDefault();
+    const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     if (requestBusy || environmentValidationBusy || !canRequestRelease(sessionUser?.roles ?? [])) return;
     const validation = validateReleaseDraft(releaseDraft);
     if (validation) { setError(validation); return; }
@@ -562,6 +575,7 @@ export default function Home() {
       await load(created.id);
     } catch (failure) {
       setError((failure as Error).message);
+      restoreFocusAfterRender(trigger);
     } finally {
       requestInFlight.current.release();
       setRequestBusy(false);
@@ -717,7 +731,7 @@ export default function Home() {
     finally { setConnectionAuditBusy(false); }
   }
 
-  async function operate(action: "promote" | "pause" | "resume" | "abort") {
+  async function operate(action: "promote" | "pause" | "resume" | "abort", trigger: HTMLElement | null = null) {
     if (!activeId || operationInFlight.current) return;
     const targetId = activeId;
     const isCurrent = latestReleaseLoad.current.snapshot();
@@ -745,14 +759,17 @@ export default function Home() {
       setOperationNotice(`${action} 요청이 접수되었습니다.`);
       await refreshAudit(targetId, isCurrent);
     } catch (failure) {
-      if (isCurrent()) setError((failure as Error).message);
+      if (isCurrent()) {
+        setError((failure as Error).message);
+        restoreFocusAfterRender(trigger);
+      }
     } finally {
       operationInFlight.current = false;
       setOperationBusy(false);
     }
   }
 
-  async function decide(action: "approve" | "reject") {
+  async function decide(action: "approve" | "reject", trigger: HTMLElement | null = null) {
     if (!activeId || operationInFlight.current) return;
     if (action === "approve" && !environmentAllowsRelease(approvalEnvironmentValidation)) {
       setError("환경 검증이 만료되었거나 사용할 수 없습니다. 재검증 후 승인하세요.");
@@ -794,7 +811,10 @@ export default function Home() {
       setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
       await refreshAudit(targetId, isCurrent);
     } catch (failure) {
-      if (isCurrent()) setError((failure as Error).message);
+      if (isCurrent()) {
+        setError((failure as Error).message);
+        restoreFocusAfterRender(trigger);
+      }
     } finally {
       operationInFlight.current = false;
       setOperationBusy(false);
@@ -806,7 +826,7 @@ export default function Home() {
       <a className={styles.skipLink} href="#main-content" tabIndex={0}>본문으로 건너뛰기</a>
       <nav className={styles.nav} aria-label="주요 탐색 및 계정 제어">
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live} role="status" aria-live="polite" aria-atomic="true"><i aria-hidden="true" />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <>{authenticationProviders.oidc && authenticationProviders.loginUrl && <button onClick={() => void logout(true)} disabled={logoutBusy}>계정 변경</button>}<button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button></>}</div>
+        <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live} role="status" aria-live="polite" aria-atomic="true"><i aria-hidden="true" />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={(event) => void startDemo(event.currentTarget)} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <>{authenticationProviders.oidc && authenticationProviders.loginUrl && <button onClick={(event) => void logout(true, event.currentTarget)} disabled={logoutBusy}>계정 변경</button>}<button onClick={(event) => void logout(false, event.currentTarget)} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button></>}</div>
       </nav>
       <section className={styles.shell} id="main-content" tabIndex={-1}>
         <header className={styles.topline}>
@@ -860,8 +880,8 @@ export default function Home() {
               <div><span>정책 snapshot</span><strong>{release.policySnapshot.name} · {release.policySnapshot.definition.strategy}</strong><small>{release.policySnapshot.definition.steps.map((step) => `${step.weight}%/${Math.round(step.minimumObservationSeconds / 60)}m`).join(" → ")}</small></div>
               <ul>{release.policySnapshot.definition.metrics.map((metric, index) => <li key={`${metric.key}:${metric.route ?? "global"}:${index}`}><strong>{metric.key}{metric.route ? ` · ${metric.route}` : ""}</strong><span>{metric.comparison ?? "THRESHOLD"} {metric.threshold}{metric.importance ? ` · ${metric.importance}` : ""}</span></li>)}</ul>
             </section>}
-            <footer><button onClick={() => operate("promote")} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={() => operate("pause")} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={() => operate("resume")} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={() => operate("abort")} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
-            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <><div className={sessionStyles.approvalReadiness} data-ready={environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)} role="status" aria-live="polite" aria-atomic="true"><strong>ENVIRONMENT READINESS</strong><span>{approvalReadinessNotice || approvalReadinessLabel(approvalEnvironmentValidation, connectionClock)}</span></div><div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={() => void decide("approve")} disabled={operationBusy || !environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)}>Approve</button><button className={styles.danger} onClick={() => void decide("reject")} disabled={operationBusy}>Reject</button></div></>}
+            <footer><button onClick={(event) => void operate("promote", event.currentTarget)} disabled={!activeId || !canOperate || operationBusy}>Promote</button><button onClick={(event) => void operate("pause", event.currentTarget)} disabled={!activeId || !canOperate || operationBusy}>Pause</button><button onClick={(event) => void operate("resume", event.currentTarget)} disabled={!activeId || !canOperate || operationBusy}>Resume</button><button className={styles.danger} onClick={(event) => void operate("abort", event.currentTarget)} disabled={!activeId || !canOperate || operationBusy}>Abort</button>{grafanaUrl && <a href={grafanaUrl} target="_blank" rel="noreferrer">Grafana에서 조사 ↗</a>}</footer>
+            {canDecideRelease(sessionUser?.roles ?? [], release?.status) && <><div className={sessionStyles.approvalReadiness} data-ready={environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)} role="status" aria-live="polite" aria-atomic="true"><strong>ENVIRONMENT READINESS</strong><span>{approvalReadinessNotice || approvalReadinessLabel(approvalEnvironmentValidation, connectionClock)}</span></div><div className={sessionStyles.approvalActions}><span>APPROVAL REQUIRED</span><button onClick={(event) => void decide("approve", event.currentTarget)} disabled={operationBusy || !environmentAllowsRelease(approvalEnvironmentValidation, connectionClock)}>Approve</button><button className={styles.danger} onClick={(event) => void decide("reject", event.currentTarget)} disabled={operationBusy}>Reject</button></div></>}
             {operationNotice && <p className={sessionStyles.operationNotice} role="status" aria-live="polite" aria-atomic="true">{operationNotice}</p>}
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
