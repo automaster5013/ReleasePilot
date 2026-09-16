@@ -5,10 +5,10 @@
 
 ## 실행 구성
 
-- Chromium: 전체 기능·보안·반응형·접근성 E2E 106개
-- Firefox: 역할별 WCAG·키보드·고대비 리플로 검사 12개
-- WebKit: 역할별 WCAG·키보드·고대비 리플로 검사 12개
-- GitHub Actions는 `chromium firefox webkit`을 명시적으로 설치한 뒤 총 130개를 실행한다.
+- Chromium: 전체 기능·보안·반응형·접근성 E2E 110개
+- Firefox: 역할별 WCAG·키보드·고대비·텍스트 간격 리플로 검사 16개
+- WebKit: 역할별 WCAG·키보드·고대비·텍스트 간격 리플로 검사 16개
+- GitHub Actions는 `chromium firefox webkit`을 명시적으로 설치한 뒤 총 142개를 실행한다.
 - Playwright 실패 리포트와 trace는 lint 입력에서 제외하고, 실패한 CI artifact로만 보관한다.
 
 ```bash
@@ -17,10 +17,10 @@ npm run build
 npx playwright test
 ```
 
-로컬 Windows에서는 Chromium 전체 106개와 WebKit 접근성 12개, 총 118개가 통과했다.
+로컬 Windows에서는 Chromium 전체 110개와 WebKit 접근성 16개, 총 126개가 통과했다.
 이 호스트의 Playwright Firefox binary는 Windows side-by-side 런타임 구성 오류로 시작되지 않아,
 Firefox 결과는 의존성을 설치한 격리된 Ubuntu GitHub runner에서 확인했다. CI 실행
-`35071980684`의 Web Console job은 세 엔진 전체 130개를 통과했다.
+`35074202583`의 Web Console job은 세 엔진 전체 142개를 통과했다.
 
 이 검사는 브라우저 엔진별 DOM·스타일·키보드·강제 색상 동작 차이를 포착하지만 실제
 스크린 리더의 발화 순서, Windows High Contrast 조합, 확대 소프트웨어와 실제 기기 조합의
@@ -28,6 +28,6 @@ Firefox 결과는 의존성을 설치한 격리된 Ubuntu GitHub runner에서 �
 
 ## 운영 반영
 
-- Docker Hub CD `35071980747`에서 Web Console 이미지 게시, attestation, GitOps 갱신과 배포 검증이 성공했다.
-- GitOps commit `2c72af6`의 새 Web Console digest를 클러스터에 반영했다.
+- Docker Hub CD `35074202893`에서 Web Console 이미지 게시, attestation, GitOps 갱신과 배포 검증이 성공했다.
+- GitOps commit `415c3b4`의 Web Console digest `sha256:257ea51c4821dfda0d89e20ffaa02ae1b93ddde3014710554657c60e8fee040b`를 최종 stable로 승격했다.
 - 세 Rollout은 2/2 Healthy, 모든 애플리케이션 Pod는 Ready이며 재시작 횟수는 0이다.

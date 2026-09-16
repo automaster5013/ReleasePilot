@@ -28,8 +28,10 @@ Chromium 106개와 Firefox·WebKit 접근성 각 12개, 총 130개를 통과했�
 
 - Docker Hub CD `35071980747`에서 Web Console 이미지 게시, attestation, GitOps 갱신과 배포 검증이 성공했다.
 - GitOps commit `2c72af6`이 Web Console digest
-  `sha256:f13a8e8d196dbca758efc2a451bfaaa6fa8c5ae6beae19cd132b11f936e13910`을 반영했다.
-- 세 Rollout은 2/2 Healthy, 모든 애플리케이션 Pod는 Ready이고 재시작 횟수는 0이다.
+  `sha256:f13a8e8d196dbca758efc2a451bfaaa6fa8c5ae6beae19cd132b11f936e13910`을 반영했고,
+  이 revision은 다음 접근성 배포가 이어지면서 최종 stable 승격 전에 대체되었다.
+- 후속 텍스트 간격 리플로 배포에서 세 Rollout 2/2 Healthy, 모든 애플리케이션 Pod Ready와
+  재시작 횟수 0을 최종 확인했다.
 - 네 Argo CD 애플리케이션은 Synced/Healthy이며 공개 루트, `/health`,
   `/actuator/health/readiness`는 HTTP 200을 반환한다.
 
