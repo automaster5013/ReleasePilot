@@ -12,6 +12,8 @@ push 실행은 두 commit 사이의 변경 경로로 게시 matrix를 생성한�
 
 경로 제한을 도입한 source commit `02e8d48`은 CI run 35051379879와 Docker Hub CD run 35051380078을 통과했고 GitOps commit `9261450`으로 세 운영 Rollout이 Healthy 2/2가 됐다. 이 문단만 추가하는 후속 docs-only commit에서는 일반 CI만 생성되고 Docker Hub CD 실행이 생성되지 않는지 확인한다.
 
+구성요소 선택 게시 source commit `8bd7510`은 CI run 35052174905와 전체 안전 배포 run 35052175125를 통과했다. 이어서 web-console 입력만 바꾼 commit `bce60e1`에서 CI run 35052614889와 Docker Hub CD run 35052615152가 성공했고, 게시 job은 `publish (web-console, apps/web-console)` 하나만 생성됐다. GitOps commit `6f9dd02`의 diff는 web-console digest 한 줄뿐이며 control-plane/analysis-worker digest는 유지됐다. web-console Canary 승격 후 Argo CD Synced/Healthy, 세 Rollout Healthy 2/2, 공개 화면 HTTP 200을 확인했다.
+
 사용자가 기존 AWS/Argo CD 배포를 지정했으므로 aws-demo overlay 자동 갱신을 기본 활성화한다. repository variable DOCKERHUB_AUTO_DEPLOY=false로 중단할 수 있다. Argo CD의 자동 sync 및 기존 수동 Canary 승격 정책은 별도이며 overlay 갱신만으로 Healthy/승격 완료를 보장하지 않는다. 별도 서버 배포는 주소·인증·배포 방식 확인 후 연결해야 한다.
 
 2026-09-16: GitHub Secrets 두 개 등록 후 run 34998468081의 재실행에서 CI 6개 및 세 이미지 게시가 성공했다. Docker Hub API로 소스 SHA 9800909c5d868b497eca75628b74cf75432f3688의 세 태그 active/digest를 확인했다. 자동배포 변수는 미활성 상태로 update-gitops는 skipped다. 배포 대상 확인이 필요하며 운영 배포 완료는 클러스터 상태로 별도 확인해야 한다.
