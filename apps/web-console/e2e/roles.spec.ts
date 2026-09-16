@@ -283,7 +283,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       return json({ id: "role-release", status }, path === "/releases" ? 201 : 200);
     }
     if (path === "/session/providers") return json({ oidc: false, loginUrl: null });
-    if (path === "/session") return json({ user: { id: "role-user", displayName: "Role fixture", roles: [role], demo: false }, csrfToken: "role-fixture-csrf", expiresAt: "2099-01-01T00:00:00Z" });
+    if (path === "/session") return json({ user: { id: "role-user", displayName: "Role fixture", username: "role-user", email: `${role.toLowerCase()}@example.test`, roles: [role], demo: false }, csrfToken: "role-fixture-csrf", expiresAt: "2099-01-01T00:00:00Z" });
     if (path === "/session/csrf") {
       if ("csrfBody" in options) return json(options.csrfBody);
       csrfRequests++;
@@ -476,3 +476,13 @@ test("cancelled approval reason does not transmit a mutation", async ({ page }) 
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
 });
+
+for (const role of ["OPERATOR", "DEVELOPER", "APPROVER"] as const) {
+  test(`shows the signed-in email and ${role} role`, async ({ page }) => {
+    await fixture(page, role);
+    await page.goto("/");
+    const identity = page.getByLabel("현재 로그인 계정");
+    await expect(identity).toContainText(`${role.toLowerCase()}@example.test`);
+    await expect(identity).toContainText(role);
+  });
+}

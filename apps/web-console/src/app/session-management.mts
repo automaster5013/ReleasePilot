@@ -1,6 +1,8 @@
 export type SessionUser = {
   id: string;
   displayName: string;
+  username?: string;
+  email?: string | null;
   roles: string[];
   demo: boolean;
 };

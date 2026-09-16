@@ -806,7 +806,7 @@ export default function Home() {
     <main className={styles.page}>
       <nav className={styles.nav}>
         <span className={styles.brand}><span className={styles.brandMark}>RP</span>ReleasePilot</span>
-        <div className={styles.sessionControls}><span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button>}</div>
+        <div className={styles.sessionControls}>{sessionUser && <div className={styles.sessionIdentity} aria-label="현재 로그인 계정"><strong>{sessionUser.email || sessionUser.username || sessionUser.displayName}</strong><small>{sessionUser.demo ? "읽기 전용 데모" : sessionUser.roles.join(" · ")}</small></div>}<span className={styles.live}><i />{sessionConnectionLabel(sessionUser, connection, Boolean(activeId))}</span>{authenticationProviders.oidc && authenticationProviders.loginUrl && <a href={authenticationProviders.loginUrl}>조직 SSO</a>}<button onClick={startDemo} disabled={demoBusy || logoutBusy}>읽기 전용 데모</button>{sessionUser && <button onClick={() => void logout()} disabled={logoutBusy}>{logoutBusy ? "로그아웃 중…" : "로그아웃"}</button>}</div>
       </nav>
       <section className={styles.shell}>
         <header className={styles.topline}>

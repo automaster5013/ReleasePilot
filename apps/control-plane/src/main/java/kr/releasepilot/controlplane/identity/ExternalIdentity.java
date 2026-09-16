@@ -52,6 +52,8 @@ public class ExternalIdentity {
         return identity;
     }
 
+    public String getEmail() { return email; }
+
     public UserAccount getUser() { return user; }
 
     public void recordLogin(String email, Instant now) {

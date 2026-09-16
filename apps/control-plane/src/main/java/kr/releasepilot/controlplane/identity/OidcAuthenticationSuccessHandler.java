@@ -46,6 +46,7 @@ public class OidcAuthenticationSuccessHandler implements AuthenticationSuccessHa
         request.changeSessionId();
         request.getSession().setMaxInactiveInterval(1800);
         request.getSession().setAttribute("RELEASEPILOT_DEMO", false);
+        request.getSession().setAttribute("RELEASEPILOT_EMAIL", oidcUser.getEmail());
         contextRepository.saveContext(context, request, response);
         response.sendRedirect("/");
     }

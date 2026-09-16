@@ -32,6 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class OidcLoginApiTests {
     @Autowired WebApplicationContext context;
+    @Autowired UserAccountRepository users;
+    @Autowired ExternalIdentityRepository identities;
     MockMvc mvc;
 
     @BeforeEach
@@ -50,4 +52,24 @@ class OidcLoginApiTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.startsWith("https://idp.example/authorize?")));
     }
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void sessionShowsLinkedEmailAndRoleWithoutExposingOtherAccounts() throws Exception {
+        var now = java.time.Instant.now();
+        var account = users.save(UserAccount.create("identity-" + java.util.UUID.randomUUID(),
+                "{noop}unused", "Developer", java.util.Set.of(Role.DEVELOPER), now));
+        identities.save(ExternalIdentity.create(account, "https://idp.example", "developer-sub",
+                "developer@example.test", now));
+        var principal = UserAccountPrincipal.from(account);
+        var authentication = org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+                .authenticated(principal, null, principal.getAuthorities());
+        mvc.perform(get("/api/v1/session").with(
+                org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("developer@example.test"))
+                .andExpect(jsonPath("$.user.username").value(account.getUsername()))
+                .andExpect(jsonPath("$.user.roles[0]").value("DEVELOPER"))
+                .andExpect(jsonPath("$.user.password").doesNotExist());
+    }
+
 }

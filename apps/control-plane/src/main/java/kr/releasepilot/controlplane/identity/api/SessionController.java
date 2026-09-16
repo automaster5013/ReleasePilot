@@ -45,6 +45,7 @@ public class SessionController {
     private final String oidcRegistrationId;
     private final SessionRateLimiter rateLimiter;
     private final SessionManagementService sessions;
+    private final kr.releasepilot.controlplane.identity.ExternalIdentityRepository identities;
 
     public SessionController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService,
                              @Value("${releasepilot.demo.enabled:false}") boolean demoEnabled,
@@ -52,7 +53,8 @@ public class SessionController {
                              @Value("${releasepilot.oidc.enabled:false}") boolean oidcEnabled,
                              @Value("${releasepilot.oidc.registration-id:releasepilot}") String oidcRegistrationId,
                              ObjectProvider<ClientRegistrationRepository> clientRegistrations,
-                             SessionRateLimiter rateLimiter, SessionManagementService sessions) {
+                             SessionRateLimiter rateLimiter, SessionManagementService sessions,
+                             kr.releasepilot.controlplane.identity.ExternalIdentityRepository identities) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.demoEnabled = demoEnabled;
@@ -61,6 +63,7 @@ public class SessionController {
         this.oidcRegistrationId = oidcRegistrationId;
         this.rateLimiter = rateLimiter;
         this.sessions = sessions;
+        this.identities = identities;
     }
 
     @GetMapping("/providers")
@@ -160,11 +163,20 @@ public class SessionController {
                 session.getLastAccessedTime() + session.getMaxInactiveInterval() * 1000L
         );
         return new SessionResponse(
-                new SessionUser(principal.id(), principal.displayName(), roles,
+                new SessionUser(principal.id(), principal.displayName(), principal.getUsername(),
+                        sessionEmail(principal, session), roles,
                         Boolean.TRUE.equals(session.getAttribute("RELEASEPILOT_DEMO"))),
                 csrfToken.getToken(),
                 expiresAt
         );
+    }
+
+    private String sessionEmail(UserAccountPrincipal principal, HttpSession session) {
+        if (session.getAttribute("RELEASEPILOT_EMAIL") instanceof String email && !email.isBlank()) return email;
+        var emails = identities.findByUserId(principal.id()).stream()
+                .map(kr.releasepilot.controlplane.identity.ExternalIdentity::getEmail)
+                .filter(email -> email != null && !email.isBlank()).distinct().toList();
+        return emails.size() == 1 ? emails.getFirst() : null;
     }
 
     private void rejectDemo(HttpSession session) {
@@ -182,7 +194,7 @@ public class SessionController {
     public record SessionResponse(SessionUser user, String csrfToken, Instant expiresAt) {
     }
 
-    public record SessionUser(UUID id, String displayName, List<String> roles, boolean demo) {
+    public record SessionUser(UUID id, String displayName, String username, String email, List<String> roles, boolean demo) {
     }
 
     public record CsrfResponse(String headerName, String token) {
