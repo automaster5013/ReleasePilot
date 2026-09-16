@@ -736,6 +736,21 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(state.mutations).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} release validation identifies and focuses the invalid field`, async ({ page }) => {
+    const state = await fixture(page, role);
+    await fillRequest(page);
+    const policyVersion = page.getByLabel("Policy Version ID", { exact: false });
+    await policyVersion.fill("invalid-policy-version");
+    await page.getByRole("button", { name: "릴리스 요청", exact: true }).click();
+    const alert = page.getByRole("alert").filter({ hasText: "Policy Version ID는 올바른 UUID여야 합니다." });
+    await expect(alert).toHaveAttribute("id", "release-request-error");
+    await expect(policyVersion).toHaveAttribute("aria-invalid", "true");
+    await expect(policyVersion).toHaveAttribute("aria-errormessage", "release-request-error");
+    await expect(policyVersion).toBeFocused();
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {
