@@ -101,3 +101,47 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "deploy: Docker Hub ReleasePilot $RELEASE_SHA"
           git push origin HEAD:main
+  verify-deployment:
+    needs: update-gitops
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dockerhub-*
+          merge-multiple: true
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          aws-region: ap-northeast-2
+      - name: Configure read-only EKS access
+        run: aws eks update-kubeconfig --name releasepilot-demo --region ap-northeast-2
+      - name: Wait for GitOps sync and Canary approval boundary
+        run: |
+          deadline=$((SECONDS + 900))
+          while (( SECONDS < deadline )); do
+            app_sync=$(kubectl get application releasepilot-demo -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || true)
+            ready=true
+            for file in dockerhub-*.txt; do
+              name="$(cut -d= -f1 "$file")"
+              expected="$(cut -d= -f2- "$file")"
+              actual="$(kubectl get rollout "$name" -n releasepilot -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
+              phase="$(kubectl get rollout "$name" -n releasepilot -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+              updated="$(kubectl get rollout "$name" -n releasepilot -o jsonpath='{.status.updatedReplicas}' 2>/dev/null || true)"
+              if [ "$actual" != "$expected" ] || { [ "$phase" != "Paused" ] && [ "$phase" != "Healthy" ]; } || [ "${updated:-0}" -lt 1 ]; then
+                ready=false
+              fi
+            done
+            if [ "$app_sync" = "Synced" ] && [ "$ready" = true ] && curl --fail --silent --show-error --max-time 10 https://releasepilot.kr/actuator/health/readiness >/dev/null; then
+              exit 0
+            fi
+            sleep 15
+          done
+          kubectl get application releasepilot-demo -n argocd || true
+          kubectl get rollouts -n releasepilot || true
+          exit 1

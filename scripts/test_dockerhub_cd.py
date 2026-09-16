@@ -23,9 +23,19 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertEqual(self.jobs["validate"]["uses"], "./.github/workflows/ci.yml")
         self.assertEqual(set(self.jobs["publish"]["needs"]), {"validate", "changes"})
         self.assertEqual(self.jobs["update-gitops"]["needs"], "publish")
+        self.assertEqual(self.jobs["verify-deployment"]["needs"], "update-gitops")
         for job in self.jobs.values():
             self.assertNotIn("continue-on-error", job)
             self.assertNotIn("always()", job.get("if", ""))
+
+    def test_deployment_verification_is_read_only_and_waits_for_canary(self):
+        verify = self.jobs["verify-deployment"]
+        self.assertEqual(verify["permissions"], {"contents": "read", "id-token": "write"})
+        command = verify["steps"][-1]["run"]
+        for boundary in ("status.sync.status", "status.phase", "status.updatedReplicas", "actuator/health/readiness"):
+            self.assertIn(boundary, command)
+        for mutation in ("kubectl apply", "kubectl patch", "argo rollouts promote"):
+            self.assertNotIn(mutation, command)
 
     def test_all_services_publish_source_sha_and_digest(self):
         publish = self.jobs["publish"]
