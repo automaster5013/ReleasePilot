@@ -649,6 +649,53 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(result.obscured).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} keyboard focus indicator meets WCAG 2.4.13 minimum`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    const state = await fixture(page, role);
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const result = await inspectTabFocusAppearance(page, 120);
+    expect(result.visited).toBeGreaterThan(0);
+    expect(result.failures).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
+}
+
+async function inspectTabFocusAppearance(page: Page, limit: number) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const seen = new Set<string>();
+  const failures: Array<{ name: string; tag: string; width: number; contrast: number }> = [];
+  for (let index = 0; index < limit; index++) {
+    await page.keyboard.press("Tab");
+    const result = await page.evaluate(() => {
+      const element = document.activeElement as HTMLElement | null;
+      if (!element || element === document.body) return null;
+      const focusable = Array.from(document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+      const fingerprint = `${element.tagName}:${focusable.indexOf(element)}:${element.id}`;
+      const style = getComputedStyle(element);
+      const parse = (color: string) => (color.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      const luminance = (color: string) => {
+        const channels = parse(color).map((value) => value / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+      };
+      const foreground = luminance(style.outlineColor);
+      const background = luminance(getComputedStyle(document.body).backgroundColor);
+      const contrast = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+      return {
+        fingerprint,
+        name: (element.getAttribute("aria-label") || element.textContent || element.getAttribute("name") || "").trim(),
+        tag: element.tagName,
+        visible: element.matches(":focus-visible") && style.outlineStyle !== "none",
+        width: parseFloat(style.outlineWidth),
+        contrast: Math.round(contrast * 100) / 100,
+      };
+    });
+    if (!result || seen.has(result.fingerprint)) break;
+    seen.add(result.fingerprint);
+    if (!result.visible || result.width < 2 || result.contrast < 3) failures.push(result);
+  }
+  return { visited: seen.size, failures };
 }
 
 async function inspectTabFocusVisibility(page: Page, limit: number) {
