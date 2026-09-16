@@ -6,6 +6,8 @@ GitHub Actions repository secrets에 DOCKERHUB_USERNAME=automaster5013 및 쓰�
 
 태그는 소스 commit SHA이며 배포는 게시 결과의 sha256 digest로 고정한다. 세 게시 job 성공 전에는 배포 파일을 갱신하지 않는다. `dockerhub-cd-main` concurrency group은 실행을 직렬화하고 실행 중 작업을 취소하지 않는다. 오래된 소스의 배포는 main HEAD 검사로 건너뛰며 동일 digest는 commit을 만들지 않는다. 배포 파일만 바뀐 push는 새 Docker Hub CD를 실행하지 않는다. 기존 ECR release workflow는 유지된다. 병행 ECR release와 Docker Hub 배포는 운영 시 조정해야 한다.
 
+각 게시 job은 Docker Hub에 push된 정확한 digest를 Trivy Action v0.36.0의 검증된 commit SHA로 스캔한다. OS와 애플리케이션 라이브러리에서 수정 가능한 CRITICAL 취약점이 하나라도 발견되면 exit code 1로 digest artifact 생성을 막고, 따라서 GitOps 갱신과 배포 검증도 실행되지 않는다. 아직 수정본이 없는 취약점은 로그에는 포함될 수 있지만 초기 차단선에서는 제외한다. provenance와 SBOM 생성은 계속 유지한다.
+
 자동 게시 push 경로는 `apps/**`, 재사용 CI/CD workflow 두 개, GitOps 이미지 갱신 스크립트로 제한한다. 문서, 배포 digest commit, 계약 테스트만 바뀐 push는 일반 CI로 검증하되 동일 애플리케이션 이미지를 다시 빌드·게시하지 않는다. `workflow_dispatch` 수동 전체 게이트·게시 기능은 유지한다.
 
 push 실행은 두 commit 사이의 변경 경로로 게시 matrix를 생성한다. `apps/control-plane`, `apps/analysis-worker`, `apps/web-console` 중 바뀐 구성요소만 게시하며 CI/CD workflow 또는 이미지 선택·GitOps 갱신 스크립트 변경은 안전한 전체 게시를 선택한다. 수동 실행과 새 브랜치의 영(0) before SHA도 전체 게시한다. 부분 게시 artifact에는 변경된 digest만 포함되고 갱신 스크립트는 해당 Kustomize image entry만 교체해 나머지 digest를 보존한다.

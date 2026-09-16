@@ -50,6 +50,18 @@ class DockerHubCDTests(unittest.TestCase):
         self.assertEqual(build["with"]["push"], "true")
         self.assertTrue(any("steps.build.outputs.digest" in str(step) for step in publish["steps"]))
 
+    def test_critical_vulnerability_scan_blocks_digest_artifact(self):
+        steps = self.jobs["publish"]["steps"]
+        scan_index = next(index for index, step in enumerate(steps) if step.get("name") == "Block fixable critical vulnerabilities")
+        record_index = next(index for index, step in enumerate(steps) if step.get("name") == "Record pinned image")
+        self.assertLess(scan_index, record_index)
+        scan = steps[scan_index]
+        self.assertEqual(scan["uses"], "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25")
+        self.assertIn("steps.build.outputs.digest", scan["with"]["image-ref"])
+        self.assertEqual(scan["with"]["exit-code"], "1")
+        self.assertEqual(scan["with"]["ignore-unfixed"], "true")
+        self.assertEqual(scan["with"]["severity"], "CRITICAL")
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")
