@@ -707,6 +707,21 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     expect(await statuses.evaluateAll((elements) => elements.filter((element) => element.getAttribute("aria-live") !== "polite" || element.getAttribute("aria-atomic") !== "true").map((element) => element.textContent?.trim()))).toEqual([]);
     expect(state.unexpected).toEqual([]);
   });
+
+  test(`@a11y ${role} error messages use a consistent assertive atomic contract`, async ({ page }) => {
+    const state = await fixture(page, role, { csrfBody: null });
+    if (role === "DEVELOPER") await fillRequest(page);
+    else await load(page);
+    const button = page.getByRole("button", { name: role === "DEVELOPER" ? "릴리스 요청" : role === "APPROVER" ? "Approve" : "Abort", exact: true });
+    if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Accessibility error fixture"));
+    await button.click();
+    await expect(page.getByRole("alert").filter({ hasText: "보안 토큰 응답이 올바르지 않습니다." })).toBeVisible();
+    const alerts = page.locator('[role="alert"]').filter({ hasText: /\S/ });
+    expect(await alerts.count()).toBeGreaterThan(0);
+    expect(await alerts.evaluateAll((elements) => elements.filter((element) => element.getAttribute("aria-live") !== "assertive" || element.getAttribute("aria-atomic") !== "true").map((element) => element.textContent?.trim()))).toEqual([]);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  });
 }
 
 async function inspectTabFocusAppearance(page: Page, limit: number) {

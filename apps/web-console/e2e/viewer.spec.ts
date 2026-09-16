@@ -482,6 +482,18 @@ test("@a11y viewer status messages use a consistent polite atomic contract", asy
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer error messages use a consistent assertive atomic contract", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await page.route("**/control-api/session/demo", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "{broken"}));
+  await page.goto("/");
+  await page.getByRole("button", { name: "읽기 전용 데모", exact: true }).click();
+  const alerts = page.locator('[role="alert"]').filter({ hasText: /\S/ });
+  await expect(alerts.first()).toBeVisible();
+  expect(await alerts.count()).toBeGreaterThan(0);
+  expect(await alerts.evaluateAll((elements) => elements.filter((element) => element.getAttribute("aria-live") !== "assertive" || element.getAttribute("aria-atomic") !== "true").map((element) => element.textContent?.trim()))).toEqual([]);
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
