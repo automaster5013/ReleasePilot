@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, sessionConnectionLabel, SessionUser } from "./session-management.mts";
-import { createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, prometheusConnectionDraftIssue, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -127,6 +127,7 @@ export default function Home() {
   const [connectionNotice, setConnectionNotice] = useState("");
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
   const [prometheusDraft, setPrometheusDraft] = useState<PrometheusConnectionDraft>(emptyPrometheusDraft);
+  const [connectionValidationIssue, setConnectionValidationIssue] = useState<{ kind: "cluster"; field: keyof ClusterConnectionDraft; message: string } | { kind: "prometheus"; field: keyof PrometheusConnectionDraft; message: string } | null>(null);
   const [connectionCreateBusy, setConnectionCreateBusy] = useState(false);
   const [connectionAuditId, setConnectionAuditId] = useState("");
   const [connectionAuditEvents, setConnectionAuditEvents] = useState<AuditEventView[]>([]);
@@ -632,8 +633,9 @@ export default function Home() {
 
   async function createClusterConnection(event: FormEvent) {
     event.preventDefault();
-    const validation = validateClusterConnectionDraft(clusterDraft);
-    if (validation) { setConnectionNotice(validation); return; }
+    const validation = clusterConnectionDraftIssue(clusterDraft);
+    if (validation) { setConnectionValidationIssue({ kind: "cluster", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="cluster-${validation.field}"]`)); return; }
+    setConnectionValidationIssue(null);
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
       const response = await fetch("/control-api/connections/clusters", {
@@ -647,10 +649,27 @@ export default function Home() {
     finally { setConnectionCreateBusy(false); }
   }
 
+  function updateClusterDraft(field: keyof ClusterConnectionDraft, value: string) {
+    setClusterDraft((current) => ({ ...current, [field]: value }));
+    if (connectionValidationIssue?.kind === "cluster" && connectionValidationIssue.field === field) {
+      setConnectionValidationIssue(null);
+      setConnectionNotice("");
+    }
+  }
+
+  function updatePrometheusDraft(field: keyof PrometheusConnectionDraft, value: string) {
+    setPrometheusDraft((current) => ({ ...current, [field]: value }));
+    if (connectionValidationIssue?.kind === "prometheus" && connectionValidationIssue.field === field) {
+      setConnectionValidationIssue(null);
+      setConnectionNotice("");
+    }
+  }
+
   async function createPrometheusConnection(event: FormEvent) {
     event.preventDefault();
-    const validation = validatePrometheusConnectionDraft(prometheusDraft);
-    if (validation) { setConnectionNotice(validation); return; }
+    const validation = prometheusConnectionDraftIssue(prometheusDraft);
+    if (validation) { setConnectionValidationIssue({ kind: "prometheus", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="prometheus-${validation.field}"]`)); return; }
+    setConnectionValidationIssue(null);
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
       const response = await fetch("/control-api/connections/prometheus", {
@@ -837,6 +856,12 @@ export default function Home() {
     "aria-invalid": activeReleaseValidationIssue?.field === field || undefined,
     "aria-errormessage": activeReleaseValidationIssue?.field === field ? "release-request-error" : undefined,
   });
+  const activeConnectionValidationIssue = connectionValidationIssue?.message === connectionNotice ? connectionValidationIssue : null;
+  const connectionFieldAccessibility = (kind: "cluster" | "prometheus", field: keyof ClusterConnectionDraft | keyof PrometheusConnectionDraft) => ({
+    "data-connection-field": `${kind}-${field}`,
+    "aria-invalid": activeConnectionValidationIssue?.kind === kind && activeConnectionValidationIssue.field === field || undefined,
+    "aria-errormessage": activeConnectionValidationIssue?.kind === kind && activeConnectionValidationIssue.field === field ? "connection-form-error" : undefined,
+  });
 
   return (
     <main className={styles.page} aria-labelledby="control-room-title">
@@ -874,8 +899,8 @@ export default function Home() {
         {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
           <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void validateAllConnections("clusters")} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-clusters" ? "Kubernetes 검증 중…" : "Kubernetes 전체 검증"}</button><button type="button" onClick={() => void validateAllConnections("prometheus")} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-prometheus" ? "Prometheus 검증 중…" : "Prometheus 전체 검증"}</button><button type="button" onClick={() => void Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]).catch((failure: Error) => setConnectionNotice(failure.message))} disabled={Boolean(connectionBusyId)}>새로고침</button></div></header>
           <details className={sessionStyles.connectionCreate}><summary>NEW CONNECTION <span>Operator workflow</span></summary><div className={sessionStyles.connectionForms}>
-            <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input required maxLength={100} value={clusterDraft.name} onChange={(event) => setClusterDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>API server<input required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => setClusterDraft((current) => ({ ...current, apiServer: event.target.value }))} /></label><label>Allowed namespaces<input required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => setClusterDraft((current) => ({ ...current, namespaces: event.target.value }))} /></label><label>Secret reference<input required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => setClusterDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
-            <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input required maxLength={100} value={prometheusDraft.name} onChange={(event) => setPrometheusDraft((current) => ({ ...current, name: event.target.value }))} /></label><label>Base URL<input required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => setPrometheusDraft((current) => ({ ...current, baseUrl: event.target.value }))} /></label><label>Secret reference <small>선택 사항</small><input maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => setPrometheusDraft((current) => ({ ...current, secretRef: event.target.value }))} /></label><label>Query timeout seconds<input required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => setPrometheusDraft((current) => ({ ...current, queryTimeoutSeconds: event.target.value }))} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>
+            <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input {...connectionFieldAccessibility("cluster", "name")} required maxLength={100} value={clusterDraft.name} onChange={(event) => updateClusterDraft("name", event.target.value)} /></label><label>API server<input {...connectionFieldAccessibility("cluster", "apiServer")} required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => updateClusterDraft("apiServer", event.target.value)} /></label><label>Allowed namespaces<input {...connectionFieldAccessibility("cluster", "namespaces")} required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => updateClusterDraft("namespaces", event.target.value)} /></label><label>Secret reference<input {...connectionFieldAccessibility("cluster", "secretRef")} required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => updateClusterDraft("secretRef", event.target.value)} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
+            <form onSubmit={(event) => void createPrometheusConnection(event)}><strong>Prometheus</strong><label>Name<input {...connectionFieldAccessibility("prometheus", "name")} required maxLength={100} value={prometheusDraft.name} onChange={(event) => updatePrometheusDraft("name", event.target.value)} /></label><label>Base URL<input {...connectionFieldAccessibility("prometheus", "baseUrl")} required type="url" maxLength={500} placeholder="https://…" value={prometheusDraft.baseUrl} onChange={(event) => updatePrometheusDraft("baseUrl", event.target.value)} /></label><label>Secret reference <small>선택 사항</small><input {...connectionFieldAccessibility("prometheus", "secretRef")} maxLength={255} placeholder="env:PROMETHEUS_TOKEN" value={prometheusDraft.secretRef} onChange={(event) => updatePrometheusDraft("secretRef", event.target.value)} /></label><label>Query timeout seconds<input {...connectionFieldAccessibility("prometheus", "queryTimeoutSeconds")} required type="number" min={1} max={120} value={prometheusDraft.queryTimeoutSeconds} onChange={(event) => updatePrometheusDraft("queryTimeoutSeconds", event.target.value)} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Prometheus 등록"}</button></form>
           </div></details>
           <h3>Kubernetes clusters</h3>
           <ConnectionFilters query={clusterQuery} filter={clusterFilter} label="Kubernetes 연결" onQuery={setClusterQuery} onFilter={setClusterFilter} />
@@ -883,7 +908,7 @@ export default function Home() {
           <h3>Prometheus</h3>
           <ConnectionFilters query={prometheusQuery} filter={prometheusFilter} label="Prometheus 연결" onQuery={setPrometheusQuery} onFilter={setPrometheusFilter} />
           {filteredPrometheusConnections.length ? <div className={sessionStyles.connectionList}>{filteredPrometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={() => void editPrometheusConnection(item)} disabled={Boolean(connectionBusyId)}>편집</button><button type="button" onClick={() => void setConnectionEnabled("prometheus", item)} disabled={Boolean(connectionBusyId)}>{item.status === "DISABLED" ? "재활성화" : "비활성화"}</button><button type="button" onClick={() => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={() => void validatePrometheusConnection(item.id)} disabled={Boolean(connectionBusyId) || item.status === "DISABLED"}>{connectionBusyId === item.id ? "처리 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>{prometheusConnections.length ? "검색 조건에 맞는 Prometheus 연결이 없습니다." : "등록된 Prometheus 연결이 없습니다."}</p>}
-          {connectionNotice && <p className={sessionStyles.sessionNotice} role="status" aria-live="polite" aria-atomic="true">{connectionNotice}</p>}
+          {connectionNotice && <p id={activeConnectionValidationIssue ? "connection-form-error" : undefined} className={sessionStyles.sessionNotice} role={activeConnectionValidationIssue ? "alert" : "status"} aria-live={activeConnectionValidationIssue ? "assertive" : "polite"} aria-atomic="true">{connectionNotice}</p>}
         </section>}
         <section className={styles.grid}>
           <article className={styles.releaseCard}>

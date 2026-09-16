@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createLatestRequestGuard, createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, prometheusConnectionDraftIssue, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("latest release request rejects delayed data, readiness and errors from older loads", async () => {
   const guard = createLatestRequestGuard();
@@ -295,4 +295,9 @@ test("release draft validation fails closed before mutation", () => {
   assert.match(validateReleaseDraft({ ...valid, imageDigest: "latest" }) ?? "", /digest/);
   assert.match(validateReleaseDraft({ ...valid, pipelineUrl: "javascript:alert(1)" }) ?? "", /HTTP/);
   assert.deepEqual(releaseDraftIssue({ ...valid, requestedPolicyVersionId: "invalid" }), { field: "requestedPolicyVersionId", message: "Policy Version ID는 올바른 UUID여야 합니다." });
+});
+
+test("connection draft validation identifies the first invalid field", () => {
+  assert.deepEqual(clusterConnectionDraftIssue({ name: "cluster", apiServer: "https://cluster.example", namespaces: "releasepilot", secretRef: "invalid ref" }), { field: "secretRef", message: "Secret reference 형식을 확인하세요." });
+  assert.deepEqual(prometheusConnectionDraftIssue({ name: "metrics", baseUrl: "https://metrics.example", secretRef: "", queryTimeoutSeconds: "121" }), { field: "queryTimeoutSeconds", message: "Query timeout은 1초 이상 120초 이하여야 합니다." });
 });

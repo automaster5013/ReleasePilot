@@ -753,6 +753,41 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
   });
 }
 
+test("@a11y OPERATOR connection validation identifies and focuses invalid fields", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR");
+  await page.goto("/");
+  await page.getByText("NEW CONNECTION", { exact: false }).click();
+
+  const clusterForm = page.locator("form").filter({ has: page.getByText("Kubernetes cluster", { exact: true }) });
+  await clusterForm.getByLabel("Name", { exact: true }).fill("Production cluster");
+  await clusterForm.getByLabel("API server", { exact: true }).fill("https://cluster.example");
+  await clusterForm.getByLabel("Allowed namespaces", { exact: true }).fill("releasepilot");
+  const clusterSecret = clusterForm.getByLabel("Secret reference", { exact: true });
+  await clusterSecret.fill("invalid secret reference");
+  await clusterForm.getByRole("button", { name: "Cluster 등록", exact: true }).click();
+  let alert = page.getByRole("alert").filter({ hasText: "Secret reference 형식을 확인하세요." });
+  await expect(alert).toHaveAttribute("id", "connection-form-error");
+  await expect(clusterSecret).toHaveAttribute("aria-invalid", "true");
+  await expect(clusterSecret).toHaveAttribute("aria-errormessage", "connection-form-error");
+  await expect(clusterSecret).toBeFocused();
+  await clusterSecret.fill("env:KUBERNETES_TOKEN");
+  await expect(alert).toHaveCount(0);
+
+  const prometheusForm = page.locator("form").filter({ has: page.getByText("Prometheus", { exact: true }) });
+  await prometheusForm.getByLabel("Name", { exact: true }).fill("Production metrics");
+  await prometheusForm.getByLabel("Base URL", { exact: true }).fill("https://metrics.example");
+  const prometheusSecret = prometheusForm.getByLabel("Secret reference", { exact: false });
+  await prometheusSecret.fill("invalid secret reference");
+  await prometheusForm.getByRole("button", { name: "Prometheus 등록", exact: true }).click();
+  alert = page.getByRole("alert").filter({ hasText: "Secret reference 형식을 확인하세요." });
+  await expect(alert).toHaveAttribute("id", "connection-form-error");
+  await expect(prometheusSecret).toHaveAttribute("aria-invalid", "true");
+  await expect(prometheusSecret).toHaveAttribute("aria-errormessage", "connection-form-error");
+  await expect(prometheusSecret).toBeFocused();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();

@@ -95,24 +95,32 @@ export function parseNamespaces(value: string) {
   return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 }
 
-export function validateClusterConnectionDraft(draft: ClusterConnectionDraft) {
-  if (!draft.name.trim() || draft.name.trim().length > 100) return "연결 이름은 1자 이상 100자 이하여야 합니다.";
+export function clusterConnectionDraftIssue(draft: ClusterConnectionDraft): { field: keyof ClusterConnectionDraft; message: string } | null {
+  if (!draft.name.trim() || draft.name.trim().length > 100) return { field: "name", message: "연결 이름은 1자 이상 100자 이하여야 합니다." };
   try { const url = new URL(draft.apiServer); if (url.protocol !== "https:" || draft.apiServer.length > 500) throw new Error(); }
-  catch { return "Kubernetes API 주소는 유효한 HTTPS URL이어야 합니다."; }
+  catch { return { field: "apiServer", message: "Kubernetes API 주소는 유효한 HTTPS URL이어야 합니다." }; }
   const namespaces = parseNamespaces(draft.namespaces);
-  if (!namespaces.length || namespaces.length > 100 || namespaces.some((item) => !namespaceName.test(item))) return "Namespace는 쉼표로 구분한 유효한 Kubernetes 이름이어야 합니다.";
-  if (!draft.secretRef.trim() || draft.secretRef.length > 255 || !secretReference.test(draft.secretRef)) return "Secret reference 형식을 확인하세요.";
+  if (!namespaces.length || namespaces.length > 100 || namespaces.some((item) => !namespaceName.test(item))) return { field: "namespaces", message: "Namespace는 쉼표로 구분한 유효한 Kubernetes 이름이어야 합니다." };
+  if (!draft.secretRef.trim() || draft.secretRef.length > 255 || !secretReference.test(draft.secretRef)) return { field: "secretRef", message: "Secret reference 형식을 확인하세요." };
+  return null;
+}
+
+export function validateClusterConnectionDraft(draft: ClusterConnectionDraft) {
+  return clusterConnectionDraftIssue(draft)?.message ?? null;
+}
+
+export function prometheusConnectionDraftIssue(draft: PrometheusConnectionDraft): { field: keyof PrometheusConnectionDraft; message: string } | null {
+  if (!draft.name.trim() || draft.name.trim().length > 100) return { field: "name", message: "연결 이름은 1자 이상 100자 이하여야 합니다." };
+  try { const url = new URL(draft.baseUrl); if (!['http:', 'https:'].includes(url.protocol) || draft.baseUrl.length > 500) throw new Error(); }
+  catch { return { field: "baseUrl", message: "Prometheus 주소는 유효한 HTTP(S) URL이어야 합니다." }; }
+  if (draft.secretRef && (draft.secretRef.length > 255 || !secretReference.test(draft.secretRef))) return { field: "secretRef", message: "Secret reference 형식을 확인하세요." };
+  const timeout = Number(draft.queryTimeoutSeconds);
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 120) return { field: "queryTimeoutSeconds", message: "Query timeout은 1초 이상 120초 이하여야 합니다." };
   return null;
 }
 
 export function validatePrometheusConnectionDraft(draft: PrometheusConnectionDraft) {
-  if (!draft.name.trim() || draft.name.trim().length > 100) return "연결 이름은 1자 이상 100자 이하여야 합니다.";
-  try { const url = new URL(draft.baseUrl); if (!['http:', 'https:'].includes(url.protocol) || draft.baseUrl.length > 500) throw new Error(); }
-  catch { return "Prometheus 주소는 유효한 HTTP(S) URL이어야 합니다."; }
-  if (draft.secretRef && (draft.secretRef.length > 255 || !secretReference.test(draft.secretRef))) return "Secret reference 형식을 확인하세요.";
-  const timeout = Number(draft.queryTimeoutSeconds);
-  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 120) return "Query timeout은 1초 이상 120초 이하여야 합니다.";
-  return null;
+  return prometheusConnectionDraftIssue(draft)?.message ?? null;
 }
 
 export function environmentAllowsRelease(result: EnvironmentValidation | null, now = Date.now(), environmentId?: string) {
