@@ -27,7 +27,7 @@ for (const width of [320, 390]) {
       if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Mobile fixture reason"));
       await page.getByRole("button", { name: names[0], exact: true }).click();
       if (role === "DEVELOPER") await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
-      else await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.");
+      else await expect(page.getByRole("status").filter({ hasText: role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다." })).toBeVisible();
       expect(state.mutations).toHaveLength(1);
       expect(state.unexpected).toEqual([]);
     });
@@ -69,7 +69,7 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
     if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Token recovery fixture"));
     await button.click();
     if (role === "DEVELOPER") await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
-    else await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다.");
+    else await expect(page.getByRole("status").filter({ hasText: role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다." })).toBeVisible();
     await expect(failure).toHaveCount(0);
     expect(state.mutations).toHaveLength(1);
     await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).toContainText("chain #1");
@@ -113,7 +113,7 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
     if (role !== "DEVELOPER") page.once("dialog", (dialog) => dialog.accept("Retry fixture reason"));
     await button.click();
     if (role === "DEVELOPER") await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
-    else await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다.");
+    else await expect(page.getByRole("status").filter({ hasText: role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다." })).toBeVisible();
     await expect(failure).toHaveCount(0);
     expect(state.mutations).toHaveLength(2);
     expect(state.mutations[1]).toEqual(state.mutations[0]);
@@ -201,7 +201,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
         await expect(page.getByText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.", { exact: true })).toHaveCount(0);
         await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).not.toContainText("chain #1");
       } else {
-      await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다.");
+      await expect(page.getByRole("status").filter({ hasText: role === "APPROVER" ? "승인 결정이 기록되었습니다." : "promote 요청이 접수되었습니다." })).toBeVisible();
       if (role === "OPERATOR") for (const name of names) await expect(page.getByRole("button", { name, exact: true })).toBeEnabled();
       else await expect(button).toHaveCount(0);
       }
@@ -224,7 +224,7 @@ for (const action of ["approve", "reject", "promote", "pause", "resume", "abort"
     page.once("dialog", (dialog) => dialog.accept(" \t가\n "));
     await button.click();
     const notice = decision ? (action === "approve" ? "승인 결정이 기록되었습니다." : "거부 결정이 기록되었습니다.") : `${action} 요청이 접수되었습니다.`;
-    await expect(page.getByRole("status")).toContainText(notice);
+    await expect(page.getByRole("status").filter({ hasText: notice })).toBeVisible();
     expect(state.mutations).toEqual([{ path: `/releases/role-release/${action}`, body: { reason: "가" } }]);
     await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).toContainText("chain #1");
     expect(state.unexpected).toEqual([]);
@@ -241,7 +241,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
     await expect(button).toBeEnabled();
     page.once("dialog", (dialog) => dialog.accept(` ${reason} `));
     await button.click();
-    await expect(page.getByRole("status")).toContainText(role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다.");
+    await expect(page.getByRole("status").filter({ hasText: role === "APPROVER" ? "승인 결정이 기록되었습니다." : "abort 요청이 접수되었습니다." })).toBeVisible();
     expect(state.mutations).toEqual([{ path: `/releases/role-release/${action}`, body: { reason } }]);
     expect(state.unexpected).toEqual([]);
   });
@@ -358,7 +358,7 @@ for (const action of ["approve", "reject"] as const) {
     await expect(button).toBeEnabled();
     page.once("dialog", (dialog) => dialog.accept(" Role decision "));
     await button.click();
-    await expect(page.getByRole("status")).toContainText(action === "approve" ? "승인 결정이 기록되었습니다." : "거부 결정이 기록되었습니다.");
+    await expect(page.getByRole("status").filter({ hasText: action === "approve" ? "승인 결정이 기록되었습니다." : "거부 결정이 기록되었습니다." })).toBeVisible();
     expect(state.mutations).toEqual([{ path: `/releases/role-release/${action}`, body: { reason: "Role decision" } }]);
     await expect(page.getByRole("region", { name: "릴리스 변경 기록" })).toContainText("chain #1");
     await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
@@ -396,7 +396,7 @@ for (const action of ["promote", "pause", "resume", "abort"]) {
     await expect(button).toBeEnabled();
     page.once("dialog", (dialog) => dialog.accept(" Role operation "));
     await button.click();
-    await expect(page.getByRole("status")).toContainText(`${action} 요청이 접수되었습니다.`);
+    await expect(page.getByRole("status").filter({ hasText: `${action} 요청이 접수되었습니다.` })).toBeVisible();
     expect(state.mutations).toEqual([{ path: `/releases/role-release/${action}`, body: { reason: "Role operation" } }]);
     expect(state.unexpected).toEqual([]);
   });
@@ -686,6 +686,15 @@ for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
     await expect(page.getByRole("main")).toHaveAccessibleName("Progressive delivery control room");
     await expect(page.getByRole("navigation", { name: "주요 탐색 및 계정 제어" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Progressive delivery control room" })).toHaveCount(1);
+    expect(state.unexpected).toEqual([]);
+  });
+
+  test(`@a11y ${role} announces session connection status without moving focus`, async ({ page }) => {
+    const state = await fixture(page, role);
+    await page.goto("/");
+    const status = page.locator("span[role=status][aria-live=polite][aria-atomic=true]");
+    await expect(status).toHaveText("SIGNED IN");
+    await expect(status.locator("i")).toHaveAttribute("aria-hidden", "true");
     expect(state.unexpected).toEqual([]);
   });
 }

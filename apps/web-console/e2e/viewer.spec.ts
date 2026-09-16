@@ -464,6 +464,15 @@ test("@a11y viewer exposes a titled landmark hierarchy", async ({ page }) => {
   expect(unexpected).toEqual([]);
 });
 
+test("@a11y viewer announces session connection status without moving focus", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  await login(page);
+  const status = page.locator("span[role=status][aria-live=polite][aria-atomic=true]");
+  await expect(status).toHaveText("DEMO · VIEW ONLY");
+  await expect(status.locator("i")).toHaveAttribute("aria-hidden", "true");
+  expect(unexpected).toEqual([]);
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
