@@ -30,6 +30,9 @@ npm run test:e2e
 자동 검사는 인지적 사용성, 실제 스크린 리더 발화 순서와 모든 브라우저·보조기기 조합을
 완전히 대체하지 않는다. 운영 SSO와 실제 backend를 포함한 수동 스크린 리더 검수는 별도다.
 
+브라우저 엔진별 자동 검수는 후속 [브라우저 엔진별 접근성 CI](cross-browser-accessibility.md)에서
+Chromium, Firefox와 WebKit으로 확대했다.
+
 ## 운영 반영
 
 - GitHub CI `35068309624`와 Docker Hub CD `35068309888`이 성공했다.
