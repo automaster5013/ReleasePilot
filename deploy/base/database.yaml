@@ -12,6 +12,15 @@ metadata: { name: mysql }
 spec:
   serviceName: mysql
   replicas: 1
+  podManagementPolicy: OrderedReady
+  revisionHistoryLimit: 10
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   selector: { matchLabels: { app: mysql } }
   template:
     metadata: { labels: { app: mysql } }
@@ -35,8 +44,11 @@ spec:
             limits: { memory: 1Gi }
           volumeMounts: [{ name: data, mountPath: /var/lib/mysql }]
   volumeClaimTemplates:
-    - metadata: { name: data }
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: { name: data }
       spec:
         accessModes: [ReadWriteOnce]
         storageClassName: auto-ebs-sc
+        volumeMode: Filesystem
         resources: { requests: { storage: 10Gi } }
