@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpArgoRolloutsGatewayTests {
     private HttpServer server;
@@ -72,6 +73,37 @@ class HttpArgoRolloutsGatewayTests {
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.createContext("/apis/argoproj.io/v1alpha1/namespaces/demo/rollouts/checkout",exchange->respond(exchange,200,rollout("16","sidecar","target").replace("\"resourceVersion\":\"16\"", "\"resourceVersion\":\"16\",\"generation\":2").replace("\"spec\":", "\"status\":{\"phase\":\"Paused\",\"pauseConditions\":[{\"reason\":\"BlueGreenPause\"}],\"abort\":false,\"observedGeneration\":2},\"spec\":").replace("\"template\":", "\"strategy\":{\"blueGreen\":{\"activeService\":\"checkout-active\",\"previewService\":\"checkout-preview\",\"autoPromotionEnabled\":false}},\"template\":")));server.start();
         var result=new HttpArgoRolloutsGateway(HttpClient.newHttpClient(),new ObjectMapper()).observe(new ArgoRolloutsGateway.ObserveRequest("http://127.0.0.1:"+server.getAddress().getPort(),"token","demo","checkout","checkout"));
         assertThat(result.phase()).isEqualTo("Paused");assertThat(result.currentStepIndex()).isZero();assertThat(result.image()).isEqualTo("target");assertThat(result.controllerObservedDesiredGeneration()).isTrue();
+    }
+
+    @Test void rejectsMissingOrTimedPolicyPausesBeforeAnyImagePatch() throws Exception {
+        var patches = new AtomicInteger();
+        var document = new AtomicReference<>(rollout("7", "sidecar", "old"));
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/apis/argoproj.io/v1alpha1/namespaces/demo/rollouts/checkout", exchange -> {
+            if ("PATCH".equals(exchange.getRequestMethod())) patches.incrementAndGet();
+            respond(exchange, 200, document.get());
+        }); server.start();
+        var gateway = new HttpArgoRolloutsGateway(HttpClient.newHttpClient(), new ObjectMapper());
+        var request = new ArgoRolloutsGateway.StartRequest("http://127.0.0.1:" + server.getAddress().getPort(),
+                "token", "demo", "checkout", "checkout", "new", java.util.List.of(20, 100));
+        assertThatThrownBy(() -> gateway.start(request)).hasMessage("ROLLOUT_POLICY_STEPS_MISMATCH");
+        document.set(rollout("7", "sidecar", "old").replace("\"template\":", "\"strategy\":{\"canary\":{\"steps\":[{\"setWeight\":20},{\"pause\":{\"duration\":60}},{\"setWeight\":100},{\"pause\":{}}]}},\"template\":"));
+        assertThatThrownBy(() -> gateway.start(request)).hasMessage("ROLLOUT_POLICY_STEPS_MISMATCH");
+        assertThat(patches).hasValue(0);
+    }
+
+    @Test void matchingPolicyStepsPreserveAnAlreadyAppliedImage() throws Exception {
+        var patches = new AtomicInteger();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/apis/argoproj.io/v1alpha1/namespaces/demo/rollouts/checkout", exchange -> {
+            if ("PATCH".equals(exchange.getRequestMethod())) patches.incrementAndGet();
+            respond(exchange, 200, rollout("9", "sidecar", "new").replace("\"template\":", "\"strategy\":{\"canary\":{\"steps\":[{\"setWeight\":20},{\"pause\":{}},{\"setWeight\":100},{\"pause\":{}}]}},\"template\":"));
+        }); server.start();
+        var request = new ArgoRolloutsGateway.StartRequest("http://127.0.0.1:" + server.getAddress().getPort(),
+                "token", "demo", "checkout", "checkout", "new", java.util.List.of(20,100));
+        var observed = new HttpArgoRolloutsGateway(HttpClient.newHttpClient(), new ObjectMapper()).start(request);
+        assertThat(observed.resourceVersion()).isEqualTo("9");
+        assertThat(patches).hasValue(0);
     }
 
     private ArgoRolloutsGateway.StartRequest request(String image) { return new ArgoRolloutsGateway.StartRequest("http://127.0.0.1:" + server.getAddress().getPort(), "token", "demo", "checkout", "checkout", image); }

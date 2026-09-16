@@ -130,7 +130,7 @@ class PromotionPreflightTests {
             when(argo.control(any())).thenReturn(new ArgoRolloutsGateway.ObservedRollout("test-only-uid","2"));
             handler=new StartRolloutCommandHandler(executions,releases,artifacts,environments,clusters,connections,
                     secrets,argo,steps,audits,json,Clock.fixed(NOW,ZoneOffset.UTC),mock(GithubCheckService.class),
-                    Duration.ofHours(6),Duration.ofHours(6));
+                    Duration.ofHours(6),Duration.ofHours(6),mock(RolloutAnalysisGate.class));
         }
 
         RolloutCommandHandler.Command command(String type) {

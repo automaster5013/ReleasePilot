@@ -21,6 +21,7 @@ public class HttpArgoRolloutsGateway implements ArgoRolloutsGateway {
                     .header("Authorization", "Bearer " + request.bearerToken()).header("Accept", "application/json").GET().build());
             requireSuccess(current, "read");
             JsonNode rollout = json.readTree(current.body());
+            validatePolicySteps(rollout, request.policyWeights());
             String uid = requiredText(rollout.path("metadata"), "uid");
             String resourceVersion = requiredText(rollout.path("metadata"), "resourceVersion");
             var containers = rollout.path("spec").path("template").path("spec").path("containers");
@@ -65,6 +66,26 @@ public class HttpArgoRolloutsGateway implements ArgoRolloutsGateway {
     @Override public Observation observe(ObserveRequest request){try{URI uri=URI.create(strip(request.apiServer())+"/apis/argoproj.io/v1alpha1/namespaces/"+request.namespace()+"/rollouts/"+request.rolloutName());var response=send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).header("Authorization","Bearer "+request.bearerToken()).header("Accept","application/json").GET().build());requireSuccess(response,"observe");JsonNode rollout=json.readTree(response.body());String image="";for(JsonNode container:rollout.path("spec").path("template").path("spec").path("containers"))if(request.containerName().equals(container.path("name").asText()))image=container.path("image").asText("");if(image.isBlank())throw new IllegalStateException("Container not found in Rollout: "+request.containerName());JsonNode status=rollout.path("status");JsonNode metadata=rollout.path("metadata");int logicalStep=logicalCanaryStep(rollout.path("spec").path("strategy").path("canary").path("steps"),status.path("currentStepIndex").asInt(0));return new Observation(requiredText(metadata,"uid"),requiredText(metadata,"resourceVersion"),status.path("phase").asText("Unknown"),logicalStep,image,status.path("abort").asBoolean(false),metadata.path("generation").asLong(0),status.path("observedGeneration").asLong(0));}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException("Argo Rollout observation interrupted",e);}catch(Exception e){if(e instanceof IllegalStateException state)throw state;throw new IllegalStateException("Argo Rollout observation failed",e);}}
 
     private int logicalCanaryStep(JsonNode steps,int rawStepIndex){int weightSteps=0;int limit=Math.min(rawStepIndex,steps.size()-1);for(int index=0;index<=limit;index++)if(steps.get(index).has("setWeight"))weightSteps++;if(rawStepIndex>=steps.size())return weightSteps;return Math.max(0,weightSteps-1);}
+
+    private void validatePolicySteps(JsonNode rollout, java.util.List<Integer> weights) {
+        if (weights.isEmpty()) return;
+        var strategy = rollout.path("spec").path("strategy");
+        if (strategy.has("blueGreen")) {
+            if (!weights.equals(java.util.List.of(100)) || strategy.path("blueGreen").path("autoPromotionEnabled").asBoolean(true))
+                throw new IllegalStateException("ROLLOUT_POLICY_STEPS_MISMATCH");
+            return;
+        }
+        var definitions = strategy.path("canary").path("steps");
+        if (!definitions.isArray() || definitions.size() != weights.size() * 2)
+            throw new IllegalStateException("ROLLOUT_POLICY_STEPS_MISMATCH");
+        for (int index = 0; index < weights.size(); index++) {
+            var weight = definitions.get(index * 2);
+            var pause = definitions.get(index * 2 + 1);
+            if (weight.size() != 1 || weight.path("setWeight").asInt(-1) != weights.get(index)
+                    || pause.size() != 1 || !pause.path("pause").isObject() || !pause.path("pause").isEmpty())
+                throw new IllegalStateException("ROLLOUT_POLICY_STEPS_MISMATCH");
+        }
+    }
 
     private HttpResponse<String> send(HttpRequest request) throws Exception { return http.send(request, HttpResponse.BodyHandlers.ofString()); }
     private URI rolloutUri(StartRequest r) { return URI.create(strip(r.apiServer()) + "/apis/argoproj.io/v1alpha1/namespaces/" + r.namespace() + "/rollouts/" + r.rolloutName()); }
