@@ -262,6 +262,7 @@ class DockerHubCDTests(unittest.TestCase):
             "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
             "gitleaks/gitleaks-action": "e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e",
             "astral-sh/setup-uv": "37802adc94f370d6bfd71619e3f0bf239e1f3b78",
+            "aws-actions/configure-aws-credentials": "e1253824e5c10ff9df46874f81ed3ec929e19cfd",
         }
         observed = {}
         for workflow in (ROOT / ".github/workflows").glob("*.yml"):
@@ -281,9 +282,19 @@ class DockerHubCDTests(unittest.TestCase):
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")
+        self.assertEqual(
+            deploy["outputs"]["deployment-required"],
+            "${{ steps.update.outputs.deployment-required }}",
+        )
+        self.assertEqual(
+            self.jobs["verify-deployment"]["if"],
+            "needs.update-gitops.outputs.deployment-required == 'true'",
+        )
         command = deploy["steps"][-1]["run"]
         self.assertLess(command.index("git rev-parse HEAD"), command.index("python scripts/"))
         self.assertIn('!= "$RELEASE_SHA"', command)
+        self.assertIn("deployment-required=false", command)
+        self.assertIn("deployment-required=true", command)
         self.assertIn("git diff --cached --quiet", command)
 
     def test_deployment_commit_does_not_trigger_publication_loop(self):

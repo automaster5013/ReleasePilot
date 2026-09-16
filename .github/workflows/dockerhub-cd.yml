@@ -99,6 +99,8 @@ jobs:
   update-gitops:
     needs: publish
     if: vars.DOCKERHUB_AUTO_DEPLOY != 'false'
+    outputs:
+      deployment-required: ${{ steps.update.outputs.deployment-required }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -111,13 +113,16 @@ jobs:
           pattern: dockerhub-*
           merge-multiple: true
       - name: Update deployment only for the current source
+        id: update
         env:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
             echo "A newer main commit exists; deployment skipped."
+            echo "deployment-required=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "deployment-required=true" >> "$GITHUB_OUTPUT"
           cat dockerhub-*.txt > image-digests.txt
           python scripts/update_releasepilot_images.py image-digests.txt deploy/overlays/aws-demo/kustomization.yaml
           git config user.name releasepilot-bot
@@ -128,6 +133,7 @@ jobs:
           git push origin HEAD:main
   verify-deployment:
     needs: update-gitops
+    if: needs.update-gitops.outputs.deployment-required == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
