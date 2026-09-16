@@ -236,6 +236,23 @@ class DockerHubCDTests(unittest.TestCase):
         platform = (ROOT / "infra/aws/platform/bootstrap.ps1").read_text()
         self.assertIn('& "$PSScriptRoot/bootstrap-gitops.ps1"', platform)
 
+    def test_platform_bootstrap_verifies_remote_manifests_before_apply(self):
+        downloader = (
+            ROOT / "infra/aws/platform/get-platform-manifests.ps1"
+        ).read_text()
+        for version in ("v1.8.3", "v3.1.7", "v1.18.2", "controller-v1.13.3"):
+            self.assertIn(version, downloader)
+        hashes = __import__("re").findall(r'Sha256 = "([0-9a-f]{64})"', downloader)
+        self.assertEqual(len(hashes), 4)
+        self.assertEqual(len(set(hashes)), 4)
+        self.assertIn("Get-FileHash", downloader)
+        self.assertIn("SHA-256 mismatch", downloader)
+        platform = (ROOT / "infra/aws/platform/bootstrap.ps1").read_text()
+        self.assertIn('get-platform-manifests.ps1', platform)
+        for line in platform.splitlines():
+            if "kubectl apply" in line:
+                self.assertNotIn("https://", line)
+
     def test_deployment_supports_disable_switch_and_checks_current_head(self):
         deploy = self.jobs["update-gitops"]
         self.assertEqual(deploy["if"], "vars.DOCKERHUB_AUTO_DEPLOY != 'false'")

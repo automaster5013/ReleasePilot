@@ -17,6 +17,8 @@
 6. `v*` 태그 workflow가 세 이미지를 ECR에 push하고 main의 AWS overlay를 digest로 갱신하는지 확인한다.
 7. `infra/aws/platform/bootstrap-gitops.ps1`을 실행한다. 스크립트가 상위 `releasepilot-platform` Application을 적용하고 상위 앱과 세 하위 앱이 main을 Synced/Healthy로 표시할 때까지 확인한다.
 
+전체 플랫폼을 새로 설치할 때 `bootstrap.ps1`은 Argo Rollouts, Argo CD, cert-manager, ingress-nginx manifest를 임시 디렉터리에 다운로드하고 고정 SHA-256 검증을 통과한 파일만 `kubectl apply`에 전달한다. 버전을 올릴 때는 공급자 공식 릴리스에서 파일을 다시 받아 digest를 함께 검토·갱신한다.
+
 ## 검증
 
 ```powershell

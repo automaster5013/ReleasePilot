@@ -10,7 +10,7 @@ NGINX는 HTTPS와 경로 라우팅을 담당한다. 현재 세 애플리케이�
 2. 출력된 `route53_name_servers`를 가비아 도메인의 네임서버로 등록한다.
 3. 출력된 `configure_kubectl`을 실행한다.
 4. `platform/bootstrap.ps1`로 Argo CD, Argo Rollouts, ingress-nginx, cert-manager를 설치한다.
-5. `platform/bootstrap.ps1`이 Argo CD CRD 준비 후 `bootstrap-gitops.ps1`을 호출해 `releasepilot-platform`과 하위 앱의 Synced/Healthy 상태를 확인한다. 기존 플랫폼에서는 `platform/bootstrap-gitops.ps1`만 안전하게 재실행할 수 있다. 기본 GitOps source는 이 저장소의 main과
+5. `platform/bootstrap.ps1`은 고정 버전의 외부 설치 manifest 네 개를 다운로드하고 저장소에 기록된 SHA-256과 일치할 때만 적용한다. 이후 Argo CD CRD 준비 후 `bootstrap-gitops.ps1`을 호출해 `releasepilot-platform`과 하위 앱의 Synced/Healthy 상태를 확인한다. 기존 플랫폼에서는 `platform/bootstrap-gitops.ps1`만 안전하게 재실행할 수 있다. 기본 GitOps source는 이 저장소의 main과
    `deploy/overlays/aws-demo`다. 다른 저장소를 사용할 때만 repoURL과 경로를 변경한다.
 
 Terraform은 기본적으로 NAT Gateway 한 개를 만든다. 데모를 계속 운영하지 않을 때는 `terraform destroy`로
