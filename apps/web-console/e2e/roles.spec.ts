@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; auditIntegrityFailure?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -264,17 +264,18 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     const path = url.pathname.slice("/control-api".length);
     const json = (body: unknown, code = 200) => route.fulfill({ status: code, contentType: "application/json", body: JSON.stringify(body) });
     if (request.method() !== "GET") {
+      const sessionMutation = role === "OPERATOR" && path === "/session/revoke-others";
       const permitted = request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
-        (role === "OPERATOR" && /^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path))
+        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation))
       );
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          !request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")) {
+          (!sessionMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
-      mutations.push({ path, body: request.postDataJSON() });
+      mutations.push({ path, body: request.postData() ? request.postDataJSON() : null });
       if (options.responseGate) await options.responseGate;
       if (options.disconnect || (options.disconnectOnce && mutations.length === 1)) return route.abort("connectionfailed");
       if (options.failure) return json({ code: options.failure }, 403);
@@ -293,7 +294,10 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       csrfRequests++;
       return options.csrfFailure ? route.abort("connectionfailed") : json({ headerName: "X-CSRF-TOKEN", token: "role-fixture-csrf" }, options.csrfRejectOnce && csrfRequests === 1 ? 403 : options.csrfStatus || 200);
     }
-    if (path === "/session/active") return json({ items: [] });
+    if (path === "/session/active") return json({ items: options.activeSessions ? [
+      { reference: "current-session", current: true, createdAt: "2026-09-17T00:00:00Z", lastAccessedAt: "2026-09-17T00:01:00Z", expiresAt: "2099-01-01T00:00:00Z" },
+      { reference: "other-session", current: false, createdAt: "2026-09-17T00:00:00Z", lastAccessedAt: "2026-09-17T00:01:00Z", expiresAt: "2099-01-01T00:00:00Z" },
+    ] : [] });
     if (path === "/audit-events/verify") return options.auditIntegrityFailure
       ? json({ code: "AUDIT_VERIFICATION_UNAVAILABLE" }, 503)
       : json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
@@ -1009,6 +1013,22 @@ test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ pa
   await expect(alert).toHaveAttribute("aria-atomic", "true");
   await expect(verify).toBeFocused();
   expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
+test("@a11y OPERATOR revoke other sessions errors preserve trigger focus", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { activeSessions: true, failure: "SESSION_REVOKE_REJECTED" });
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.goto("/");
+
+  const revoke = page.getByRole("button", { name: "다른 세션 모두 종료", exact: true });
+  await revoke.focus();
+  await revoke.press("Enter");
+  const alert = page.getByRole("alert").filter({ hasText: "다른 세션 종료 요청이 거부되었습니다." });
+  await expect(alert).toHaveAttribute("aria-live", "assertive");
+  await expect(alert).toHaveAttribute("aria-atomic", "true");
+  await expect(revoke).toBeFocused();
+  expect(state.mutations).toEqual([{ path: "/session/revoke-others", body: null }]);
   expect(state.unexpected).toEqual([]);
 });
 
