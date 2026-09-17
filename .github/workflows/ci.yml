@@ -88,6 +88,9 @@ jobs:
       - run: python -m unittest discover -s scripts -p test_public_ingress.py
       - run: python -m unittest discover -s scripts -p test_release_ci_gate.py
       - run: python -m unittest discover -s scripts -p test_dockerhub_cd.py
+      - name: Verify project log management
+        shell: pwsh
+        run: ./scripts/Test-ProjectLogManagement.ps1
       - name: Validate release policy example
         run: >-
           python -c "import json,jsonschema,pathlib;
