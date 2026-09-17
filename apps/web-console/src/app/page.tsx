@@ -131,6 +131,7 @@ export default function Home() {
   const [clusterConnections, setClusterConnections] = useState<ClusterConnection[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState("");
   const connectionRefreshInFlight = useRef(false);
+  const connectionValidationInFlight = useRef(false);
   const [connectionNotice, setConnectionNotice] = useState("");
   const [connectionActionError, setConnectionActionError] = useState("");
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
@@ -642,7 +643,8 @@ export default function Home() {
   }
 
   async function validatePrometheusConnection(connectionId: string, trigger: HTMLElement) {
-    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId) return;
+    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId || connectionValidationInFlight.current) return;
+    connectionValidationInFlight.current = true;
     setConnectionActionError("");
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
@@ -660,12 +662,14 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     } finally {
+      connectionValidationInFlight.current = false;
       setConnectionBusyId("");
     }
   }
 
   async function validateClusterConnection(connectionId: string, trigger: HTMLElement) {
-    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId) return;
+    if (!canManageConnections(sessionUser?.roles ?? []) || connectionBusyId || connectionValidationInFlight.current) return;
+    connectionValidationInFlight.current = true;
     setConnectionActionError("");
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
@@ -683,6 +687,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     } finally {
+      connectionValidationInFlight.current = false;
       setConnectionBusyId("");
     }
   }
@@ -824,7 +829,8 @@ export default function Home() {
   }
 
   async function validateAllConnections(kind: "clusters" | "prometheus", trigger: HTMLElement) {
-    if (connectionBusyId) return;
+    if (connectionBusyId || connectionValidationInFlight.current) return;
+    connectionValidationInFlight.current = true;
     setConnectionActionError("");
     setConnectionBusyId(`all-${kind}`); setConnectionNotice("");
     try {
@@ -840,7 +846,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionBusyId(""); }
+    finally { connectionValidationInFlight.current = false; setConnectionBusyId(""); }
   }
 
   async function refreshConnections(trigger: HTMLElement) {

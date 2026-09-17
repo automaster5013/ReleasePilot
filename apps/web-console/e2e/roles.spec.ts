@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -269,20 +269,23 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       const sessionMutation = role === "OPERATOR" && path === "/session/revoke-others";
       const individualSessionMutation = role === "OPERATOR" && request.method() === "DELETE" && path === "/session/active/other-session";
       const environmentValidationMutation = role === "OPERATOR" && path === `/environments/${environmentId}/validate`;
+      const connectionValidationMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)(\/[^/]+)?\/validate$/.test(path);
       const permitted = (request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
-        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation))
+        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation))
       )) || individualSessionMutation;
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
+          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && !connectionValidationMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
       mutations.push({ path, body: request.postData() ? request.postDataJSON() : null });
       if (options.responseGate) await options.responseGate;
+      if (connectionValidationMutation && options.connectionValidationGate) await options.connectionValidationGate;
       if (options.disconnect || (options.disconnectOnce && mutations.length === 1)) return route.abort("connectionfailed");
       if (options.failure) return json({ code: options.failure }, 403);
+      if (connectionValidationMutation) return json(path.split("/").length === 4 ? [{ status: "ACTIVE" }] : { status: "ACTIVE" });
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
       const eventType = path === "/releases" ? "RELEASE_REQUESTED" : ["approve", "reject"].includes(action)
@@ -1029,6 +1032,30 @@ test("connection refresh remains locked until both list requests complete", asyn
   } finally { respond(); }
 });
 
+test("OPERATOR connection validation remains single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const connectionValidationGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionValidationGate });
+  try {
+    await page.goto("/");
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    const validate = cluster.getByRole("button", { name: "연결 검증", exact: true });
+    await validate.evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await page.getByRole("button", { name: "Prometheus 전체 검증", exact: true }).evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(state.mutations).toEqual([{ path: "/connections/clusters/cluster-role/validate", body: null }]);
+    respond();
+    await expect(validate).toBeEnabled();
+    expect(state.mutations).toEqual([{ path: "/connections/clusters/cluster-role/validate", body: null }]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
 test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { releaseRefreshFailure: true });
   await page.goto("/");
@@ -1068,6 +1095,7 @@ test("release refresh remains locked until the current list request completes", 
 test("@a11y OPERATOR release load errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { releaseLoadFailure: true });
   await page.goto("/");
+  await page.getByRole("combobox", { name: "최근 릴리스" }).selectOption("role-release");
 
   const loadRelease = page.getByRole("button", { name: "불러오기", exact: true });
   await loadRelease.focus();
