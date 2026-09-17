@@ -431,6 +431,32 @@ test("approval decisions remain single-flight before busy state renders", async 
   }
 });
 
+test("approval decisions allow only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "APPROVER", { responseGate });
+  const otherState = await fixture(other, "APPROVER");
+  page.on("dialog", (dialog) => dialog.accept("Cross-tab approve"));
+  other.on("dialog", (dialog) => dialog.accept("Cross-tab reject"));
+  try {
+    await Promise.all([load(page), load(other)]);
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "Reject", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 승인 결정을 처리하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/releases/role-release/approve", body: { reason: "Cross-tab approve" } }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByRole("status").filter({ hasText: "승인 결정이 기록되었습니다." })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("approval decision timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });

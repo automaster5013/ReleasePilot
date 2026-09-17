@@ -971,28 +971,31 @@ export default function Home() {
     setOperationNotice("");
     setError("");
     try {
-      const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
-      const headers = await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve");
-      if (!isCurrent()) return;
-      const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
-        method: "POST", credentials: "include",
-        headers,
-        body: JSON.stringify({ reason }),
+      const result = await runWithBrowserLock("releasepilot:approval-decision", async () => {
+        const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
+        const headers = await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve");
+        if (!isCurrent()) return;
+        const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
+          method: "POST", credentials: "include",
+          headers,
+          body: JSON.stringify({ reason }),
+        });
+        if (!isCurrent()) return;
+        if (!response.ok) {
+          const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
+          if (problem?.code === "SELF_APPROVAL_NOT_ALLOWED") throw new Error("요청자는 자신의 릴리스를 승인할 수 없습니다.");
+          const readinessMessage = approvalReadinessMessage(problem?.code);
+          if (action === "approve" && readinessMessage) throw new Error(readinessMessage);
+          throw new Error(problem?.detail ?? `${action} 요청이 거부되었습니다.`);
+        }
+        const decided = await response.json() as { status: string };
+        if (!isCurrent()) return;
+        setRelease((current) => current?.id === targetId ? { ...current, status: decided.status } : current);
+        setLive((current) => ({ ...current, releaseStatus: decided.status }));
+        setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
+        await refreshAudit(targetId, isCurrent);
       });
-      if (!isCurrent()) return;
-      if (!response.ok) {
-        const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
-        if (problem?.code === "SELF_APPROVAL_NOT_ALLOWED") throw new Error("요청자는 자신의 릴리스를 승인할 수 없습니다.");
-        const readinessMessage = approvalReadinessMessage(problem?.code);
-        if (action === "approve" && readinessMessage) throw new Error(readinessMessage);
-        throw new Error(problem?.detail ?? `${action} 요청이 거부되었습니다.`);
-      }
-      const decided = await response.json() as { status: string };
-      if (!isCurrent()) return;
-      setRelease((current) => current?.id === targetId ? { ...current, status: decided.status } : current);
-      setLive((current) => ({ ...current, releaseStatus: decided.status }));
-      setOperationNotice(`${action === "approve" ? "승인" : "거부"} 결정이 기록되었습니다.`);
-      await refreshAudit(targetId, isCurrent);
+      if (!result.acquired) throw new Error("다른 탭에서 승인 결정을 처리하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       if (isCurrent()) {
         setError((failure as Error).message);
