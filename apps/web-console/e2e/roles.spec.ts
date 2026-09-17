@@ -250,6 +250,31 @@ test("release request timeout unlocks controls and permits one clean retry", asy
   }
 });
 
+test("release request allows only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "DEVELOPER", { responseGate });
+  const otherState = await fixture(other, "DEVELOPER");
+  try {
+    await fillRequest(page);
+    await fillRequest(other);
+    await page.getByRole("button", { name: "릴리스 요청", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "릴리스 요청", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 릴리스를 요청하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toHaveLength(1);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 for (const role of ["APPROVER", "OPERATOR"]) {
   for (const rejected of [false, true]) {
   test(`${role} prevents repeated actions while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {

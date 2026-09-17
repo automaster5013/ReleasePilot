@@ -625,29 +625,32 @@ export default function Home() {
     setReleaseValidationIssue(null);
     setError("");
     try {
-      const response = await fetchWithTimeout("/control-api/releases", {
-        method: "POST", credentials: "include",
-        headers: await readinessMutationHeaders(environmentValidation, csrfToken, { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }, true, releaseDraft.environmentId),
-        body: JSON.stringify({
-          ...releaseDraft,
-          serviceId: releaseDraft.serviceId.trim(), environmentId: releaseDraft.environmentId.trim(),
-          version: releaseDraft.version.trim(), imageRepository: releaseDraft.imageRepository.trim(),
-          changeSummary: releaseDraft.changeSummary.trim(), commitSha: releaseDraft.commitSha.trim(),
-          pipelineUrl: releaseDraft.pipelineUrl.trim(),
-          requestedPolicyVersionId: releaseDraft.requestedPolicyVersionId.trim() || null,
-        }),
+      const result = await runWithBrowserLock("releasepilot:release-request", async () => {
+        const response = await fetchWithTimeout("/control-api/releases", {
+          method: "POST", credentials: "include",
+          headers: await readinessMutationHeaders(environmentValidation, csrfToken, { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }, true, releaseDraft.environmentId),
+          body: JSON.stringify({
+            ...releaseDraft,
+            serviceId: releaseDraft.serviceId.trim(), environmentId: releaseDraft.environmentId.trim(),
+            version: releaseDraft.version.trim(), imageRepository: releaseDraft.imageRepository.trim(),
+            changeSummary: releaseDraft.changeSummary.trim(), commitSha: releaseDraft.commitSha.trim(),
+            pipelineUrl: releaseDraft.pipelineUrl.trim(),
+            requestedPolicyVersionId: releaseDraft.requestedPolicyVersionId.trim() || null,
+          }),
+        });
+        if (!response.ok) {
+          const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
+          const readinessMessage = releaseRequestReadinessMessage(problem?.code);
+          if (readinessMessage) throw new Error(readinessMessage);
+          throw new Error(problem?.detail ?? "릴리스 요청이 거부되었습니다.");
+        }
+        const created = await response.json() as { id: string };
+        setReleaseId(created.id);
+        setRequestNotice(`릴리스 ${created.id} 요청이 생성되었습니다.`);
+        await refreshReleases();
+        await load(created.id);
       });
-      if (!response.ok) {
-        const problem = await response.json().catch(() => null) as { code?: string; detail?: string } | null;
-        const readinessMessage = releaseRequestReadinessMessage(problem?.code);
-        if (readinessMessage) throw new Error(readinessMessage);
-        throw new Error(problem?.detail ?? "릴리스 요청이 거부되었습니다.");
-      }
-      const created = await response.json() as { id: string };
-      setReleaseId(created.id);
-      setRequestNotice(`릴리스 ${created.id} 요청이 생성되었습니다.`);
-      await refreshReleases();
-      await load(created.id);
+      if (!result.acquired) throw new Error("다른 탭에서 릴리스를 요청하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
