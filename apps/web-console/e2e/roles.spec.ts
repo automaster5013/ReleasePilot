@@ -214,6 +214,44 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   }
 }
 
+test("operator release actions remain single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, failure: "FORBIDDEN" });
+  try {
+    await load(page);
+    const promote = page.getByRole("button", { name: "Promote", exact: true });
+    const pause = page.getByRole("button", { name: "Pause", exact: true });
+    await expect(promote).toBeEnabled();
+    await expect(pause).toBeEnabled();
+    page.on("dialog", (dialog) => dialog.accept("Concurrent operation fixture"));
+
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const promoteButton = buttons.find((button) => button.textContent === "Promote");
+      const pauseButton = buttons.find((button) => button.textContent === "Pause");
+      if (!promoteButton || !pauseButton) throw new Error("Release operation controls are unavailable");
+      promoteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      promoteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      pauseButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await expect.poll(() => state.mutations.length).toBe(1);
+    expect(state.mutations).toEqual([{
+      path: "/releases/role-release/promote",
+      body: { reason: "Concurrent operation fixture" },
+    }]);
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "promote 요청이 거부되었습니다." })).toBeVisible();
+    await expect(promote).toBeEnabled();
+    await expect(pause).toBeEnabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
 for (const action of ["approve", "reject", "promote", "pause", "resume", "abort"]) {
   test(`${action} accepts a single character reason after whitespace trimming`, async ({ page }) => {
     const decision = action === "approve" || action === "reject";
