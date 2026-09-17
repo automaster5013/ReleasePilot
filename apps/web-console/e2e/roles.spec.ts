@@ -389,7 +389,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       const connectionCreateMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)$/.test(path);
       const connectionMutation = role === "OPERATOR" && ((request.method() === "PUT" && /^\/connections\/(clusters|prometheus)\/[^/]+$/.test(path)) || (request.method() === "POST" && /^\/connections\/(clusters|prometheus)\/[^/]+\/(enable|disable)$/.test(path)));
       const permitted = (request.method() === "POST" && (
-        (role === "DEVELOPER" && path === "/releases") ||
+        (["DEVELOPER", "APPROVER", "OPERATOR"].includes(role) && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
         (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation || connectionCreateMutation || connectionMutation))
       )) || individualSessionMutation || connectionMutation;
@@ -1509,6 +1509,39 @@ test("environment revalidation and release request remain single-flight before b
     await expect(page.getByRole("alert").filter({ hasText: "환경 재검증 요청이 거부되었습니다." })).toBeVisible();
     await expect(revalidate).toBeEnabled();
     await expect(request).toBeDisabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
+test("release request blocks environment revalidation before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, failure: "FORBIDDEN" });
+  try {
+    await fillRequest(page);
+    const request = page.getByRole("button", { name: "릴리스 요청", exact: true });
+    const revalidate = page.getByRole("button", { name: "지금 재검증", exact: true });
+    await expect(request).toBeEnabled();
+    await expect(revalidate).toBeEnabled();
+
+    await request.evaluate((requestButton) => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const revalidateButton = buttons.find((button) => button.textContent === "지금 재검증");
+      if (!revalidateButton) throw new Error("Environment revalidation control is unavailable");
+      const form = requestButton.closest("form");
+      if (!form) throw new Error("Release request form is unavailable");
+      form.requestSubmit(requestButton as HTMLButtonElement);
+      form.requestSubmit(requestButton as HTMLButtonElement);
+      revalidateButton.click();
+    });
+
+    await expect.poll(() => state.mutations.length).toBe(1);
+    expect(state.mutations[0].path).toBe("/releases");
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "릴리스 요청이 거부되었습니다." })).toBeVisible();
+    await expect(request).toBeEnabled();
+    await expect(revalidate).toBeEnabled();
     expect(state.mutations).toHaveLength(1);
     expect(state.unexpected).toEqual([]);
   } finally { respond(); }
