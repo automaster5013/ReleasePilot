@@ -1185,6 +1185,50 @@ test("OPERATOR connection registration remains single-flight before busy state r
   } finally { respond(); }
 });
 
+test("connection registration timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, responseGateOnce: true });
+  try {
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      let attempts = 0;
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/connections/clusters" || init?.method !== "POST") return pending;
+        attempts++;
+        if (attempts > 1) return pending;
+        void pending.catch(() => undefined);
+        return new Promise<Response>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+        });
+      }) as typeof window.fetch;
+    });
+    await page.goto("/");
+    await page.getByText("NEW CONNECTION", { exact: false }).click();
+    const clusterForm = page.locator("form").filter({ has: page.getByText("Kubernetes cluster", { exact: true }) });
+    await clusterForm.getByLabel("Name", { exact: true }).fill("Production cluster");
+    await clusterForm.getByLabel("API server", { exact: true }).fill("https://cluster.example");
+    await clusterForm.getByLabel("Allowed namespaces", { exact: true }).fill("releasepilot");
+    await clusterForm.getByLabel("Secret reference", { exact: true }).fill("env:KUBERNETES_TOKEN");
+    const submit = clusterForm.getByRole("button", { name: "Cluster 등록", exact: true });
+
+    await submit.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(clusterForm.getByRole("button", { name: "등록 중…", exact: true })).toBeDisabled();
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+    await expect(submit).toBeEnabled();
+
+    respond();
+    await submit.click();
+    await expect(page.getByText("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.", { exact: true })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
 test("OPERATOR connection changes remain single-flight before busy state renders", async ({ page }) => {
   let respond!: () => void;
   const connectionMutationGate = new Promise<void>((resolve) => { respond = resolve; });
@@ -1204,6 +1248,45 @@ test("OPERATOR connection changes remain single-flight before busy state renders
     respond();
     await expect(prometheusEnable).toBeEnabled();
     expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
+test("connection status timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, disabledPrometheus: true, responseGate, responseGateOnce: true });
+  try {
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      let attempts = 0;
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/connections/prometheus/prometheus-role/enable" || init?.method !== "POST") return pending;
+        attempts++;
+        if (attempts > 1) return pending;
+        void pending.catch(() => undefined);
+        return new Promise<Response>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+        });
+      }) as typeof window.fetch;
+    });
+    await page.goto("/");
+    const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+    const enable = prometheus.getByRole("button", { name: "재활성화", exact: true });
+
+    await enable.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(enable).toBeDisabled();
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+    await expect(enable).toBeEnabled();
+
+    respond();
+    await enable.click();
+    await expect(page.getByText("연결을 재활성화했습니다. 사용 전에 연결 검증을 실행하세요.", { exact: true })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
     expect(state.unexpected).toEqual([]);
   } finally { respond(); }
 });

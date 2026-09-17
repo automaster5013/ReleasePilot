@@ -706,7 +706,7 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
-      const response = await fetch("/control-api/connections/clusters", {
+      const response = await fetchWithTimeout("/control-api/connections/clusters", {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
         body: JSON.stringify({ name: clusterDraft.name.trim(), apiServer: clusterDraft.apiServer.trim(), allowedNamespaces: parseNamespaces(clusterDraft.namespaces), secretRef: clusterDraft.secretRef.trim() }),
       });
@@ -751,7 +751,7 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
-      const response = await fetch("/control-api/connections/prometheus", {
+      const response = await fetchWithTimeout("/control-api/connections/prometheus", {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
         body: JSON.stringify({ name: prometheusDraft.name.trim(), baseUrl: prometheusDraft.baseUrl.trim(), secretRef: prometheusDraft.secretRef.trim() || null, queryTimeoutSeconds: Number(prometheusDraft.queryTimeoutSeconds) }),
       });
@@ -779,7 +779,7 @@ export default function Home() {
     const validation = validateClusterConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
+      const response = await fetchWithTimeout(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
       const problem = await response.json().catch(() => null) as { detail?: string } | null;
       if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 수정이 거부되었습니다.");
       await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
@@ -804,7 +804,7 @@ export default function Home() {
     const validation = validatePrometheusConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
+      const response = await fetchWithTimeout(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
       const problem = await response.json().catch(() => null) as { detail?: string } | null;
       if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 수정이 거부되었습니다.");
       await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
@@ -825,7 +825,7 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/${kind}/${item.id}/${enable ? "enable" : "disable"}`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+      const response = await fetchWithTimeout(`/control-api/connections/${kind}/${item.id}/${enable ? "enable" : "disable"}`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
       if (!response.ok) throw new Error(`연결 ${enable ? "재활성화" : "비활성화"} 요청이 거부되었습니다.`);
       if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
       setConnectionNotice(enable ? "연결을 재활성화했습니다. 사용 전에 연결 검증을 실행하세요." : "연결을 비활성화했습니다.");
