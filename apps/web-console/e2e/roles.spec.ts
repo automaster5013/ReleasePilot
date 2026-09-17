@@ -526,6 +526,13 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       if (connectionValidationMutation) return json(path.split("/").length === 4 ? [{ status: "ACTIVE" }] : { status: "ACTIVE" });
       if (connectionCreateMutation) return json({ id: path.endsWith("clusters") ? "cluster-created" : "prometheus-created", status: "PENDING_VALIDATION" }, 201);
       if (connectionMutation) return json({ status: path.endsWith("disable") ? "DISABLED" : "PENDING_VALIDATION" });
+      if (environmentValidationMutation) return json({
+        environmentId,
+        status: "ACTIVE",
+        checkedAt: new Date().toISOString(),
+        validUntil: "2099-01-01T00:00:00Z",
+        checks: [{ code: "FIXTURE_READY", outcome: "PASS", message: "Isolated readiness" }],
+      });
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
       const eventType = path === "/releases" ? "RELEASE_REQUESTED" : ["approve", "reject"].includes(action)
@@ -1598,6 +1605,47 @@ test("@a11y OPERATOR environment revalidation errors preserve trigger focus", as
   await expect(revalidate).toBeFocused();
   expect(state.mutations).toEqual([{ path: `/environments/${environmentId}/validate`, body: null }]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("environment revalidation timeout keeps release fail-closed and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, responseGateOnce: true });
+  try {
+    await fillRequest(page);
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (!url.pathname.endsWith("/validate") || init?.method !== "POST") return pending;
+        return new Promise<Response>((resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          pending.then(resolve, reject);
+        });
+      }) as typeof window.fetch;
+    });
+    const revalidate = page.getByRole("button", { name: "지금 재검증", exact: true });
+    const request = page.getByRole("button", { name: "릴리스 요청", exact: true });
+
+    await revalidate.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(page.getByRole("button", { name: "재검증 중…", exact: true })).toBeDisabled();
+    await expect(request).toBeDisabled();
+
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible({ timeout: 20_000 });
+    await expect(revalidate).toBeEnabled();
+    await expect(request).toBeDisabled();
+
+    await revalidate.click();
+    await expect(page.getByText("환경 재검증이 완료되었습니다.", { exact: true })).toBeVisible();
+    await expect(request).toBeEnabled();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
 });
 
 test("environment revalidation and release request remain single-flight before busy state renders", async ({ page }) => {

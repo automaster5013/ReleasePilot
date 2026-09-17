@@ -571,7 +571,7 @@ export default function Home() {
     setEnvironmentValidation(null);
     setEnvironmentValidationBusy(true); setEnvironmentValidationNotice("환경 재검증 중에는 릴리스를 요청할 수 없습니다.");
     try {
-      const response = await fetch(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+      const response = await fetchWithTimeout(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
       if (!response.ok) throw new Error("환경 재검증 요청이 거부되었습니다.");
       const result = await response.json() as EnvironmentValidation;
       if (!isCurrent() || selectedEnvironmentId.current !== environmentId) return;
