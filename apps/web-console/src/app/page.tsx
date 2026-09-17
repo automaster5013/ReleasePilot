@@ -917,7 +917,7 @@ export default function Home() {
       const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
       const headers = mutationHeaders(await csrfToken(), { idempotencyKey, json: true });
       if (!isCurrent()) return;
-      const response = await fetch(`/control-api/releases/${targetId}/${action}`, {
+      const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
         method: "POST", credentials: "include",
         headers,
         body: JSON.stringify({ reason }),
@@ -959,7 +959,7 @@ export default function Home() {
       const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
       const headers = await readinessMutationHeaders(approvalEnvironmentValidation, csrfToken, { idempotencyKey, json: true }, action === "approve");
       if (!isCurrent()) return;
-      const response = await fetch(`/control-api/releases/${targetId}/${action}`, {
+      const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
         method: "POST", credentials: "include",
         headers,
         body: JSON.stringify({ reason }),

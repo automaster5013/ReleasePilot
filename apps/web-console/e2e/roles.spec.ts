@@ -327,6 +327,47 @@ test("operator release actions remain single-flight before busy state renders", 
   }
 });
 
+test("operator release action timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, responseGateOnce: true });
+  try {
+    await load(page);
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/releases/role-release/promote" || init?.method !== "POST") return pending;
+        return new Promise<Response>((resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          pending.then(resolve, reject);
+        });
+      }) as typeof window.fetch;
+    });
+    const promote = page.getByRole("button", { name: "Promote", exact: true });
+    const pause = page.getByRole("button", { name: "Pause", exact: true });
+    page.on("dialog", (dialog) => dialog.accept("Timeout recovery fixture"));
+
+    await promote.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(promote).toBeDisabled();
+    await expect(pause).toBeDisabled();
+
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible({ timeout: 20_000 });
+    await expect(promote).toBeEnabled();
+    await expect(pause).toBeEnabled();
+
+    await promote.click();
+    await expect(page.getByRole("status").filter({ hasText: "promote 요청이 접수되었습니다." })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
 test("approval decisions remain single-flight before busy state renders", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });
@@ -359,6 +400,47 @@ test("approval decisions remain single-flight before busy state renders", async 
     await expect(approve).toBeEnabled();
     await expect(reject).toBeEnabled();
     expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
+test("approval decision timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "APPROVER", { responseGate, responseGateOnce: true });
+  try {
+    await load(page);
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/releases/role-release/approve" || init?.method !== "POST") return pending;
+        return new Promise<Response>((resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          pending.then(resolve, reject);
+        });
+      }) as typeof window.fetch;
+    });
+    const approve = page.getByRole("button", { name: "Approve", exact: true });
+    const reject = page.getByRole("button", { name: "Reject", exact: true });
+    page.on("dialog", (dialog) => dialog.accept("Timeout recovery fixture"));
+
+    await approve.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(approve).toBeDisabled();
+    await expect(reject).toBeDisabled();
+
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible({ timeout: 20_000 });
+    await expect(approve).toBeEnabled();
+    await expect(reject).toBeEnabled();
+
+    await approve.click();
+    await expect(page.getByRole("status").filter({ hasText: "승인 결정이 기록되었습니다." })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
     expect(state.unexpected).toEqual([]);
   } finally {
     respond();
