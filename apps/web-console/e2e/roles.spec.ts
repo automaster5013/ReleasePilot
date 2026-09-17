@@ -1762,6 +1762,32 @@ test("OPERATOR session revocation remains single-flight before busy state render
   } finally { respond(); }
 });
 
+test("OPERATOR session revocation allows only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { activeSessions: true, responseGate });
+  const otherState = await fixture(other, "OPERATOR", { activeSessions: true });
+  page.on("dialog", (dialog) => dialog.accept());
+  other.on("dialog", (dialog) => dialog.accept());
+  try {
+    await Promise.all([page.goto("/"), other.goto("/")]);
+    await page.getByRole("button", { name: "종료", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "다른 세션 모두 종료", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 활성 세션을 종료하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/session/active/other-session", body: null }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByRole("status").filter({ hasText: "선택한 세션을 종료했습니다." })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("session revocation timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });

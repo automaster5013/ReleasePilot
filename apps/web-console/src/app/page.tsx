@@ -388,20 +388,23 @@ export default function Home() {
     setSessionBusy(true);
     setSessionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/session/active/${session.reference}`, {
-        method: "DELETE", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      const result = await runWithBrowserLock("releasepilot:session-revoke", async () => {
+        const response = await fetchWithTimeout(`/control-api/session/active/${session.reference}`, {
+          method: "DELETE", credentials: "include", headers: mutationHeaders(await csrfToken()),
+        });
+        if (!response.ok) throw new Error("세션 종료 요청이 거부되었습니다.");
+        if (session.current) {
+          setSessionUser(null);
+          setActiveSessions([]);
+          setAuditIntegrity(null);
+          setCanOperate(false);
+          setSessionNotice("현재 세션이 종료되었습니다.");
+        } else {
+          await refreshSessions();
+          setSessionNotice("선택한 세션을 종료했습니다.");
+        }
       });
-      if (!response.ok) throw new Error("세션 종료 요청이 거부되었습니다.");
-      if (session.current) {
-        setSessionUser(null);
-        setActiveSessions([]);
-        setAuditIntegrity(null);
-        setCanOperate(false);
-        setSessionNotice("현재 세션이 종료되었습니다.");
-      } else {
-        await refreshSessions();
-        setSessionNotice("선택한 세션을 종료했습니다.");
-      }
+      if (!result.acquired) throw new Error("다른 탭에서 활성 세션을 종료하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
@@ -419,13 +422,16 @@ export default function Home() {
     setSessionBusy(true);
     setSessionNotice("");
     try {
-      const response = await fetchWithTimeout("/control-api/session/revoke-others", {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      const result = await runWithBrowserLock("releasepilot:session-revoke", async () => {
+        const response = await fetchWithTimeout("/control-api/session/revoke-others", {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+        });
+        if (!response.ok) throw new Error("다른 세션 종료 요청이 거부되었습니다.");
+        const result = await response.json() as { revoked: number };
+        await refreshSessions();
+        setSessionNotice(`${result.revoked}개의 다른 세션을 종료했습니다.`);
       });
-      if (!response.ok) throw new Error("다른 세션 종료 요청이 거부되었습니다.");
-      const result = await response.json() as { revoked: number };
-      await refreshSessions();
-      setSessionNotice(`${result.revoked}개의 다른 세션을 종료했습니다.`);
+      if (!result.acquired) throw new Error("다른 탭에서 활성 세션을 종료하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
