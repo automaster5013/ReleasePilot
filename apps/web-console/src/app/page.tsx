@@ -101,6 +101,7 @@ export default function Home() {
   const logoutInFlight = useRef(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [sessionBusy, setSessionBusy] = useState(false);
+  const sessionMutationInFlight = useRef(false);
   const [sessionNotice, setSessionNotice] = useState("");
   const [operationBusy, setOperationBusy] = useState(false);
   const [operationNotice, setOperationNotice] = useState("");
@@ -370,7 +371,9 @@ export default function Home() {
   }
 
   async function revokeSession(session: ActiveSession, trigger: HTMLElement | null = null) {
+    if (sessionMutationInFlight.current) return;
     if (!window.confirm(session.current ? "현재 세션을 종료하시겠습니까?" : "선택한 세션을 종료하시겠습니까?")) return;
+    sessionMutationInFlight.current = true;
     setError("");
     setSessionBusy(true);
     setSessionNotice("");
@@ -393,12 +396,15 @@ export default function Home() {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
     } finally {
+      sessionMutationInFlight.current = false;
       setSessionBusy(false);
     }
   }
 
   async function revokeOtherSessions(trigger: HTMLElement | null = null) {
+    if (sessionMutationInFlight.current) return;
     if (!window.confirm("현재 세션을 제외한 모든 세션을 종료하시겠습니까?")) return;
+    sessionMutationInFlight.current = true;
     setError("");
     setSessionBusy(true);
     setSessionNotice("");
@@ -414,6 +420,7 @@ export default function Home() {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
     } finally {
+      sessionMutationInFlight.current = false;
       setSessionBusy(false);
     }
   }

@@ -1172,6 +1172,30 @@ test("@a11y OPERATOR individual session revoke errors preserve trigger focus", a
   expect(state.unexpected).toEqual([]);
 });
 
+test("OPERATOR session revocation remains single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { activeSessions: true, responseGate });
+  page.on("dialog", (dialog) => dialog.accept());
+  try {
+    await page.goto("/");
+    const revoke = page.getByRole("button", { name: "종료", exact: true });
+    await revoke.evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await page.getByRole("button", { name: "다른 세션 모두 종료", exact: true }).evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(state.mutations).toEqual([{ path: "/session/active/other-session", body: null }]);
+    respond();
+    await expect(revoke).toBeEnabled();
+    expect(state.mutations).toEqual([{ path: "/session/active/other-session", body: null }]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
 test("@a11y OPERATOR environment revalidation errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { failure: "ENVIRONMENT_VALIDATION_REJECTED" });
   await fillRequest(page);
