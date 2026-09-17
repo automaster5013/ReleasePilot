@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -257,6 +257,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
   let prometheusListRequests = 0;
   let releaseListRequests = 0;
   let releaseLoadRequests = 0;
+  let auditIntegrityRequests = 0;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -301,9 +302,13 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       { reference: "current-session", current: true, createdAt: "2026-09-17T00:00:00Z", lastAccessedAt: "2026-09-17T00:01:00Z", expiresAt: "2099-01-01T00:00:00Z" },
       { reference: "other-session", current: false, createdAt: "2026-09-17T00:00:00Z", lastAccessedAt: "2026-09-17T00:01:00Z", expiresAt: "2099-01-01T00:00:00Z" },
     ] : [] });
-    if (path === "/audit-events/verify") return options.auditIntegrityFailure
-      ? json({ code: "AUDIT_VERIFICATION_UNAVAILABLE" }, 503)
-      : json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
+    if (path === "/audit-events/verify") {
+      auditIntegrityRequests++;
+      if (options.auditIntegrityGate && auditIntegrityRequests > 1) await options.auditIntegrityGate;
+      return options.auditIntegrityFailure
+        ? json({ code: "AUDIT_VERIFICATION_UNAVAILABLE" }, 503)
+        : json({ valid: true, verifiedEvents: audit.length, failedEventId: null, headHash: "a".repeat(64) });
+    }
     if (path === "/audit-events") {
       const aggregateType = url.searchParams.get("aggregateType");
       if (options.connectionAuditFailure && ["CLUSTER_CONNECTION", "PROMETHEUS_CONNECTION"].includes(aggregateType ?? "")) return json({ code: "AUDIT_UNAVAILABLE" }, 503);
@@ -341,7 +346,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     unexpected.push(`Unhandled API: ${path}`);
     return json({ code: "UNHANDLED_FIXTURE" }, 500);
   });
-  return { mutations, unexpected, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests };
+  return { mutations, unexpected, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests, auditIntegrityRequests: () => auditIntegrityRequests };
 }
 
 async function load(page: Page) {
@@ -1082,6 +1087,29 @@ test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ pa
   await expect(verify).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("audit integrity verification remains locked until the current request completes", async ({ page }) => {
+  let respond!: () => void;
+  const auditIntegrityGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { auditIntegrityGate });
+  try {
+    await page.goto("/");
+    await expect.poll(state.releaseListRequests).toBe(1);
+    await expect.poll(state.auditIntegrityRequests).toBe(1);
+    const verify = page.getByRole("button", { name: "Verified · 0 events", exact: true });
+    await verify.click();
+    await expect.poll(state.auditIntegrityRequests).toBe(2);
+    const pending = page.getByRole("button", { name: "Verifying…", exact: true });
+    await expect(pending).toBeDisabled();
+    await pending.evaluate((element) => (element as HTMLButtonElement).click());
+    expect(state.auditIntegrityRequests()).toBe(2);
+    respond();
+    await expect(page.getByRole("button", { name: "Verified · 0 events", exact: true })).toBeEnabled();
+    expect(state.auditIntegrityRequests()).toBe(2);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR revoke other sessions errors preserve trigger focus", async ({ page }) => {

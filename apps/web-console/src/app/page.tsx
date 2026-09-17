@@ -90,6 +90,7 @@ export default function Home() {
   const [auditEvents, setAuditEvents] = useState<AuditEventView[]>([]);
   const [auditIntegrity, setAuditIntegrity] = useState<AuditChainVerification | null>(null);
   const [auditIntegrityBusy, setAuditIntegrityBusy] = useState(false);
+  const auditIntegrityInFlight = useRef(false);
   const [connection, setConnection] = useState("DEMO SNAPSHOT");
   const [error, setError] = useState("");
   const [canOperate, setCanOperate] = useState(false);
@@ -154,6 +155,8 @@ export default function Home() {
   }, [sessionUser]);
 
   const refreshAuditIntegrity = useCallback(async (trigger: HTMLElement | null = null) => {
+    if (auditIntegrityInFlight.current) return;
+    auditIntegrityInFlight.current = true;
     if (trigger) setError("");
     setAuditIntegrityBusy(true);
     try {
@@ -165,6 +168,7 @@ export default function Home() {
       setError("감사 체인을 검증할 수 없습니다.");
       if (trigger) restoreFocusAfterRender(trigger);
     } finally {
+      auditIntegrityInFlight.current = false;
       setAuditIntegrityBusy(false);
     }
   }, []);
