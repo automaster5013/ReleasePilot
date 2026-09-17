@@ -382,7 +382,7 @@ export default function Home() {
     setSessionBusy(true);
     setSessionNotice("");
     try {
-      const response = await fetch(`/control-api/session/active/${session.reference}`, {
+      const response = await fetchWithTimeout(`/control-api/session/active/${session.reference}`, {
         method: "DELETE", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       if (!response.ok) throw new Error("세션 종료 요청이 거부되었습니다.");
@@ -413,7 +413,7 @@ export default function Home() {
     setSessionBusy(true);
     setSessionNotice("");
     try {
-      const response = await fetch("/control-api/session/revoke-others", {
+      const response = await fetchWithTimeout("/control-api/session/revoke-others", {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       if (!response.ok) throw new Error("다른 세션 종료 요청이 거부되었습니다.");
