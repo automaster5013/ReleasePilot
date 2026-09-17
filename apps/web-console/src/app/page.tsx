@@ -322,10 +322,13 @@ export default function Home() {
     setLogoutBusy(true);
     setError("");
     try {
-      const response = await fetchWithTimeout("/control-api/session/logout", {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      const result = await runWithBrowserLock("releasepilot:session-logout", async () => {
+        const response = await fetchWithTimeout("/control-api/session/logout", {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+        });
+        if (!response.ok) throw new Error("로그아웃하지 못했습니다. 다시 시도해 주세요.");
       });
-      if (!response.ok) throw new Error("로그아웃하지 못했습니다. 다시 시도해 주세요.");
+      if (!result.acquired) throw new Error("다른 탭에서 로그아웃을 진행하고 있습니다. 완료 후 다시 시도해 주세요.");
       // A full document navigation discards authenticated state and pending requests.
       window.location.assign(changeAccount && authenticationProviders.loginUrl ? authenticationProviders.loginUrl : "/");
     } catch (failure) {

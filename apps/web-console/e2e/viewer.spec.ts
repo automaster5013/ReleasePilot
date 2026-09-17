@@ -371,6 +371,47 @@ test("logout clears the session and selected release after navigation", async ({
   expect(unexpected).toEqual([]);
 });
 
+test("logout allows only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  const unexpected = await isolateApi(page);
+  const otherUnexpected = await isolateApi(other);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let csrfRequests = 0;
+  let logoutRequests = 0;
+  try {
+    await page.goto("/");
+    await page.getByRole("button", { name: "읽기 전용 데모", exact: true }).click();
+    await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    await other.goto("/");
+    await other.getByRole("button", { name: "읽기 전용 데모", exact: true }).click();
+    await expect(other.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    await page.route("**/control-api/session/csrf", async (route) => {
+      csrfRequests++;
+      await gate;
+      await route.fallback();
+    });
+    await page.route("**/control-api/session/logout", async (route) => { logoutRequests++; await route.fallback(); });
+    await other.route("**/control-api/session/csrf", async (route) => { csrfRequests++; await route.fallback(); });
+    await other.route("**/control-api/session/logout", async (route) => { logoutRequests++; await route.fallback(); });
+    await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+    await expect.poll(() => csrfRequests).toBe(1);
+    await other.getByRole("button", { name: "로그아웃", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 로그아웃을 진행하고 있습니다." })).toBeVisible();
+    expect(csrfRequests).toBe(1);
+    expect(logoutRequests).toBe(0);
+    release();
+    await expect(page.getByRole("navigation")).toContainText("DEMO SNAPSHOT");
+    expect(csrfRequests).toBe(1);
+    expect(logoutRequests).toBe(1);
+    expect(unexpected).toEqual([]);
+    expect(otherUnexpected).toEqual([]);
+  } finally {
+    release();
+    await other.close();
+  }
+});
+
 test("rejected logout preserves the session and permits a manual retry", async ({ page }) => {
   const unexpected = await isolateApi(page);
   let attempts = 0;
