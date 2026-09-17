@@ -175,6 +175,45 @@ for (const rejected of [false, true]) {
   });
 }
 
+test("release requests remain single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "DEVELOPER", { responseGate, failure: "FORBIDDEN" });
+  try {
+    await fillRequest(page);
+    const request = page.getByRole("button", { name: "릴리스 요청", exact: true });
+    await expect(request).toBeEnabled();
+
+    await request.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await expect.poll(() => state.mutations.length).toBe(1);
+    expect(state.mutations).toEqual([{
+      path: "/releases",
+      body: {
+        serviceId,
+        environmentId,
+        version: "v-role",
+        imageRepository: "example.invalid/role",
+        imageDigest: `sha256:${"a".repeat(64)}`,
+        commitSha: "a".repeat(40),
+        pipelineUrl: "https://example.invalid/role",
+        changeSummary: "Role request",
+        requestedPolicyVersionId: null,
+      },
+    }]);
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "릴리스 요청이 거부되었습니다." })).toBeVisible();
+    await expect(request).toBeEnabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
 for (const role of ["APPROVER", "OPERATOR"]) {
   for (const rejected of [false, true]) {
   test(`${role} prevents repeated actions while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {
