@@ -582,6 +582,8 @@ test("logout and account switch remain single-flight before busy state renders",
   });
   try {
     await page.goto("/");
+    await expect(page.getByRole("button", { name: "로그아웃", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "계정 변경", exact: true })).toBeVisible();
     await page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll("button"));
       const logout = buttons.find((button) => button.textContent === "로그아웃");
