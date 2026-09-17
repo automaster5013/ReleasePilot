@@ -143,6 +143,7 @@ export default function Home() {
   const [connectionAuditId, setConnectionAuditId] = useState("");
   const [connectionAuditEvents, setConnectionAuditEvents] = useState<AuditEventView[]>([]);
   const [connectionAuditBusy, setConnectionAuditBusy] = useState(false);
+  const connectionAuditInFlight = useRef(false);
   const [clusterQuery, setClusterQuery] = useState("");
   const [clusterFilter, setClusterFilter] = useState<ConnectionFilter>("ALL");
   const [prometheusQuery, setPrometheusQuery] = useState("");
@@ -879,8 +880,9 @@ export default function Home() {
   }
 
   async function loadConnectionAudit(aggregateType: "CLUSTER_CONNECTION" | "PROMETHEUS_CONNECTION", connectionId: string, trigger: HTMLElement) {
-    if (connectionAuditBusy) return;
+    if (connectionAuditInFlight.current) return;
     if (connectionAuditId === connectionId) { setConnectionAuditId(""); setConnectionAuditEvents([]); return; }
+    connectionAuditInFlight.current = true;
     setConnectionActionError("");
     setConnectionAuditBusy(true); setConnectionNotice("");
     try {
@@ -894,7 +896,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionAuditBusy(false); }
+    finally { connectionAuditInFlight.current = false; setConnectionAuditBusy(false); }
   }
 
   async function operate(action: "promote" | "pause" | "resume" | "abort", trigger: HTMLElement | null = null) {

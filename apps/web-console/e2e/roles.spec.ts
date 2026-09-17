@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; connectionMutationGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; connectionMutationGate?: Promise<void>; connectionAuditGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -258,6 +258,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
   let releaseListRequests = 0;
   let releaseLoadRequests = 0;
   let auditIntegrityRequests = 0;
+  let connectionAuditRequests = 0;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -320,6 +321,10 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     }
     if (path === "/audit-events") {
       const aggregateType = url.searchParams.get("aggregateType");
+      if (["CLUSTER_CONNECTION", "PROMETHEUS_CONNECTION"].includes(aggregateType ?? "")) {
+        connectionAuditRequests++;
+        if (options.connectionAuditGate) await options.connectionAuditGate;
+      }
       if (options.connectionAuditFailure && ["CLUSTER_CONNECTION", "PROMETHEUS_CONNECTION"].includes(aggregateType ?? "")) return json({ code: "AUDIT_UNAVAILABLE" }, 503);
       return json({ items: audit });
     }
@@ -357,7 +362,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     unexpected.push(`Unhandled API: ${path}`);
     return json({ code: "UNHANDLED_FIXTURE" }, 500);
   });
-  return { mutations, unexpected, clusterListRequests: () => clusterListRequests, prometheusListRequests: () => prometheusListRequests, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests, auditIntegrityRequests: () => auditIntegrityRequests };
+  return { mutations, unexpected, clusterListRequests: () => clusterListRequests, prometheusListRequests: () => prometheusListRequests, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests, auditIntegrityRequests: () => auditIntegrityRequests, connectionAuditRequests: () => connectionAuditRequests };
 }
 
 async function load(page: Page) {
@@ -1047,6 +1052,32 @@ test("@a11y OPERATOR connection audit errors preserve trigger focus", async ({ p
   await expect(prometheusAudit).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("OPERATOR connection audit remains single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const connectionAuditGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionAuditGate });
+  try {
+    await page.goto("/");
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    const clusterAudit = cluster.getByRole("button", { name: "감사 이력", exact: true });
+    await clusterAudit.evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expect.poll(state.connectionAuditRequests).toBe(1);
+    const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+    await prometheus.getByRole("button", { name: "감사 이력", exact: true }).evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(state.connectionAuditRequests()).toBe(1);
+    respond();
+    await expect(cluster.getByRole("button", { name: "이력 닫기", exact: true })).toBeEnabled();
+    expect(state.connectionAuditRequests()).toBe(1);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR connection refresh errors preserve trigger focus", async ({ page }) => {
