@@ -30,6 +30,8 @@ try {
     $generatedLog = Get-ChildItem -LiteralPath (Join-Path $testRoot "logs\contract") -File -Filter "*-smoke.log" | Select-Object -First 1
     Assert-True ($null -ne $generatedLog) "Logged command did not create a central log."
     Assert-True ((Get-Content -LiteralPath $generatedLog.FullName -Raw).Trim() -eq "routed-log") "Generated log content differs from command output."
+    & pwsh -NoProfile -File $invokeScript -Name nested -Category contract -RepositoryRoot $testRoot -WorkingDirectory work -Executable pwsh -ArgumentList $fixtureScript | Out-Host
+    Assert-True ($LASTEXITCODE -eq 0) "Logged command failed in a repository subdirectory."
 
     Write-Output "Project log management contract passed."
 } finally {

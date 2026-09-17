@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, prometheusConnectionDraftIssue, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, fetchWithTimeout, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, prometheusConnectionDraftIssue, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("latest release request rejects delayed data, readiness and errors from older loads", async () => {
   const guard = createLatestRequestGuard();
@@ -54,6 +54,21 @@ test("release mutation gate blocks same-tick submissions and recovers after fail
   assert.equal(gate.tryAcquire(), false);
   gate.release();
   assert.equal(gate.tryAcquire(), true);
+});
+
+test("timed fetch aborts stalled requests with a retryable message and preserves other failures", async () => {
+  let observedSignal: AbortSignal | undefined;
+  const stalled = ((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+    observedSignal = init?.signal ?? undefined;
+    observedSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+  })) as typeof fetch;
+  await assert.rejects(fetchWithTimeout("https://example.invalid", {}, 5, stalled), /요청 시간이 초과되었습니다/);
+  assert.equal(observedSignal?.aborted, true);
+
+  const networkFailure = new Error("network failure");
+  const rejected = (() => Promise.reject(networkFailure)) as typeof fetch;
+  await assert.rejects(fetchWithTimeout("https://example.invalid", {}, 50, rejected), networkFailure);
+  await assert.rejects(fetchWithTimeout("https://example.invalid", {}, 0, rejected), /0보다 커야/);
 });
 
 test("revalidation and release requests share one gate and failed validation stays fail-closed", () => {

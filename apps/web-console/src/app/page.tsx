@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, sessionConnectionLabel, SessionUser } from "./session-management.mts";
-import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, prometheusConnectionDraftIssue, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, fetchWithTimeout, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, prometheusConnectionDraftIssue, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -613,7 +613,7 @@ export default function Home() {
     setReleaseValidationIssue(null);
     setError("");
     try {
-      const response = await fetch("/control-api/releases", {
+      const response = await fetchWithTimeout("/control-api/releases", {
         method: "POST", credentials: "include",
         headers: await readinessMutationHeaders(environmentValidation, csrfToken, { idempotencyKey: crypto.randomUUID() + crypto.randomUUID(), json: true }, true, releaseDraft.environmentId),
         body: JSON.stringify({

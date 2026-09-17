@@ -152,6 +152,20 @@ export function createLatestRequestGuard() {
   return { begin() { generation++; return snapshot(); }, snapshot };
 }
 
+export async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = 15_000, fetcher: typeof fetch = fetch) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("요청 제한 시간은 0보다 커야 합니다.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetcher(input, { ...init, signal: controller.signal });
+  } catch (failure) {
+    if (controller.signal.aborted) throw new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.");
+    throw failure;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function mutationHeaders(csrf: CsrfToken, options: { idempotencyKey?: string; json?: boolean } = {}) {
   if (!csrf || typeof csrf.headerName !== "string" || !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(csrf.headerName) ||
       typeof csrf.token !== "string" || !csrf.token.trim() || /[\r\n]/.test(csrf.token)) {

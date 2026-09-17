@@ -10,10 +10,17 @@ param(
 
     [string]$Category = "runs",
 
-    [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
+
+    [string]$WorkingDirectory = "."
 )
 
 $repositoryPath = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+$workingPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryPath $WorkingDirectory))
+if (-not $workingPath.StartsWith($repositoryPath + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -and $workingPath -ne $repositoryPath) {
+    throw "WorkingDirectory must remain within the repository."
+}
+if (-not (Test-Path -LiteralPath $workingPath -PathType Container)) { throw "WorkingDirectory does not exist: $workingPath" }
 $safeName = $Name -replace '[^A-Za-z0-9._-]', '-'
 $safeCategory = $Category -replace '[^A-Za-z0-9._-]', '-'
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -22,7 +29,7 @@ $logPath = Join-Path $logDirectory ("{0}-{1}.log" -f $timestamp, $safeName)
 
 New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 
-Push-Location $repositoryPath
+Push-Location $workingPath
 try {
     & $Executable @ArgumentList 2>&1 | Tee-Object -FilePath $logPath
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { $LASTEXITCODE }

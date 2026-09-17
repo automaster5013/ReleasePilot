@@ -3,7 +3,7 @@
 ReleasePilot의 로컬 실행·검증 로그는 이 디렉터리에 모은다. 새 명령을 로그와 함께 실행할 때는 저장소 루트에서 다음 helper를 사용한다.
 
 ```powershell
-.\scripts\Invoke-WithProjectLog.ps1 -Name web-tests -Category web -Executable npm -ArgumentList "test"
+.\scripts\Invoke-WithProjectLog.ps1 -Name web-tests -Category web -WorkingDirectory apps/web-console -Executable npm -ArgumentList "test"
 ```
 
 저장소의 다른 위치에 남은 프로젝트 `.log` 파일은 다음 명령으로 기존 상대 경로를 보존해 이 디렉터리 아래로 옮긴다.

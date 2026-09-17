@@ -214,6 +214,42 @@ test("release requests remain single-flight before busy state renders", async ({
   }
 });
 
+test("release request timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "DEVELOPER", { responseGate, responseGateOnce: true });
+  try {
+    await fillRequest(page);
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/releases" || init?.method !== "POST") return pending;
+        return new Promise<Response>((resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          pending.then(resolve, reject);
+        });
+      }) as typeof window.fetch;
+    });
+    const request = page.getByRole("button", { name: "릴리스 요청", exact: true });
+    await request.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(page.getByRole("button", { name: "요청 중…", exact: true })).toBeDisabled();
+
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible({ timeout: 20_000 });
+    await expect(request).toBeEnabled();
+
+    await request.click();
+    await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
 for (const role of ["APPROVER", "OPERATOR"]) {
   for (const rejected of [false, true]) {
   test(`${role} prevents repeated actions while awaiting ${rejected ? "rejection" : "success"}`, async ({ page }) => {
@@ -362,7 +398,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; connectionMutationGate?: Promise<void>; connectionAuditGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; responseGateOnce?: boolean; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; connectionMutationGate?: Promise<void>; connectionAuditGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -399,7 +435,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
         return json({ code: "FORBIDDEN" }, 403);
       }
       mutations.push({ path, body: request.postData() ? request.postDataJSON() : null });
-      if (options.responseGate) await options.responseGate;
+      if (options.responseGate && (!options.responseGateOnce || mutations.length === 1)) await options.responseGate;
       if (connectionValidationMutation && options.connectionValidationGate) await options.connectionValidationGate;
       if (connectionCreateMutation && options.connectionCreateGate) await options.connectionCreateGate;
       if (connectionMutation && options.connectionMutationGate) await options.connectionMutationGate;
