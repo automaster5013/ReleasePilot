@@ -81,6 +81,7 @@ export default function Home() {
   const [recentReleases, setRecentReleases] = useState<ReleaseSummary[]>([]);
   const [releaseListBusy, setReleaseListBusy] = useState(false);
   const [releaseLoadBusy, setReleaseLoadBusy] = useState(false);
+  const releaseLoadInFlight = useRef(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [release, setRelease] = useState<Release | null>(null);
   const [live, setLive] = useState<LiveState>({ releaseStatus: "ANALYZING", steps: demoSteps });
@@ -490,13 +491,15 @@ export default function Home() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (releaseLoadBusy) return;
+    if (releaseLoadInFlight.current) return;
+    releaseLoadInFlight.current = true;
     const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     setReleaseLoadBusy(true);
     try { await load(releaseId.trim()); } catch (failure) {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
     } finally {
+      releaseLoadInFlight.current = false;
       setReleaseLoadBusy(false);
     }
   }

@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -256,6 +256,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
   let clusterListRequests = 0;
   let prometheusListRequests = 0;
   let releaseListRequests = 0;
+  let releaseLoadRequests = 0;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -329,13 +330,17 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     }
     if (path === "/releases/role-release/analyses") return json([]);
     if (path === "/releases/role-release/events") return route.fulfill({ contentType: "text/event-stream", body: `event: release-state\ndata: ${JSON.stringify({ releaseStatus: status, steps: [] })}\n\n` });
-    if (path === "/releases/role-release") return options.releaseLoadFailure
-      ? json({ code: "RELEASE_UNAVAILABLE" }, 503)
-      : json({ id: "role-release", environmentId, version: "v-role", status, createdAt: new Date().toISOString(), imageRepository: "example.invalid/role", imageDigest: `sha256:${"a".repeat(64)}`, changeSummary: "Role fixture", commitSha: "a".repeat(40), pipelineUrl: "https://example.invalid/role", context: { serviceName: "Role service", environmentName: "Role environment" }, requester: { displayName: "Other requester", username: "other" }, policySnapshot: { name: "Role policy", checksum: "role-policy", definition: { strategy: "CANARY", steps: [], metrics: [] } } });
+    if (path === "/releases/role-release") {
+      releaseLoadRequests++;
+      if (options.releaseLoadGate) await options.releaseLoadGate;
+      return options.releaseLoadFailure
+        ? json({ code: "RELEASE_UNAVAILABLE" }, 503)
+        : json({ id: "role-release", environmentId, version: "v-role", status, createdAt: new Date().toISOString(), imageRepository: "example.invalid/role", imageDigest: `sha256:${"a".repeat(64)}`, changeSummary: "Role fixture", commitSha: "a".repeat(40), pipelineUrl: "https://example.invalid/role", context: { serviceName: "Role service", environmentName: "Role environment" }, requester: { displayName: "Other requester", username: "other" }, policySnapshot: { name: "Role policy", checksum: "role-policy", definition: { strategy: "CANARY", steps: [], metrics: [] } } });
+    }
     unexpected.push(`Unhandled API: ${path}`);
     return json({ code: "UNHANDLED_FIXTURE" }, 500);
   });
-  return { mutations, unexpected };
+  return { mutations, unexpected, releaseLoadRequests: () => releaseLoadRequests };
 }
 
 async function load(page: Page) {
@@ -1018,6 +1023,28 @@ test("@a11y OPERATOR release load errors preserve trigger focus", async ({ page 
   await expect(loadRelease).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("release load remains locked until the current detail request completes", async ({ page }) => {
+  let respond!: () => void;
+  const releaseLoadGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { releaseLoadGate });
+  try {
+    await page.goto("/");
+    const loadRelease = page.getByRole("button", { name: "불러오기", exact: true });
+    await loadRelease.click();
+    await expect.poll(state.releaseLoadRequests).toBe(1);
+    const pending = page.getByRole("button", { name: "조회 중…", exact: true });
+    await expect(pending).toBeDisabled();
+    await pending.evaluate((element) => (element as HTMLButtonElement).click());
+    expect(state.releaseLoadRequests()).toBe(1);
+    respond();
+    await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+    await expect(loadRelease).toBeEnabled();
+    expect(state.releaseLoadRequests()).toBe(1);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ page }) => {
