@@ -843,6 +843,52 @@ test("logout and account switch remain single-flight before busy state renders",
   } finally { respond(); }
 });
 
+test("logout timeout restores both session controls and permits one clean retry", async ({ page }) => {
+  await fixture(page, "APPROVER");
+  let respond!: () => void;
+  const gate = new Promise<void>((resolve) => { respond = resolve; });
+  let logoutRequests = 0;
+  await page.route("**/control-api/session/providers", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ oidc: true, loginUrl: "/oauth2/authorization/releasepilot" }) }));
+  await page.route("**/control-api/session/logout", async (route) => {
+    logoutRequests++;
+    if (logoutRequests === 1) await gate;
+    return route.fulfill({ status: 204 });
+  });
+  try {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      let attempts = 0;
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/session/logout" || init?.method !== "POST") return pending;
+        attempts++;
+        if (attempts > 1) return pending;
+        void pending.catch(() => undefined);
+        return new Promise<Response>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+        });
+      }) as typeof window.fetch;
+    });
+    const logout = page.getByRole("button", { name: "로그아웃", exact: true });
+    const changeAccount = page.getByRole("button", { name: "계정 변경", exact: true });
+
+    await expect(changeAccount).toBeVisible();
+    await logout.click();
+    await expect(page.getByRole("button", { name: "로그아웃 중…", exact: true })).toBeDisabled();
+    await expect.poll(() => logoutRequests).toBe(1);
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+    await expect(logout).toBeEnabled();
+    await expect(changeAccount).toBeEnabled();
+    await expect(logout).toBeFocused();
+
+    respond();
+    await logout.click();
+    await expect.poll(() => logoutRequests).toBe(2);
+  } finally { respond(); }
+});
+
 for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
   test(`@a11y ${role} screen meets automated WCAG A and AA checks`, async ({ page }) => {
     const state = await fixture(page, role);

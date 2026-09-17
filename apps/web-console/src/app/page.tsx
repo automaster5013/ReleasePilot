@@ -322,7 +322,7 @@ export default function Home() {
     setLogoutBusy(true);
     setError("");
     try {
-      const response = await fetch("/control-api/session/logout", {
+      const response = await fetchWithTimeout("/control-api/session/logout", {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       if (!response.ok) throw new Error("로그아웃하지 못했습니다. 다시 시도해 주세요.");
