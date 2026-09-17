@@ -119,8 +119,7 @@ class DockerHubCDTests(unittest.TestCase):
         )["webhook"]
         self.assertEqual(values["replicaCount"], 1)
         self.assertEqual(values["failurePolicy"], "Fail")
-        self.assertTrue(values["podDisruptionBudget"]["enabled"])
-        self.assertEqual(values["podDisruptionBudget"]["minAvailable"], 1)
+        self.assertFalse(values["podDisruptionBudget"]["enabled"])
         self.assertNotIn("affinity", values)
 
     def test_cluster_admission_is_managed_by_pinned_argocd_apps(self):

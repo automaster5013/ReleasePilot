@@ -4,5 +4,4 @@ webhook:
   replicaCount: 1
   failurePolicy: Fail
   podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
+    enabled: false

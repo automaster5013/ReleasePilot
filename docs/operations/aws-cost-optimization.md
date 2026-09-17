@@ -70,7 +70,8 @@ AWS가 보낸 구독 확인 메일을 수신자가 승인해야 한다. 예산�
 현재 계정의 Free Tier 자격 정책은 EKS Auto Mode가 새 `t3.medium` 노드를 기동하는 것을 허용하지 않는다.
 따라서 `demo-low-cost`는 내장 `general-purpose` 풀의 기존 노드 한 대를 사용하고 admission webhook을 한
 replica로 실행한다. 검증과 fail-closed 동작은 유지되지만 노드 및 webhook 고가용성은 제공하지 않는다.
-production-like 검증 전에는 webhook replica를 2로 복구하고 서로 다른 zone에 배치되는지 확인한다.
+단일 replica가 노드 통합을 막지 않도록 PDB도 비활성화한다. production-like 검증 전에는 webhook replica를
+2로 복구하고 PDB `minAvailable: 1` 및 required cross-zone anti-affinity를 함께 복구한다.
 
 ## 보호 대상 경계
 
