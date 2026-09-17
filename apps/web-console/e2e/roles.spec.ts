@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -325,6 +325,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     if (path === `/environments/${environmentId}/validation-results/latest`) return json({ environmentId, status: "ACTIVE", checkedAt: new Date().toISOString(), validUntil: options.stale ? "2020-01-01T00:00:00Z" : "2099-01-01T00:00:00Z", checks: [{ code: "FIXTURE_READY", outcome: "PASS", message: "Isolated readiness" }] });
     if (path === "/releases") {
       releaseListRequests++;
+      if (options.releaseRefreshGate && releaseListRequests > 1) await options.releaseRefreshGate;
       if (options.releaseRefreshFailure && releaseListRequests > 1) return json({ code: "RELEASES_UNAVAILABLE" }, 503);
       return json({ items: [{ id: "role-release", version: "v-role", status, createdAt: new Date().toISOString(), context: { serviceName: "Role service", environmentName: "Role environment" } }] });
     }
@@ -340,7 +341,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     unexpected.push(`Unhandled API: ${path}`);
     return json({ code: "UNHANDLED_FIXTURE" }, 500);
   });
-  return { mutations, unexpected, releaseLoadRequests: () => releaseLoadRequests };
+  return { mutations, unexpected, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests };
 }
 
 async function load(page: Page) {
@@ -1008,6 +1009,27 @@ test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ pa
   await expect(refresh).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("release refresh remains locked until the current list request completes", async ({ page }) => {
+  let respond!: () => void;
+  const releaseRefreshGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { releaseRefreshGate });
+  try {
+    await page.goto("/");
+    await expect.poll(state.releaseListRequests).toBe(1);
+    const refresh = page.getByRole("button", { name: "최근 릴리스 새로고침", exact: true });
+    await refresh.click();
+    await expect.poll(state.releaseListRequests).toBe(2);
+    await expect(refresh).toBeDisabled();
+    await refresh.evaluate((element) => (element as HTMLButtonElement).click());
+    expect(state.releaseListRequests()).toBe(2);
+    respond();
+    await expect(refresh).toBeEnabled();
+    expect(state.releaseListRequests()).toBe(2);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR release load errors preserve trigger focus", async ({ page }) => {

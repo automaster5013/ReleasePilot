@@ -80,6 +80,7 @@ export default function Home() {
   const [releaseId, setReleaseId] = useState("");
   const [recentReleases, setRecentReleases] = useState<ReleaseSummary[]>([]);
   const [releaseListBusy, setReleaseListBusy] = useState(false);
+  const releaseListInFlight = useRef(false);
   const [releaseLoadBusy, setReleaseLoadBusy] = useState(false);
   const releaseLoadInFlight = useRef(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -178,6 +179,8 @@ export default function Home() {
   }, []);
 
   const refreshReleases = useCallback(async (trigger: HTMLElement | null = null) => {
+    if (releaseListInFlight.current) return;
+    releaseListInFlight.current = true;
     if (trigger) setError("");
     setReleaseListBusy(true);
     try {
@@ -190,6 +193,7 @@ export default function Home() {
       setError("최근 릴리스를 불러올 수 없습니다.");
       if (trigger) restoreFocusAfterRender(trigger);
     } finally {
+      releaseListInFlight.current = false;
       setReleaseListBusy(false);
     }
   }, []);
