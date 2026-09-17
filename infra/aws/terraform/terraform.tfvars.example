@@ -3,3 +3,14 @@ cluster_name       = "releasepilot-demo"
 domain_name        = "releasepilot.kr"
 create_route53_zone = true
 owner              = "your-name"
+
+# Low-cost demo defaults. Audit logging can be enabled temporarily for a
+# security review with ["api", "audit", "authenticator"].
+environment_profile             = "demo-low-cost"
+eks_control_plane_log_types     = ["api", "authenticator"]
+cloudwatch_log_retention_days   = 7
+ecr_tagged_images_to_keep       = 10
+
+# Set after confirming the recipient; AWS sends a subscription confirmation.
+# budget_alert_email = "owner@example.com"
+monthly_budget_usd = 20

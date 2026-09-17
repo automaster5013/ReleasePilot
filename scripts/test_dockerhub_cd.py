@@ -113,26 +113,15 @@ class DockerHubCDTests(unittest.TestCase):
             "true",
         )
 
-    def test_cluster_admission_webhook_is_fail_closed_and_redundant(self):
+    def test_cluster_admission_webhook_is_fail_closed_and_cost_optimized(self):
         values = yaml.safe_load(
             (ROOT / "deploy/security/policy-controller-values.yaml").read_text()
         )["webhook"]
-        self.assertEqual(values["replicaCount"], 2)
+        self.assertEqual(values["replicaCount"], 1)
         self.assertEqual(values["failurePolicy"], "Fail")
         self.assertTrue(values["podDisruptionBudget"]["enabled"])
         self.assertEqual(values["podDisruptionBudget"]["minAvailable"], 1)
-        required = values["affinity"]["podAntiAffinity"][
-            "requiredDuringSchedulingIgnoredDuringExecution"
-        ]
-        self.assertEqual(
-            {term["topologyKey"] for term in required},
-            {"kubernetes.io/hostname", "topology.kubernetes.io/zone"},
-        )
-        for term in required:
-            self.assertEqual(
-                term["labelSelector"]["matchLabels"],
-                {"control-plane": "policy-controller-webhook"},
-            )
+        self.assertNotIn("affinity", values)
 
     def test_cluster_admission_is_managed_by_pinned_argocd_apps(self):
         expected = {

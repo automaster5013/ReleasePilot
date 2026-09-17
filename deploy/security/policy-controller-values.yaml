@@ -1,17 +1,8 @@
 webhook:
-  replicaCount: 2
+  # The low-cost demo runs one webhook replica. A production-like profile
+  # must restore two replicas and required cross-zone anti-affinity.
+  replicaCount: 1
   failurePolicy: Fail
   podDisruptionBudget:
     enabled: true
     minAvailable: 1
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchLabels:
-              control-plane: policy-controller-webhook
-          topologyKey: kubernetes.io/hostname
-        - labelSelector:
-            matchLabels:
-              control-plane: policy-controller-webhook
-          topologyKey: topology.kubernetes.io/zone

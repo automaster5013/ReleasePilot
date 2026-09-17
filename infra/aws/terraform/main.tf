@@ -35,6 +35,8 @@ module "eks" {
   vpc_id                                   = module.vpc.vpc_id
   subnet_ids                               = module.vpc.private_subnets
   compute_config                           = { enabled = true, node_pools = ["general-purpose"] }
+  enabled_log_types                        = var.eks_control_plane_log_types
+  cloudwatch_log_group_retention_in_days   = var.cloudwatch_log_retention_days
   tags                                     = local.tags
 }
 
@@ -54,4 +56,36 @@ resource "aws_ecr_repository" "service" {
   image_scanning_configuration { scan_on_push = true }
   encryption_configuration { encryption_type = "AES256" }
   tags = local.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "service" {
+  for_each   = aws_ecr_repository.service
+  repository = each.value.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Remove untagged images after seven days"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 7
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep recent tagged images for rollback"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = var.ecr_tagged_images_to_keep
+        }
+        action = { type = "expire" }
+      }
+    ]
+  })
 }
