@@ -497,6 +497,8 @@ export default function Home() {
   const evidence = latest?.evidence ?? demoEvidence;
   const title = release ? `release · ${release.version}` : "checkout · v1.4.2";
   const activeStep = useMemo(() => live.steps.find((step) => ["RUNNING", "EVALUATING"].includes(step.status)), [live.steps]);
+  const passedEvidence = evidence.filter((item) => item.verdict === "PASS").length;
+  const progress = activeStep?.weight ?? (live.steps.every((step) => step.status === "PASSED") ? 100 : 0);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -983,11 +985,24 @@ export default function Home() {
       </nav>
       <section className={styles.shell} id="main-content" tabIndex={-1}>
         <header className={styles.topline}>
-          <div><p>RELEASE OPERATIONS</p><h1 id="control-room-title">Progressive delivery control room</h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
+          <div><p>RELEASE OPERATIONS · CONTROL PLANE</p><h1 id="control-room-title" aria-label="Progressive delivery control room">Progressive delivery<br /><em>without guesswork.</em></h1><span>Canary와 Blue/Green의 판정 근거부터 실행 결과까지 한 화면에서 추적합니다.</span></div>
           <form className={browserStyles.browser} onSubmit={submit}><select aria-label="최근 릴리스" value={releaseId} onChange={(event) => setReleaseId(event.target.value)} disabled={releaseListBusy || releaseLoadBusy}><option value="">{releaseListBusy ? "불러오는 중…" : recentReleases.length ? "릴리스 선택" : "조회 가능한 릴리스 없음"}</option>{recentReleases.map((item) => <option key={item.id} value={item.id}>{releaseOptionLabel(item)}</option>)}</select><button disabled={!releaseId || releaseListBusy || releaseLoadBusy}>{releaseLoadBusy ? "조회 중…" : "불러오기"}</button><button type="button" className={browserStyles.refresh} onClick={(event) => void refreshReleases(event.currentTarget)} disabled={!sessionUser || releaseListBusy || releaseLoadBusy} aria-label="최근 릴리스 새로고침">↻</button></form>
         </header>
         {error && <p id={activeReleaseValidationIssue ? "release-request-error" : undefined} className={styles.error} role="alert" aria-live="assertive" aria-atomic="true">{error}</p>}
         {!release && <p className={styles.sampleNotice} role="note">예시 화면입니다. 아래 릴리스 상태와 판정 근거는 샘플 데이터이며 실제 운영 결과가 아닙니다. 실제 데이터를 확인하려면 최근 릴리스를 선택해 불러오세요.</p>}
+        <section className={styles.commandCenter} aria-label="현재 릴리스 운영 요약">
+          <div className={styles.commandHeader}>
+            <div><span>NOW OBSERVING</span><strong>{title}</strong></div>
+            <div className={styles.quickLinks} role="group" aria-label="화면 바로가기"><a href="#release-overview">Overview</a>{canManageConnections(sessionUser?.roles ?? []) && <a href="#release-readiness">Readiness</a>}<a href="#decision-evidence">Evidence</a><a href="#audit-title">Audit</a><a href="#account-security">Account</a></div>
+          </div>
+          <div className={styles.signalGrid}>
+            <div><span>Release state</span><strong data-tone={live.releaseStatus}>{live.releaseStatus}</strong><small>{release ? "실제 릴리스" : "예시 데이터"}</small></div>
+            <div><span>Traffic step</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><small>{activeStep?.status ?? "대기 중"}</small></div>
+            <div><span>Latest decision</span><strong data-tone={latest?.verdict ?? "PENDING"}>{latest?.verdict ?? "PENDING"}</strong><small>{latest?.reasonCode ?? "관찰 진행 중"}</small></div>
+            <div><span>Evidence coverage</span><strong>{passedEvidence}/{evidence.length}</strong><small>검증 기준 통과</small></div>
+          </div>
+          <div className={styles.progressTrack} role="progressbar" aria-label="현재 트래픽 단계" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><i style={{ width: `${progress}%` }} /></div>
+        </section>
         {canRequestRelease(sessionUser?.roles ?? []) && <details className={sessionStyles.releaseRequest}>
           <summary>NEW RELEASE REQUEST <span>Developer workflow</span></summary>
           <form onSubmit={(event) => void requestRelease(event)}>
@@ -1007,7 +1022,7 @@ export default function Home() {
           {catalogNotice && <p role="alert" aria-live="assertive" aria-atomic="true">{catalogNotice}</p>}
           {requestNotice && <p role="status" aria-live="polite" aria-atomic="true">{requestNotice}</p>}
         </details>}
-        {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} aria-labelledby="connections-title">
+        {canManageConnections(sessionUser?.roles ?? []) && <section className={sessionStyles.connections} id="release-readiness" aria-labelledby="connections-title">
           <header><div><p>RELEASE READINESS</p><h2 id="connections-title">외부 연결 검증</h2></div><div className={sessionStyles.connectionActions}><button type="button" onClick={(event) => void validateAllConnections("clusters", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-clusters" ? "Kubernetes 검증 중…" : "Kubernetes 전체 검증"}</button><button type="button" onClick={(event) => void validateAllConnections("prometheus", event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "all-prometheus" ? "Prometheus 검증 중…" : "Prometheus 전체 검증"}</button><button type="button" onClick={(event) => void refreshConnections(event.currentTarget)} disabled={Boolean(connectionBusyId)}>{connectionBusyId === "refresh" ? "새로고침 중…" : "새로고침"}</button></div></header>
           <details className={sessionStyles.connectionCreate}><summary>NEW CONNECTION <span>Operator workflow</span></summary><div className={sessionStyles.connectionForms}>
             <form onSubmit={(event) => void createClusterConnection(event)}><strong>Kubernetes cluster</strong><label>Name<input {...connectionFieldAccessibility("cluster", "name")} required maxLength={100} value={clusterDraft.name} onChange={(event) => updateClusterDraft("name", event.target.value)} /></label><label>API server<input {...connectionFieldAccessibility("cluster", "apiServer")} required type="url" maxLength={500} placeholder="https://…" value={clusterDraft.apiServer} onChange={(event) => updateClusterDraft("apiServer", event.target.value)} /></label><label>Allowed namespaces<input {...connectionFieldAccessibility("cluster", "namespaces")} required placeholder="releasepilot, monitoring" value={clusterDraft.namespaces} onChange={(event) => updateClusterDraft("namespaces", event.target.value)} /></label><label>Secret reference<input {...connectionFieldAccessibility("cluster", "secretRef")} required maxLength={255} placeholder="env:KUBERNETES_TOKEN" value={clusterDraft.secretRef} onChange={(event) => updateClusterDraft("secretRef", event.target.value)} /></label><button disabled={connectionCreateBusy}>{connectionCreateBusy ? "등록 중…" : "Cluster 등록"}</button></form>
@@ -1021,7 +1036,7 @@ export default function Home() {
           {filteredPrometheusConnections.length ? <div className={sessionStyles.connectionList}>{filteredPrometheusConnections.map((item) => <article key={item.id}><div><strong>{item.name}</strong><code>{item.baseUrl}</code><small data-status={item.status}>{connectionValidationLabel(item)} · timeout {item.queryTimeoutSeconds}s</small></div><div className={sessionStyles.connectionActions}><button type="button" onClick={(event) => void editPrometheusConnection(item, event.currentTarget)} disabled={Boolean(connectionBusyId)}>편집</button><button type="button" onClick={(event) => void setConnectionEnabled("prometheus", item, event.currentTarget)} disabled={Boolean(connectionBusyId)}>{item.status === "DISABLED" ? "재활성화" : "비활성화"}</button><button type="button" onClick={(event) => void loadConnectionAudit("PROMETHEUS_CONNECTION", item.id, event.currentTarget)} disabled={connectionAuditBusy}>{connectionAuditId === item.id ? "이력 닫기" : "감사 이력"}</button><button type="button" onClick={(event) => void validatePrometheusConnection(item.id, event.currentTarget)} disabled={Boolean(connectionBusyId) || item.status === "DISABLED"}>{connectionBusyId === item.id ? "처리 중…" : "연결 검증"}</button></div>{connectionAuditId === item.id && <ConnectionAudit events={connectionAuditEvents} />}</article>)}</div> : <p className={sessionStyles.sessionEmpty}>{prometheusConnections.length ? "검색 조건에 맞는 Prometheus 연결이 없습니다." : "등록된 Prometheus 연결이 없습니다."}</p>}
           {connectionNotice && <p id={activeConnectionValidationIssue ? "connection-form-error" : undefined} className={sessionStyles.sessionNotice} role={activeConnectionValidationIssue || activeConnectionActionError ? "alert" : "status"} aria-live={activeConnectionValidationIssue || activeConnectionActionError ? "assertive" : "polite"} aria-atomic="true">{connectionNotice}</p>}
         </section>}
-        <section className={styles.grid}>
+        <section className={styles.grid} id="release-overview">
           <article className={styles.releaseCard}>
             <header><div><span>{release ? "SELECTED RELEASE" : "SAMPLE RELEASE · 예시"}</span><h2>{title}</h2></div><b data-status={live.releaseStatus}>{live.releaseStatus}</b></header>
             <div className={styles.meta}><span>현재 단계</span><strong>{activeStep ? `${activeStep.weight}%` : "—"}</strong><span>최근 판정</span><strong>{latest?.verdict ?? "관찰 중"}</strong></div>
@@ -1039,8 +1054,10 @@ export default function Home() {
           </article>
           <aside className={styles.activity}><p>ANALYSIS JOB</p><strong>{latest?.status ?? "EVALUATING"}</strong><dl><div><dt>Attempt</dt><dd>{latest?.attempts ?? 1}</dd></div><div><dt>Verdict</dt><dd>{latest?.verdict ?? "—"}</dd></div><div><dt>Reason</dt><dd>{latest?.reasonCode ?? "관찰 시간 진행 중"}</dd></div></dl><code>{activeId ?? "demo-correlation · 9f31c8"}</code></aside>
         </section>
+        <span className={styles.anchor} id="decision-evidence" aria-hidden="true" />
         <section className={styles.evidence}><header><div><p>DECISION EVIDENCE</p><h2>같은 시간창의 stable / canary 비교</h2></div><span>Route 범위와 Query hash로 재현 가능</span></header><div className={styles.table}><div className={styles.rowHead}><span>Metric / Route</span><span>Stable</span><span>Canary</span><span>Threshold</span><span>Result</span></div>{evidence.map((item) => <div className={styles.row} key={`${item.metric_key}:${item.route ?? "global"}`}><span><strong>{item.metric_key}</strong>{item.route && <small className={styles.route}>{item.importance ?? "STANDARD"} · {item.route}</small>}<small>{item.canary_query_hash.slice(0, 12)}…</small></span><span>{format(item.baseline_value, item.metric_key)}</span><span>{format(item.canary_value, item.metric_key)}</span><span>{format(item.threshold, item.metric_key)}</span><b data-verdict={item.verdict}>{item.verdict}</b></div>)}</div></section>
         <section className={auditStyles.timeline} aria-labelledby="audit-title"><header><div><p>AUDIT TIMELINE</p><h2 id="audit-title">릴리스 변경 기록</h2></div><div className={auditStyles.summary}><span>{auditEvents.length} events</span>{canVerifyAudit(sessionUser?.roles ?? []) && <button type="button" onClick={(event) => void refreshAuditIntegrity(event.currentTarget)} disabled={auditIntegrityBusy} data-valid={auditIntegrity?.valid ?? "unknown"}>{auditIntegrityBusy ? "Verifying…" : auditIntegrity ? auditIntegrityLabel(auditIntegrity) : "Verification unavailable"}</button>}</div></header>{canVerifyAudit(sessionUser?.roles ?? []) && auditIntegrity && !auditIntegrity.valid && <p className={auditStyles.integrityAlert} role="alert" aria-live="assertive" aria-atomic="true">감사 체인 검증에 실패했습니다. 자동 승격을 중지하고 이벤트 {auditIntegrity.failedEventId ?? "unknown"}부터 조사하세요.</p>}{auditEvents.length ? <ol>{auditEvents.map((event) => <li key={event.id}><i /><div><strong>{auditEventLabel(event)}</strong><small>correlation {event.correlationId.slice(0, 12)}…{event.chainSequence ? ` · chain #${event.chainSequence}` : ""}</small></div><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("ko-KR")}</time></li>)}</ol> : <p className={auditStyles.empty}>{activeId ? "기록된 감사 이벤트가 없습니다." : "릴리스를 선택하면 변경 기록을 확인할 수 있습니다."}</p>}</section>
+        <span className={styles.anchor} id="account-security" aria-hidden="true" />
         <section className={sessionStyles.sessions} aria-labelledby="sessions-title">
           <header><div><p>ACCOUNT SECURITY</p><h2 id="sessions-title">활성 세션</h2></div>{canManageSessions(sessionUser) && <button onClick={(event) => void revokeOtherSessions(event.currentTarget)} disabled={sessionBusy || activeSessions.length < 2}>다른 세션 모두 종료</button>}</header>
           {!sessionUser && <p className={sessionStyles.sessionEmpty}>조직 SSO로 로그인하면 활성 세션을 확인하고 원격으로 종료할 수 있습니다.</p>}
