@@ -652,7 +652,7 @@ export default function Home() {
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/prometheus/${connectionId}/validate`, {
+      const response = await fetchWithTimeout(`/control-api/connections/prometheus/${connectionId}/validate`, {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
@@ -677,7 +677,7 @@ export default function Home() {
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/clusters/${connectionId}/validate`, {
+      const response = await fetchWithTimeout(`/control-api/connections/clusters/${connectionId}/validate`, {
         method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
       });
       const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
@@ -844,7 +844,7 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionBusyId(`all-${kind}`); setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/connections/${kind}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+      const response = await fetchWithTimeout(`/control-api/connections/${kind}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
       if (!response.ok) throw new Error(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} 일괄 검증 요청이 거부되었습니다.`);
       const results = await response.json() as { status: string }[];
       if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();

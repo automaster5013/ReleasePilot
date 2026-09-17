@@ -1424,6 +1424,47 @@ test("OPERATOR connection validation remains single-flight before busy state ren
   } finally { respond(); }
 });
 
+test("connection validation timeout unlocks controls and permits one clean retry", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, responseGate, responseGateOnce: true });
+  try {
+    await page.addInitScript(() => {
+      const nativeFetch = window.fetch.bind(window);
+      let validationAttempts = 0;
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (!url.pathname.includes("/connections/") || !url.pathname.endsWith("/validate") || init?.method !== "POST") return pending;
+        validationAttempts++;
+        if (validationAttempts > 1) return pending;
+        void pending.catch(() => undefined);
+        return new Promise<Response>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+        });
+      }) as typeof window.fetch;
+    });
+    await page.goto("/");
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    const validate = cluster.getByRole("button", { name: "연결 검증", exact: true });
+
+    await validate.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await expect(cluster.getByRole("button", { name: "처리 중…", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Prometheus 전체 검증", exact: true })).toBeDisabled();
+
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+    await expect(validate).toBeEnabled();
+
+    respond();
+    await validate.click();
+    await expect(page.getByText("Kubernetes 연결 검증을 통과했습니다.", { exact: true })).toBeVisible();
+    expect(state.mutations).toHaveLength(2);
+    expect(state.mutations[1]).toEqual(state.mutations[0]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
 test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { releaseRefreshFailure: true });
   await page.goto("/");
