@@ -343,7 +343,7 @@ export default function Home() {
     setDemoBusy(true);
     setError("");
     try {
-    const response = await fetch("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+    const response = await fetchWithTimeout("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
     if (!response.ok) { setError("공개 데모 세션을 시작할 수 없습니다."); return; }
     const session = await response.json() as SessionResponse;
     setSessionUser(session.user);

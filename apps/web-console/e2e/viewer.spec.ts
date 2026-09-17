@@ -104,6 +104,51 @@ test("demo login rejects same-task duplicate activation before busy state render
   } finally { release(); }
 });
 
+test("demo login timeout unlocks the control and permits one clean retry", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let demoRequests = 0;
+  await page.route("**/control-api/session/demo", async (route) => {
+    demoRequests++;
+    if (demoRequests === 1) await gate;
+    await route.fallback();
+  });
+  try {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const nativeFetch = window.fetch.bind(window);
+      let attempts = 0;
+      window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const pending = nativeFetch(input, init);
+        if (url.pathname !== "/control-api/session/demo" || init?.method !== "POST") return pending;
+        attempts++;
+        if (attempts > 1) return pending;
+        void pending.catch(() => undefined);
+        return new Promise<Response>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+        });
+      }) as typeof window.fetch;
+    });
+    const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+
+    await button.click();
+    await expect(button).toBeDisabled();
+    await expect.poll(() => demoRequests).toBe(1);
+    await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+    await expect(button).toBeEnabled();
+    await expect(button).toBeFocused();
+    await expect(page.getByRole("navigation")).not.toContainText("DEMO · VIEW ONLY");
+
+    release();
+    await button.click();
+    await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    expect(demoRequests).toBe(2);
+    expect(unexpected).toEqual([]);
+  } finally { release(); }
+});
+
 for (const failure of ["null", "empty", "forbidden", "connection"]) {
   test(`demo login blocks ${failure} CSRF and recovers on retry`, async ({ page }) => {
     const unexpected = await isolateApi(page);
