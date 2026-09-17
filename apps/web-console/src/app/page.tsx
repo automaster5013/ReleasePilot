@@ -138,6 +138,7 @@ export default function Home() {
   const [prometheusDraft, setPrometheusDraft] = useState<PrometheusConnectionDraft>(emptyPrometheusDraft);
   const [connectionValidationIssue, setConnectionValidationIssue] = useState<{ kind: "cluster"; field: keyof ClusterConnectionDraft; message: string } | { kind: "prometheus"; field: keyof PrometheusConnectionDraft; message: string } | null>(null);
   const [connectionCreateBusy, setConnectionCreateBusy] = useState(false);
+  const connectionCreateInFlight = useRef(false);
   const [connectionAuditId, setConnectionAuditId] = useState("");
   const [connectionAuditEvents, setConnectionAuditEvents] = useState<AuditEventView[]>([]);
   const [connectionAuditBusy, setConnectionAuditBusy] = useState(false);
@@ -697,6 +698,8 @@ export default function Home() {
     const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const validation = clusterConnectionDraftIssue(clusterDraft);
     if (validation) { setConnectionActionError(""); setConnectionValidationIssue({ kind: "cluster", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="cluster-${validation.field}"]`)); return; }
+    if (connectionCreateInFlight.current) return;
+    connectionCreateInFlight.current = true;
     setConnectionValidationIssue(null);
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
@@ -714,7 +717,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionCreateBusy(false); }
+    finally { connectionCreateInFlight.current = false; setConnectionCreateBusy(false); }
   }
 
   function updateClusterDraft(field: keyof ClusterConnectionDraft, value: string) {
@@ -740,6 +743,8 @@ export default function Home() {
     const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     const validation = prometheusConnectionDraftIssue(prometheusDraft);
     if (validation) { setConnectionActionError(""); setConnectionValidationIssue({ kind: "prometheus", ...validation }); setConnectionNotice(validation.message); restoreFocusAfterRender(document.querySelector<HTMLElement>(`[data-connection-field="prometheus-${validation.field}"]`)); return; }
+    if (connectionCreateInFlight.current) return;
+    connectionCreateInFlight.current = true;
     setConnectionValidationIssue(null);
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
@@ -757,7 +762,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionCreateBusy(false); }
+    finally { connectionCreateInFlight.current = false; setConnectionCreateBusy(false); }
   }
 
   async function editClusterConnection(item: ClusterConnection, trigger: HTMLElement) {

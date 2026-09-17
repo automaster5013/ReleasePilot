@@ -33,7 +33,7 @@ for (const width of [320, 390]) {
     });
   }
 }
-type Mutation = { path: string; body: Record<string, string | null> };
+type Mutation = { path: string; body: unknown };
 
 for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"]) {
   for (const csrfBody of [null, {}, { headerName: "X-CSRF-TOKEN", token: " " }]) {
@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -270,22 +270,25 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       const individualSessionMutation = role === "OPERATOR" && request.method() === "DELETE" && path === "/session/active/other-session";
       const environmentValidationMutation = role === "OPERATOR" && path === `/environments/${environmentId}/validate`;
       const connectionValidationMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)(\/[^/]+)?\/validate$/.test(path);
+      const connectionCreateMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)$/.test(path);
       const permitted = (request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
-        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation))
+        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation || connectionCreateMutation))
       )) || individualSessionMutation;
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && !connectionValidationMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
+          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && !connectionValidationMutation && !connectionCreateMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
       mutations.push({ path, body: request.postData() ? request.postDataJSON() : null });
       if (options.responseGate) await options.responseGate;
       if (connectionValidationMutation && options.connectionValidationGate) await options.connectionValidationGate;
+      if (connectionCreateMutation && options.connectionCreateGate) await options.connectionCreateGate;
       if (options.disconnect || (options.disconnectOnce && mutations.length === 1)) return route.abort("connectionfailed");
       if (options.failure) return json({ code: options.failure }, 403);
       if (connectionValidationMutation) return json(path.split("/").length === 4 ? [{ status: "ACTIVE" }] : { status: "ACTIVE" });
+      if (connectionCreateMutation) return json({ id: path.endsWith("clusters") ? "cluster-created" : "prometheus-created", status: "PENDING_VALIDATION" }, 201);
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
       const eventType = path === "/releases" ? "RELEASE_REQUESTED" : ["approve", "reject"].includes(action)
@@ -864,6 +867,35 @@ test("@a11y OPERATOR connection registration errors preserve submit focus", asyn
   await expect(prometheusSubmit).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("OPERATOR connection registration remains single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const connectionCreateGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connectionCreateGate });
+  try {
+    await page.goto("/");
+    await page.getByText("NEW CONNECTION", { exact: false }).click();
+    const clusterForm = page.locator("form").filter({ has: page.getByText("Kubernetes cluster", { exact: true }) });
+    await clusterForm.getByLabel("Name", { exact: true }).fill("Production cluster");
+    await clusterForm.getByLabel("API server", { exact: true }).fill("https://cluster.example");
+    await clusterForm.getByLabel("Allowed namespaces", { exact: true }).fill("releasepilot");
+    await clusterForm.getByLabel("Secret reference", { exact: true }).fill("env:KUBERNETES_TOKEN");
+    const prometheusForm = page.locator("form").filter({ has: page.getByText("Prometheus", { exact: true }) });
+    await prometheusForm.getByLabel("Name", { exact: true }).fill("Production metrics");
+    await prometheusForm.getByLabel("Base URL", { exact: true }).fill("https://metrics.example");
+    await clusterForm.evaluate((form) => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await prometheusForm.evaluate((form) => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(state.mutations).toEqual([{ path: "/connections/clusters", body: { name: "Production cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN" } }]);
+    respond();
+    await expect(clusterForm.getByRole("button", { name: "Cluster 등록", exact: true })).toBeEnabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR connection validation errors preserve trigger focus", async ({ page }) => {
