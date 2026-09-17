@@ -252,6 +252,44 @@ test("operator release actions remain single-flight before busy state renders", 
   }
 });
 
+test("approval decisions remain single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "APPROVER", { responseGate, failure: "FORBIDDEN" });
+  try {
+    await load(page);
+    const approve = page.getByRole("button", { name: "Approve", exact: true });
+    const reject = page.getByRole("button", { name: "Reject", exact: true });
+    await expect(approve).toBeEnabled();
+    await expect(reject).toBeEnabled();
+    page.on("dialog", (dialog) => dialog.accept("Concurrent decision fixture"));
+
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const approveButton = buttons.find((button) => button.textContent === "Approve");
+      const rejectButton = buttons.find((button) => button.textContent === "Reject");
+      if (!approveButton || !rejectButton) throw new Error("Approval controls are unavailable");
+      approveButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      approveButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      rejectButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await expect.poll(() => state.mutations.length).toBe(1);
+    expect(state.mutations).toEqual([{
+      path: "/releases/role-release/approve",
+      body: { reason: "Concurrent decision fixture" },
+    }]);
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "approve 요청이 거부되었습니다." })).toBeVisible();
+    await expect(approve).toBeEnabled();
+    await expect(reject).toBeEnabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally {
+    respond();
+  }
+});
+
 for (const action of ["approve", "reject", "promote", "pause", "resume", "abort"]) {
   test(`${action} accepts a single character reason after whitespace trimming`, async ({ page }) => {
     const decision = action === "approve" || action === "reject";
