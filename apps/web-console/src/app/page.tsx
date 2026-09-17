@@ -6,7 +6,7 @@ import sessionStyles from "./session.module.css";
 import browserStyles from "./release-browser.module.css";
 import auditStyles from "./audit-timeline.module.css";
 import { ActiveSession, canManageSessions, formatSessionTime, sessionConnectionLabel, SessionUser } from "./session-management.mts";
-import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, fetchWithTimeout, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, prometheusConnectionDraftIssue, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, approvalReadinessLabel, approvalReadinessMessage, AuditChainVerification, AuditEventView, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, CatalogItem, ClusterConnection, ClusterConnectionDraft, ConnectionFilter, connectionAuditDetail, connectionValidationLabel, CsrfToken, EnvironmentValidation, fetchWithTimeout, readinessMutationHeaders, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, PrometheusConnection, PrometheusConnectionDraft, prometheusConnectionDraftIssue, ReleaseDraft, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, ReleaseSummary, runWithBrowserLock, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft } from "./control-api.mts";
 
 type Step = { index: number; weight: number; status: string };
 type LiveState = { releaseStatus: string; steps: Step[] };
@@ -343,15 +343,18 @@ export default function Home() {
     setDemoBusy(true);
     setError("");
     try {
-    const response = await fetchWithTimeout("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
-    if (!response.ok) { setError("공개 데모 세션을 시작할 수 없습니다."); return; }
-    const session = await response.json() as SessionResponse;
-    setSessionUser(session.user);
-    setActiveSessions([]);
-    setAuditIntegrity(null);
-    setCanOperate(session.user.roles.includes("OPERATOR"));
-    await refreshReleases();
-    failed = false;
+      const result = await runWithBrowserLock("releasepilot:session-demo", async () => {
+        const response = await fetchWithTimeout("/control-api/session/demo", { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+        if (!response.ok) throw new Error("공개 데모 세션을 시작할 수 없습니다.");
+        const session = await response.json() as SessionResponse;
+        setSessionUser(session.user);
+        setActiveSessions([]);
+        setAuditIntegrity(null);
+        setCanOperate(session.user.roles.includes("OPERATOR"));
+        await refreshReleases();
+      });
+      if (!result.acquired) throw new Error("다른 탭에서 공개 데모 세션을 시작하고 있습니다. 완료 후 다시 시도해 주세요.");
+      failed = false;
     } catch (failure) {
       setError((failure as Error).message);
     } finally {

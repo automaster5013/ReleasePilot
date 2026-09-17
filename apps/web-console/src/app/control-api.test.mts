@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, fetchWithTimeout, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, prometheusConnectionDraftIssue, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
+import { clusterConnectionDraftIssue, createLatestRequestGuard, createMutationGate, fetchWithTimeout, readinessMutationHeaders, approvalReadinessLabel, approvalReadinessMessage, auditEventLabel, auditIntegrityLabel, canDecideRelease, canManageConnections, canRequestRelease, canRevalidateEnvironment, canVerifyAudit, connectionAuditDetail, connectionValidationLabel, environmentAllowsRelease, environmentValidationSummary, filterConnections, mutationHeaders, parseNamespaces, prometheusConnectionDraftIssue, releaseDraftIssue, releaseOptionLabel, releaseRequestReadinessMessage, runWithBrowserLock, selectableCatalogItems, validateClusterConnectionDraft, validatePrometheusConnectionDraft, validateReleaseDraft } from "./control-api.mts";
 
 test("latest release request rejects delayed data, readiness and errors from older loads", async () => {
   const guard = createLatestRequestGuard();
@@ -54,6 +54,36 @@ test("release mutation gate blocks same-tick submissions and recovers after fail
   assert.equal(gate.tryAcquire(), false);
   gate.release();
   assert.equal(gate.tryAcquire(), true);
+});
+
+test("browser lock rejects a competing tab and releases after completion", async () => {
+  let held = false;
+  const manager = {
+    request: async (_name: string, _options: LockOptions, callback: (lock: Lock | null) => Promise<unknown>) => {
+      if (held) return callback(null);
+      held = true;
+      try { return await callback({ name: "releasepilot:session-demo", mode: "exclusive" } as Lock); }
+      finally { held = false; }
+    },
+  } as LockManager;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() { return values.size; },
+  } as Storage;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const first = runWithBrowserLock("releasepilot:session-demo", async () => { await gate; return "started"; }, manager, storage, 1000);
+  await Promise.resolve();
+  const competing = await runWithBrowserLock("releasepilot:session-demo", async () => "duplicate", manager, storage, 1001);
+  assert.deepEqual(competing, { acquired: false });
+  release();
+  assert.deepEqual(await first, { acquired: true, value: "started" });
+  assert.deepEqual(await runWithBrowserLock("releasepilot:session-demo", async () => "retry", manager, storage, 1002), { acquired: true, value: "retry" });
 });
 
 test("timed fetch aborts stalled requests with a retryable message and preserves other failures", async () => {

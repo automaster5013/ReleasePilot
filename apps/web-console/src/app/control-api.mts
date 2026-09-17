@@ -146,6 +146,42 @@ export function createMutationGate() {
   };
 }
 
+export type BrowserLockResult<T> = { acquired: true; value: T } | { acquired: false };
+
+export async function runWithBrowserLock<T>(
+  name: string,
+  action: () => Promise<T>,
+  lockManager: LockManager | undefined = typeof navigator === "undefined" ? undefined : navigator.locks,
+  storage: Storage | undefined = typeof window === "undefined" ? undefined : window.localStorage,
+  now = Date.now(),
+): Promise<BrowserLockResult<T>> {
+  const leaseKey = `${name}:lease`;
+  const owner = typeof crypto === "undefined" ? `${now}-${Math.random()}` : crypto.randomUUID();
+  if (storage) {
+    try {
+      const current = JSON.parse(storage.getItem(leaseKey) ?? "null") as { owner?: unknown; expiresAt?: unknown } | null;
+      if (current && typeof current.expiresAt === "number" && current.expiresAt > now) return { acquired: false };
+      storage.setItem(leaseKey, JSON.stringify({ owner, expiresAt: now + 30_000 }));
+      const claimed = JSON.parse(storage.getItem(leaseKey) ?? "null") as { owner?: unknown } | null;
+      if (claimed?.owner !== owner) return { acquired: false };
+    } catch { /* Web Locks remains the authoritative fallback. */ }
+  }
+  const releaseLease = () => {
+    if (!storage) return;
+    try {
+      const current = JSON.parse(storage.getItem(leaseKey) ?? "null") as { owner?: unknown } | null;
+      if (current?.owner === owner) storage.removeItem(leaseKey);
+    } catch { /* An unavailable storage backend must not hide the operation result. */ }
+  };
+  try {
+    if (!lockManager) return { acquired: true, value: await action() };
+    return await lockManager.request(name, { mode: "exclusive", ifAvailable: true }, async (lock) => {
+      if (!lock) return { acquired: false } as BrowserLockResult<T>;
+      return { acquired: true, value: await action() } as BrowserLockResult<T>;
+    });
+  } finally { releaseLease(); }
+}
+
 export function createLatestRequestGuard() {
   let generation = 0;
   const snapshot = () => { const request = generation; return () => request === generation; };
