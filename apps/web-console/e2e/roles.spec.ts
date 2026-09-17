@@ -1443,6 +1443,38 @@ test("@a11y OPERATOR environment revalidation errors preserve trigger focus", as
   expect(state.unexpected).toEqual([]);
 });
 
+test("environment revalidation and release request remain single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate, failure: "ENVIRONMENT_VALIDATION_REJECTED" });
+  try {
+    await fillRequest(page);
+    const revalidate = page.getByRole("button", { name: "지금 재검증", exact: true });
+    const request = page.getByRole("button", { name: "릴리스 요청", exact: true });
+    await expect(revalidate).toBeEnabled();
+    await expect(request).toBeEnabled();
+
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const revalidateButton = buttons.find((button) => button.textContent === "지금 재검증");
+      const requestButton = buttons.find((button) => button.textContent === "릴리스 요청");
+      if (!revalidateButton || !requestButton) throw new Error("Release request controls are unavailable");
+      revalidateButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      revalidateButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      requestButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await expect.poll(() => state.mutations.length).toBe(1);
+    expect(state.mutations).toEqual([{ path: `/environments/${environmentId}/validate`, body: null }]);
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "환경 재검증 요청이 거부되었습니다." })).toBeVisible();
+    await expect(revalidate).toBeEnabled();
+    await expect(request).toBeDisabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
 async function inspectTabFocusAppearance(page: Page, limit: number) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const seen = new Set<string>();
