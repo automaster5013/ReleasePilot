@@ -564,6 +564,43 @@ test("account switch ends the current session before opening SSO sign-in", async
   await expect(page.getByRole("heading", { name: "다른 계정으로 로그인" })).toBeVisible();
 });
 
+test("logout and account switch remain single-flight before busy state renders", async ({ page }) => {
+  await fixture(page, "APPROVER");
+  let respond!: () => void;
+  const gate = new Promise<void>((resolve) => { respond = resolve; });
+  let logoutRequests = 0;
+  let loginRequests = 0;
+  await page.route("**/control-api/session/providers", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ oidc: true, loginUrl: "/oauth2/authorization/releasepilot" }) }));
+  await page.route("**/control-api/session/logout", async (route) => {
+    logoutRequests++;
+    await gate;
+    return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ code: "FORBIDDEN" }) });
+  });
+  await page.route("**/oauth2/authorization/releasepilot", route => {
+    loginRequests++;
+    return route.fulfill({ contentType: "text/html", body: "<meta charset=\"utf-8\"><h1>다른 계정으로 로그인</h1>" });
+  });
+  try {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const logout = buttons.find((button) => button.textContent === "로그아웃");
+      const changeAccount = buttons.find((button) => button.textContent === "계정 변경");
+      if (!logout || !changeAccount) throw new Error("Session controls are unavailable");
+      logout.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      logout.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      changeAccount.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expect.poll(() => logoutRequests).toBe(1);
+    expect(loginRequests).toBe(0);
+    respond();
+    await expect(page.getByRole("alert").filter({ hasText: "로그아웃하지 못했습니다. 다시 시도해 주세요." })).toBeVisible();
+    await expect(page.getByRole("button", { name: "로그아웃", exact: true })).toBeEnabled();
+    expect(logoutRequests).toBe(1);
+    expect(loginRequests).toBe(0);
+  } finally { respond(); }
+});
+
 for (const role of ["DEVELOPER", "APPROVER", "OPERATOR"] as const) {
   test(`@a11y ${role} screen meets automated WCAG A and AA checks`, async ({ page }) => {
     const state = await fixture(page, role);
