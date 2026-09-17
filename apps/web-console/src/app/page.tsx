@@ -128,6 +128,7 @@ export default function Home() {
   const [prometheusConnections, setPrometheusConnections] = useState<PrometheusConnection[]>([]);
   const [clusterConnections, setClusterConnections] = useState<ClusterConnection[]>([]);
   const [connectionBusyId, setConnectionBusyId] = useState("");
+  const connectionRefreshInFlight = useRef(false);
   const [connectionNotice, setConnectionNotice] = useState("");
   const [connectionActionError, setConnectionActionError] = useState("");
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
@@ -831,7 +832,8 @@ export default function Home() {
   }
 
   async function refreshConnections(trigger: HTMLElement) {
-    if (connectionBusyId) return;
+    if (connectionBusyId || connectionRefreshInFlight.current) return;
+    connectionRefreshInFlight.current = true;
     setConnectionActionError("");
     setConnectionBusyId("refresh");
     setConnectionNotice("");
@@ -844,6 +846,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     } finally {
+      connectionRefreshInFlight.current = false;
       setConnectionBusyId("");
     }
   }

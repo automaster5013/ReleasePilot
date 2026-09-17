@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -316,11 +316,13 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     }
     if (path === "/connections/clusters") {
       clusterListRequests++;
+      if (options.connectionRefreshGate && clusterListRequests > 1) await options.connectionRefreshGate;
       if (options.connectionRefreshFailure && clusterListRequests > 1) return json({ code: "CONNECTIONS_UNAVAILABLE" }, 503);
       return json(options.connections ? [{ id: "cluster-role", name: "Role cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN", status: "ACTIVE", lastValidatedAt: new Date().toISOString() }] : []);
     }
     if (path === "/connections/prometheus") {
       prometheusListRequests++;
+      if (options.connectionRefreshGate && prometheusListRequests > 1) await options.connectionRefreshGate;
       if (options.connectionRefreshFailure && prometheusListRequests > 1) return json({ code: "CONNECTIONS_UNAVAILABLE" }, 503);
       return json(options.connections ? [{ id: "prometheus-role", name: "Role metrics", baseUrl: "https://metrics.example", secretRef: null, status: options.disabledPrometheus ? "DISABLED" : "ACTIVE", lastValidatedAt: new Date().toISOString(), queryTimeoutSeconds: 15 }] : []);
     }
@@ -346,7 +348,7 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
     unexpected.push(`Unhandled API: ${path}`);
     return json({ code: "UNHANDLED_FIXTURE" }, 500);
   });
-  return { mutations, unexpected, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests, auditIntegrityRequests: () => auditIntegrityRequests };
+  return { mutations, unexpected, clusterListRequests: () => clusterListRequests, prometheusListRequests: () => prometheusListRequests, releaseListRequests: () => releaseListRequests, releaseLoadRequests: () => releaseLoadRequests, auditIntegrityRequests: () => auditIntegrityRequests };
 }
 
 async function load(page: Page) {
@@ -999,6 +1001,32 @@ test("@a11y OPERATOR connection refresh errors preserve trigger focus", async ({
   await expect(refresh).toBeFocused();
   expect(state.mutations).toEqual([]);
   expect(state.unexpected).toEqual([]);
+});
+
+test("connection refresh remains locked until both list requests complete", async ({ page }) => {
+  let respond!: () => void;
+  const connectionRefreshGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionRefreshGate });
+  try {
+    await page.goto("/");
+    await expect.poll(state.clusterListRequests).toBe(1);
+    await expect.poll(state.prometheusListRequests).toBe(1);
+    const refresh = page.getByRole("button", { name: "새로고침", exact: true });
+    await refresh.click();
+    await expect.poll(state.clusterListRequests).toBe(2);
+    await expect.poll(state.prometheusListRequests).toBe(2);
+    const pending = page.getByRole("button", { name: "새로고침 중…", exact: true });
+    await expect(pending).toBeDisabled();
+    await pending.evaluate((element) => (element as HTMLButtonElement).click());
+    expect(state.clusterListRequests()).toBe(2);
+    expect(state.prometheusListRequests()).toBe(2);
+    respond();
+    await expect(refresh).toBeEnabled();
+    expect(state.clusterListRequests()).toBe(2);
+    expect(state.prometheusListRequests()).toBe(2);
+    expect(state.mutations).toEqual([]);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
 });
 
 test("@a11y OPERATOR release refresh errors preserve trigger focus", async ({ page }) => {
