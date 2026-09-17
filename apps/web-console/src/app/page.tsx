@@ -96,6 +96,7 @@ export default function Home() {
   const [canOperate, setCanOperate] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
+  const demoInFlight = useRef(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const logoutInFlight = useRef(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
@@ -331,7 +332,8 @@ export default function Home() {
   }
 
   async function startDemo(trigger: HTMLElement | null = null) {
-    if (demoBusy) return;
+    if (demoInFlight.current) return;
+    demoInFlight.current = true;
     let failed = true;
     setDemoBusy(true);
     setError("");
@@ -348,6 +350,7 @@ export default function Home() {
     } catch (failure) {
       setError((failure as Error).message);
     } finally {
+      demoInFlight.current = false;
       setDemoBusy(false);
       if (failed) restoreFocusAfterRender(trigger);
     }

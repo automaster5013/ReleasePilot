@@ -72,6 +72,38 @@ for (const rejected of [false, true]) {
   }
 }
 
+test("demo login rejects same-task duplicate activation before busy state renders", async ({ page }) => {
+  const unexpected = await isolateApi(page);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let csrfRequests = 0;
+  let demoRequests = 0;
+  await page.route("**/control-api/session/csrf", async (route) => {
+    csrfRequests++;
+    await gate;
+    await route.fallback();
+  });
+  await page.route("**/control-api/session/demo", async (route) => {
+    demoRequests++;
+    await route.fallback();
+  });
+  try {
+    await page.goto("/");
+    const button = page.getByRole("button", { name: "읽기 전용 데모", exact: true });
+    await button.evaluate((element) => {
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expect.poll(() => csrfRequests).toBe(1);
+    expect(demoRequests).toBe(0);
+    release();
+    await expect(page.getByRole("navigation")).toContainText("DEMO · VIEW ONLY");
+    expect(csrfRequests).toBe(1);
+    expect(demoRequests).toBe(1);
+    expect(unexpected).toEqual([]);
+  } finally { release(); }
+});
+
 for (const failure of ["null", "empty", "forbidden", "connection"]) {
   test(`demo login blocks ${failure} CSRF and recovers on retry`, async ({ page }) => {
     const unexpected = await isolateApi(page);
