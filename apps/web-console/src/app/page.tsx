@@ -132,6 +132,7 @@ export default function Home() {
   const [connectionBusyId, setConnectionBusyId] = useState("");
   const connectionRefreshInFlight = useRef(false);
   const connectionValidationInFlight = useRef(false);
+  const connectionMutationInFlight = useRef(false);
   const [connectionNotice, setConnectionNotice] = useState("");
   const [connectionActionError, setConnectionActionError] = useState("");
   const [clusterDraft, setClusterDraft] = useState<ClusterConnectionDraft>(emptyClusterDraft);
@@ -766,14 +767,15 @@ export default function Home() {
   }
 
   async function editClusterConnection(item: ClusterConnection, trigger: HTMLElement) {
-    if (connectionBusyId) return;
-    const name = window.prompt("Kubernetes 연결 이름", item.name); if (name === null) return;
-    const apiServer = window.prompt("Kubernetes API HTTPS 주소", item.apiServer); if (apiServer === null) return;
-    const namespaces = window.prompt("허용 namespace (쉼표 구분)", item.allowedNamespaces.join(", ")); if (namespaces === null) return;
-    const secretRef = window.prompt("Secret reference", item.secretRef); if (secretRef === null) return;
+    if (connectionBusyId || connectionMutationInFlight.current) return;
+    connectionMutationInFlight.current = true;
+    const name = window.prompt("Kubernetes 연결 이름", item.name); if (name === null) { connectionMutationInFlight.current = false; return; }
+    const apiServer = window.prompt("Kubernetes API HTTPS 주소", item.apiServer); if (apiServer === null) { connectionMutationInFlight.current = false; return; }
+    const namespaces = window.prompt("허용 namespace (쉼표 구분)", item.allowedNamespaces.join(", ")); if (namespaces === null) { connectionMutationInFlight.current = false; return; }
+    const secretRef = window.prompt("Secret reference", item.secretRef); if (secretRef === null) { connectionMutationInFlight.current = false; return; }
     const draft = { name, apiServer, namespaces, secretRef };
     setConnectionActionError("");
-    const validation = validateClusterConnectionDraft(draft); if (validation) { setConnectionNotice(validation); return; }
+    const validation = validateClusterConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
       const response = await fetch(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
@@ -786,18 +788,19 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionBusyId(""); }
+    finally { connectionMutationInFlight.current = false; setConnectionBusyId(""); }
   }
 
   async function editPrometheusConnection(item: PrometheusConnection, trigger: HTMLElement) {
-    if (connectionBusyId) return;
-    const name = window.prompt("Prometheus 연결 이름", item.name); if (name === null) return;
-    const baseUrl = window.prompt("Prometheus HTTP(S) 주소", item.baseUrl); if (baseUrl === null) return;
-    const secretRef = window.prompt("Secret reference (인증이 없으면 비움)", item.secretRef ?? ""); if (secretRef === null) return;
-    const queryTimeoutSeconds = window.prompt("Query timeout (초)", String(item.queryTimeoutSeconds)); if (queryTimeoutSeconds === null) return;
+    if (connectionBusyId || connectionMutationInFlight.current) return;
+    connectionMutationInFlight.current = true;
+    const name = window.prompt("Prometheus 연결 이름", item.name); if (name === null) { connectionMutationInFlight.current = false; return; }
+    const baseUrl = window.prompt("Prometheus HTTP(S) 주소", item.baseUrl); if (baseUrl === null) { connectionMutationInFlight.current = false; return; }
+    const secretRef = window.prompt("Secret reference (인증이 없으면 비움)", item.secretRef ?? ""); if (secretRef === null) { connectionMutationInFlight.current = false; return; }
+    const queryTimeoutSeconds = window.prompt("Query timeout (초)", String(item.queryTimeoutSeconds)); if (queryTimeoutSeconds === null) { connectionMutationInFlight.current = false; return; }
     const draft = { name, baseUrl, secretRef, queryTimeoutSeconds };
     setConnectionActionError("");
-    const validation = validatePrometheusConnectionDraft(draft); if (validation) { setConnectionNotice(validation); return; }
+    const validation = validatePrometheusConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
       const response = await fetch(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
@@ -810,13 +813,14 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionBusyId(""); }
+    finally { connectionMutationInFlight.current = false; setConnectionBusyId(""); }
   }
 
   async function setConnectionEnabled(kind: "clusters" | "prometheus", item: ClusterConnection | PrometheusConnection, trigger: HTMLElement) {
-    if (connectionBusyId) return;
+    if (connectionBusyId || connectionMutationInFlight.current) return;
+    connectionMutationInFlight.current = true;
     const enable = item.status === "DISABLED";
-    if (!enable && !window.confirm(`${item.name} 연결을 비활성화하시겠습니까? 진행 중인 릴리스의 다음 preflight와 새 릴리스 요청이 차단됩니다.`)) return;
+    if (!enable && !window.confirm(`${item.name} 연결을 비활성화하시겠습니까? 진행 중인 릴리스의 다음 preflight와 새 릴리스 요청이 차단됩니다.`)) { connectionMutationInFlight.current = false; return; }
     setConnectionActionError("");
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
@@ -830,7 +834,7 @@ export default function Home() {
       setConnectionNotice(message);
       restoreFocusAfterRender(trigger);
     }
-    finally { setConnectionBusyId(""); }
+    finally { connectionMutationInFlight.current = false; setConnectionBusyId(""); }
   }
 
   async function validateAllConnections(kind: "clusters" | "prometheus", trigger: HTMLElement) {

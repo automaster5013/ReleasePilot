@@ -247,7 +247,7 @@ for (const role of ["APPROVER", "OPERATOR"]) {
   });
 }
 
-async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
+async function fixture(page: Page, role: string, options: { stale?: boolean; failure?: string; responseGate?: Promise<void>; releaseLoadGate?: Promise<void>; releaseRefreshGate?: Promise<void>; auditIntegrityGate?: Promise<void>; connectionRefreshGate?: Promise<void>; connectionValidationGate?: Promise<void>; connectionCreateGate?: Promise<void>; connectionMutationGate?: Promise<void>; disconnect?: boolean; disconnectOnce?: boolean; csrfFailure?: boolean; csrfStatus?: number; csrfRejectOnce?: boolean; csrfBody?: unknown; connections?: boolean; disabledPrometheus?: boolean; connectionAuditFailure?: boolean; connectionRefreshFailure?: boolean; releaseRefreshFailure?: boolean; releaseLoadFailure?: boolean; auditIntegrityFailure?: boolean; activeSessions?: boolean } = {}) {
   let status = role === "OPERATOR" ? "ANALYZING" : "PENDING_APPROVAL";
   const mutations: Mutation[] = [];
   const unexpected: string[] = [];
@@ -271,13 +271,14 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       const environmentValidationMutation = role === "OPERATOR" && path === `/environments/${environmentId}/validate`;
       const connectionValidationMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)(\/[^/]+)?\/validate$/.test(path);
       const connectionCreateMutation = role === "OPERATOR" && request.method() === "POST" && /^\/connections\/(clusters|prometheus)$/.test(path);
+      const connectionMutation = role === "OPERATOR" && ((request.method() === "PUT" && /^\/connections\/(clusters|prometheus)\/[^/]+$/.test(path)) || (request.method() === "POST" && /^\/connections\/(clusters|prometheus)\/[^/]+\/(enable|disable)$/.test(path)));
       const permitted = (request.method() === "POST" && (
         (role === "DEVELOPER" && path === "/releases") ||
         (role === "APPROVER" && /^\/releases\/role-release\/(approve|reject)$/.test(path)) ||
-        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation || connectionCreateMutation))
-      )) || individualSessionMutation;
+        (role === "OPERATOR" && (/^\/releases\/role-release\/(promote|pause|resume|abort)$/.test(path) || sessionMutation || environmentValidationMutation || connectionValidationMutation || connectionCreateMutation || connectionMutation))
+      )) || individualSessionMutation || connectionMutation;
       if (!permitted || request.headers()["x-csrf-token"] !== "role-fixture-csrf" ||
-          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && !connectionValidationMutation && !connectionCreateMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
+          (!sessionMutation && !individualSessionMutation && !environmentValidationMutation && !connectionValidationMutation && !connectionCreateMutation && !connectionMutation && (!request.headers()["idempotency-key"] || !request.headers()["content-type"]?.includes("application/json")))) {
         unexpected.push(`Unsafe mutation: ${request.method()} ${path}`);
         return json({ code: "FORBIDDEN" }, 403);
       }
@@ -285,10 +286,12 @@ async function fixture(page: Page, role: string, options: { stale?: boolean; fai
       if (options.responseGate) await options.responseGate;
       if (connectionValidationMutation && options.connectionValidationGate) await options.connectionValidationGate;
       if (connectionCreateMutation && options.connectionCreateGate) await options.connectionCreateGate;
+      if (connectionMutation && options.connectionMutationGate) await options.connectionMutationGate;
       if (options.disconnect || (options.disconnectOnce && mutations.length === 1)) return route.abort("connectionfailed");
       if (options.failure) return json({ code: options.failure }, 403);
       if (connectionValidationMutation) return json(path.split("/").length === 4 ? [{ status: "ACTIVE" }] : { status: "ACTIVE" });
       if (connectionCreateMutation) return json({ id: path.endsWith("clusters") ? "cluster-created" : "prometheus-created", status: "PENDING_VALIDATION" }, 201);
+      if (connectionMutation) return json({ status: path.endsWith("disable") ? "DISABLED" : "PENDING_VALIDATION" });
       status = path.endsWith("/approve") ? "APPROVED" : path.endsWith("/reject") ? "REJECTED" : status;
       const action = path.split("/").at(-1)!;
       const eventType = path === "/releases" ? "RELEASE_REQUESTED" : ["approve", "reject"].includes(action)
@@ -893,6 +896,29 @@ test("OPERATOR connection registration remains single-flight before busy state r
     expect(state.mutations).toEqual([{ path: "/connections/clusters", body: { name: "Production cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN" } }]);
     respond();
     await expect(clusterForm.getByRole("button", { name: "Cluster 등록", exact: true })).toBeEnabled();
+    expect(state.mutations).toHaveLength(1);
+    expect(state.unexpected).toEqual([]);
+  } finally { respond(); }
+});
+
+test("OPERATOR connection changes remain single-flight before busy state renders", async ({ page }) => {
+  let respond!: () => void;
+  const connectionMutationGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, disabledPrometheus: true, connectionMutationGate });
+  try {
+    await page.goto("/");
+    const prometheus = page.locator("article").filter({ hasText: "Role metrics" });
+    const prometheusEnable = prometheus.getByRole("button", { name: "재활성화", exact: true });
+    await prometheusEnable.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
+    await expect.poll(() => state.mutations.length).toBe(1);
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    await cluster.getByRole("button", { name: "편집", exact: true }).evaluate((button) => (button as HTMLButtonElement).click());
+    expect(state.mutations).toEqual([{ path: "/connections/prometheus/prometheus-role/enable", body: null }]);
+    respond();
+    await expect(prometheusEnable).toBeEnabled();
     expect(state.mutations).toHaveLength(1);
     expect(state.unexpected).toEqual([]);
   } finally { respond(); }
