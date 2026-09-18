@@ -19,11 +19,13 @@ export const metadata: Metadata = {
     siteName: "ReleasePilot",
     title: "ReleasePilot Progressive Delivery 시뮬레이터",
     description: "배포 승인부터 점진적 트래픽 전환과 자동 롤백까지 하나의 안전한 흐름으로 확인하세요.",
+    images: [{ url: `${showcaseUrl}/opengraph-image`, width: 1200, height: 630, alt: "ReleasePilot — Progressive Delivery Control Plane" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "ReleasePilot Progressive Delivery 시뮬레이터",
     description: "승인 검토, Canary 트래픽 제어, 자동 롤백을 직접 체험하세요.",
+    images: [`${showcaseUrl}/opengraph-image`],
   },
 };
 

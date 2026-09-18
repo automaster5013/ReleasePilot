@@ -28,6 +28,11 @@ test("control room exposes the public showcase and showcase metadata is canonica
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /index/);
   await expect(page.locator('meta[name="robots"]')).not.toHaveAttribute("content", /noindex/);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "ReleasePilot Progressive Delivery 시뮬레이터");
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /^https:\/\/releasepilot\.kr\/showcase\/opengraph-image(?:\?.+)?$/);
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", /^https:\/\/releasepilot\.kr\/showcase\/opengraph-image(?:\?.+)?$/);
 
   const structuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent() ?? "{}");
   expect(structuredData).toMatchObject({
@@ -48,6 +53,11 @@ test("public discovery endpoints advertise the showcase", async ({ request }) =>
   const sitemap = await request.get("/sitemap.xml");
   expect(sitemap.ok()).toBe(true);
   expect(await sitemap.text()).toContain("https://releasepilot.kr/showcase");
+
+  const socialImage = await request.get("/showcase/opengraph-image");
+  expect(socialImage.ok()).toBe(true);
+  expect(socialImage.headers()["content-type"]).toContain("image/png");
+  expect((await socialImage.body()).byteLength).toBeGreaterThan(10_000);
 });
 
 test("showcase automatically rolls back when the error policy is breached", async ({ page }) => {
