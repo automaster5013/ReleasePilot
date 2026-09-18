@@ -16,6 +16,27 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByText("10% traffic", { exact: true })).toBeVisible({ timeout: 3_000 });
 });
 
+test("control room exposes the public showcase and showcase metadata is canonical", async ({ page }) => {
+  await page.goto("/");
+  const showcaseLink = page.getByRole("link", { name: "제품 둘러보기", exact: true });
+  await expect(showcaseLink).toHaveAttribute("href", "/showcase");
+  await showcaseLink.click();
+  await expect(page).toHaveURL(/\/showcase$/);
+  await expect(page).toHaveTitle("Progressive Delivery 시뮬레이터 | ReleasePilot");
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://releasepilot.kr/showcase");
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "ReleasePilot Progressive Delivery 시뮬레이터");
+});
+
+test("public discovery endpoints advertise the showcase", async ({ request }) => {
+  const robots = await request.get("/robots.txt");
+  expect(robots.ok()).toBe(true);
+  expect(await robots.text()).toContain("Sitemap: https://releasepilot.kr/sitemap.xml");
+
+  const sitemap = await request.get("/sitemap.xml");
+  expect(sitemap.ok()).toBe(true);
+  expect(await sitemap.text()).toContain("https://releasepilot.kr/showcase");
+});
+
 test("showcase automatically rolls back when the error policy is breached", async ({ page }) => {
   await page.goto("/showcase");
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
