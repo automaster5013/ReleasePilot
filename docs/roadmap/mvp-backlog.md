@@ -205,7 +205,7 @@ VIEWER 세션의 상태 변경 거부는 통합 테스트와 실환경 요청으
 
 1. Blue/Green 전략 — 완료 (2026-09-14)
 2. OIDC/SSO — 완료 (2026-09-14, 공급자 연결은 배포 설정)
-3. Slack 또는 GitHub Checks 알림·승인 연동 — GitHub Checks 완료 (2026-09-14, token 연결은 배포 설정)
+3. Slack 또는 GitHub Checks 알림·승인 연동 — 완료 (2026-09-19, 저장소 전용 GitHub App `ReleasePilot Checks automaster5013` 설치·Checks write/Metadata read 최소 권한·App ID 4993433/Installation ID 162831833·PKCS#1/PKCS#8 private key 기반 RS256 JWT와 1시간 installation token 자동 발급/만료 5분 전 캐시 갱신·EKS Secret projected volume/fail-closed 활성화·정적 token fallback 유지·provider/gateway/service 및 전체 Control Plane 205개 테스트 통과·gitleaks PEM marker 오탐 수정·CI #369/CD #124 성공·GitOps 6d7719a·control-plane digest `sha256:64f0bdfd2c207f4ce8bd5a13d24e7ac864e1bb444ae607298f32011420707914` Canary 20% 자동 관찰/50% 신규 Pod readiness·키 마운트·오류 0 확인 후 stable 승격·Rollout 2/2 Healthy/Argo Synced/Healthy/공개 readiness UP·운영 worker가 Check Run 105735510576을 생성해 `GitHub App connection verified` success 확인·노출된 교체 키 2개 폐기/로컬 PEM 3개 제거/최종 키 1개만 EKS Secret에 보관)
 4. 다중 클러스터 — 완료 (2026-09-14, 클러스터별 Environment 대상 지정 및 일괄 권한 검증)
 5. route별 중요도 정책 — 완료 (2026-09-14, OpenTelemetry `http.route` 범위와 CRITICAL fail-closed 판정)
 6. 감사 이벤트 해시 체인과 외부 보관 — 완료 (2026-09-14, SHA-256 전역 체인·검증 API·트랜잭션 전달함·S3 Object Lock WORM 보관)
