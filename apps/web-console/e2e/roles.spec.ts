@@ -1961,6 +1961,31 @@ test("environment revalidation timeout keeps release fail-closed and permits one
   }
 });
 
+test("environment revalidation blocks release requests across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate });
+  const otherState = await fixture(other, "OPERATOR");
+  try {
+    await fillRequest(page);
+    await fillRequest(other);
+    await page.getByRole("button", { name: "지금 재검증", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "릴리스 요청", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 릴리스를 요청하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: `/environments/${environmentId}/validate`, body: null }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByText("환경 재검증이 완료되었습니다.", { exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("environment revalidation and release request remain single-flight before busy state renders", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });

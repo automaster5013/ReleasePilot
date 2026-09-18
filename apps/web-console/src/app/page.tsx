@@ -583,15 +583,18 @@ export default function Home() {
     setEnvironmentValidation(null);
     setEnvironmentValidationBusy(true); setEnvironmentValidationNotice("환경 재검증 중에는 릴리스를 요청할 수 없습니다.");
     try {
-      const response = await fetchWithTimeout(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
-      if (!response.ok) throw new Error("환경 재검증 요청이 거부되었습니다.");
-      const result = await response.json() as EnvironmentValidation;
-      if (!isCurrent() || selectedEnvironmentId.current !== environmentId) return;
-      if (result.environmentId !== environmentId) throw new Error("환경 검증 결과의 대상이 일치하지 않습니다.");
-      setEnvironmentValidation(result);
-      setEnvironments((current) => current.map((item) => item.id === result.environmentId ? { ...item, status: result.status } : item));
-      setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
-      await refreshEnvironmentAudit(result.environmentId);
+      const lockResult = await runWithBrowserLock("releasepilot:release-request", async () => {
+        const response = await fetchWithTimeout(`/control-api/environments/${releaseDraft.environmentId}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+        if (!response.ok) throw new Error("환경 재검증 요청이 거부되었습니다.");
+        const result = await response.json() as EnvironmentValidation;
+        if (!isCurrent() || selectedEnvironmentId.current !== environmentId) return;
+        if (result.environmentId !== environmentId) throw new Error("환경 검증 결과의 대상이 일치하지 않습니다.");
+        setEnvironmentValidation(result);
+        setEnvironments((current) => current.map((item) => item.id === result.environmentId ? { ...item, status: result.status } : item));
+        setEnvironmentValidationNotice(environmentAllowsRelease(result) ? "환경 재검증이 완료되었습니다." : "재검증에 실패한 환경에서는 릴리스를 요청할 수 없습니다.");
+        await refreshEnvironmentAudit(result.environmentId);
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 환경 재검증 또는 릴리스 요청을 처리하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       if (isCurrent() && selectedEnvironmentId.current === environmentId) {
         setEnvironmentValidationNotice("");
