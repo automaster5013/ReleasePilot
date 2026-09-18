@@ -118,6 +118,9 @@ test("showcase automatically rolls back when the error policy is breached", asyn
   await expect(page.getByRole("alert").filter({ hasText: "정책 임계치 5% 초과" })).toBeVisible();
   await expect(page.getByText("복구 완료", { exact: true })).toBeVisible({ timeout: 4_000 });
   await expect(page.getByText("0% traffic", { exact: true })).toBeVisible();
+  await expect(page.getByText("QUARANTINED", { exact: true })).toBeVisible();
+  await expect(page.getByText("RECOVERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("TRAFFIC RESTORED · CANARY ISOLATED", { exact: true })).toBeVisible();
 });
 
 test("@a11y showcase has no automated WCAG A or AA violations", async ({ page }) => {

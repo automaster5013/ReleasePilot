@@ -51,6 +51,8 @@ export default function Showcase() {
   const status = phaseCopy[phase];
   const oldTraffic = 100 - traffic;
   const unsafe = errorRate > errorThreshold;
+  const rollingBack = phase === "ROLLING_BACK";
+  const recovered = phase === "ROLLED_BACK";
   const canStart = phase === "READY" || phase === "ROLLED_BACK" || phase === "COMPLETED";
   const eventLog = useMemo(() => {
     if (phase === "REVIEW") return ["배포 요청 생성", "운영 승인 대기"];
@@ -110,7 +112,7 @@ export default function Showcase() {
               <path className={styles.routeBed} d={stablePath}/>
               <path className={styles.routeBed} d={canaryPath}/>
               <path className={`${styles.flowLine} ${styles.stableFlow}`} data-route="stable" d={stablePath} pathLength="100" style={{ "--flow-level": oldTraffic } as React.CSSProperties}/>
-              <path className={`${styles.flowLine} ${styles.canaryFlow}`} data-route="canary" d={canaryPath} pathLength="100" style={{ "--flow-level": traffic } as React.CSSProperties}/>
+              <path className={`${styles.flowLine} ${styles.canaryFlow}`} data-route="canary" data-rollback={rollingBack} d={canaryPath} pathLength="100" style={{ "--flow-level": traffic } as React.CSSProperties}/>
 
               <g className={styles.gates} aria-hidden="true">
                 {[
@@ -121,6 +123,11 @@ export default function Showcase() {
               {(phase === "RUNNING" || phase === "COMPLETED") && Array.from({ length: 5 }, (_, index) => (
                 <circle className={styles.canaryPacket} r="4" key={`canary-${index}`} aria-hidden="true">
                   <animateMotion dur="2.8s" begin={`${index * -.56}s`} repeatCount="indefinite" path={canaryPath}/>
+                </circle>
+              ))}
+              {rollingBack && Array.from({ length: 6 }, (_, index) => (
+                <circle className={styles.rollbackPacket} r="4" key={`rollback-${index}`} aria-hidden="true">
+                  <animateMotion dur="1.2s" begin={`${index * -.2}s`} repeatCount="indefinite" path={canaryPath} keyPoints="1;0" keyTimes="0;1" calcMode="linear"/>
                 </circle>
               ))}
               {Array.from({ length: 4 }, (_, index) => (
@@ -135,7 +142,7 @@ export default function Showcase() {
                 <path className={styles.coreMark} d="M0-34 30-17 30 17 0 34-30 17-30-17Z"/>
                 <text className={styles.coreKicker} y="-7">RELEASEPILOT</text>
                 <text className={styles.coreName} y="12">POLICY CORE</text>
-                <text className={styles.coreStatus} y="30">{phase === "ROLLING_BACK" ? "ROLLBACK" : "ROUTING LIVE"}</text>
+                <text className={styles.coreStatus} y="30">{rollingBack ? "CUTOVER" : recovered ? "RECOVERED" : phase === "COMPLETED" ? "PROMOTED" : phase === "REVIEW" ? "POLICY READY" : "ROUTING LIVE"}</text>
               </g>
 
               <g className={`${styles.releaseNode} ${styles.stableNode}`} data-release="stable" transform="translate(520 65)">
@@ -145,13 +152,15 @@ export default function Showcase() {
                 <text className={styles.nodeTraffic} x="20" y="88">{oldTraffic}% traffic</text>
                 <text className={styles.nodeHealth} x="148" y="28" textAnchor="end">HEALTHY</text>
               </g>
-              <g className={`${styles.releaseNode} ${styles.canaryNode}`} data-release="canary" transform="translate(520 325)" data-active={traffic > 0}>
+              <g className={`${styles.releaseNode} ${styles.canaryNode}`} data-release="canary" transform="translate(520 325)" data-active={traffic > 0} data-state={rollingBack ? "rollback" : recovered ? "quarantined" : phase === "COMPLETED" ? "promoted" : "normal"}>
                 <rect width="168" height="110" rx="17"/>
                 <circle cx="22" cy="24" r="4"/><text className={styles.nodeKicker} x="34" y="28">CANARY</text>
                 <text className={styles.nodeVersion} x="20" y="61">v1.9.0</text>
                 <text className={styles.nodeTraffic} x="20" y="88">{traffic}% traffic</text>
-                <text className={styles.nodeHealth} x="148" y="28" textAnchor="end">{unsafe ? "AT RISK" : "ANALYZING"}</text>
+                <text className={styles.nodeHealth} x="148" y="28" textAnchor="end">{rollingBack ? "BLOCKED" : recovered ? "QUARANTINED" : phase === "COMPLETED" ? "PROMOTED" : traffic > 0 ? "ANALYZING" : "STANDBY"}</text>
               </g>
+              {(rollingBack || recovered) && <g className={styles.rollbackSeal} transform="translate(500 380)" aria-hidden="true"><circle r="15"/><path d="M-5-5 5 5M5-5-5 5"/></g>}
+              {recovered && <g className={styles.recoveryStamp} transform="translate(255 424)"><rect width="245" height="34" rx="17"/><circle cx="18" cy="17" r="4"/><text x="32" y="21">TRAFFIC RESTORED · CANARY ISOLATED</text></g>}
             </svg>
           </section>
 

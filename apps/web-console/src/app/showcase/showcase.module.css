@@ -16,6 +16,7 @@
 .flowLine{fill:none;stroke-width:7;stroke-linecap:round;stroke-dasharray:var(--flow-level) 100;transition:stroke-dasharray .7s ease;filter:url(#flow-glow)}
 .stableFlow{stroke:url(#stable-flow)}
 .canaryFlow{stroke:url(#canary-flow)}
+.canaryFlow[data-rollback=true]{stroke:#ff766f;stroke-dasharray:var(--flow-level) 100;animation:rollbackPulse .55s ease-in-out infinite alternate}
 .gates g circle:first-child{fill:#091713;stroke:#5b756b;stroke-width:1}
 .gates g circle:nth-child(2){fill:#647d73}
 .gates g text{fill:#718b81;font-size:9px;font-weight:700;text-anchor:middle;letter-spacing:.06em}
@@ -24,6 +25,7 @@
 .gates g[data-passed=true] text{fill:#87e9c1}
 .stablePacket{fill:#9bbcff;filter:url(#flow-glow)}
 .canaryPacket{fill:#74f4bd;filter:url(#flow-glow)}
+.rollbackPacket{fill:#ff948d;filter:url(#flow-glow)}
 .coreAura{fill:#55e7ab;opacity:.08;filter:url(#core-glow)}
 .coreOrbit{fill:url(#core-fill);stroke:#7fa6ff;stroke-width:1.5;stroke-dasharray:4 3}
 .coreMark{fill:#10231d;stroke:#60e4af;stroke-width:1.5}
@@ -44,4 +46,15 @@
 .canaryNode[data-active=true] rect{stroke:#60e4ad;filter:url(#flow-glow)}
 .canaryNode[data-active=true] circle{fill:#63e7a5}
 .canaryNode[data-active=true] .nodeHealth{fill:#63e7a5}
-@media(prefers-reduced-motion:reduce){.stablePacket,.canaryPacket{display:none}}
+.canaryNode[data-state=rollback] rect{stroke:#ff7f79;fill:#241513;filter:url(#flow-glow)}
+.canaryNode[data-state=rollback] circle,.canaryNode[data-state=rollback] .nodeHealth{fill:#ff8e87}
+.canaryNode[data-state=quarantined] rect{stroke:#8a625e;stroke-dasharray:5 3;fill:#171311}
+.canaryNode[data-state=quarantined] circle,.canaryNode[data-state=quarantined] .nodeHealth{fill:#c28b84}
+.canaryNode[data-state=promoted] rect{stroke:#60e4ad;filter:url(#flow-glow)}
+.rollbackSeal circle{fill:#321714;stroke:#ff8d86;stroke-width:1.5}
+.rollbackSeal path{fill:none;stroke:#ffaaa4;stroke-width:2;stroke-linecap:round}
+.recoveryStamp rect{fill:#10241e;stroke:#55dda9;stroke-width:1}
+.recoveryStamp circle{fill:#63e7a5;filter:url(#flow-glow)}
+.recoveryStamp text{fill:#a9e8cf;font-size:8px;font-weight:700;letter-spacing:.08em}
+@keyframes rollbackPulse{from{opacity:.45}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.stablePacket,.canaryPacket,.rollbackPacket{display:none}.canaryFlow[data-rollback=true]{animation:none}}
