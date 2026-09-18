@@ -465,9 +465,9 @@ export default function Home() {
     setApprovalReadinessNotice("환경 readiness를 확인하는 중…");
     try {
       const [releaseResponse, analysesResponse, auditResponse] = await Promise.all([
-        fetch(`/control-api/releases/${id}`, { credentials: "include" }),
-        fetch(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
-        fetch(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" }),
+        fetchWithTimeout(`/control-api/releases/${id}`, { credentials: "include" }),
+        fetchWithTimeout(`/control-api/releases/${id}/analyses`, { credentials: "include" }),
+        fetchWithTimeout(`/control-api/audit-events?aggregateType=RELEASE&aggregateId=${id}`, { credentials: "include" }),
       ]);
       if (!isCurrent()) return;
       if (!releaseResponse.ok || !analysesResponse.ok || !auditResponse.ok) throw new Error("릴리스 조회 권한 또는 ID를 확인하세요.");
@@ -481,7 +481,7 @@ export default function Home() {
       let readinessNotice = "";
       if (loadedRelease.status === "PENDING_APPROVAL") {
         try {
-          const response = await fetch(`/control-api/environments/${loadedRelease.environmentId}/validation-results/latest`, { credentials: "include" });
+          const response = await fetchWithTimeout(`/control-api/environments/${loadedRelease.environmentId}/validation-results/latest`, { credentials: "include" });
           if (!response.ok) throw new Error();
           validation = await response.json() as EnvironmentValidation;
           if (validation.environmentId !== loadedRelease.environmentId) throw new Error();

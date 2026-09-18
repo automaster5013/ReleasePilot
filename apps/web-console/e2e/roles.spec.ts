@@ -1979,6 +1979,42 @@ test("release load allows only one detail request across browser tabs", async ({
   }
 });
 
+test("release load timeout unlocks the control and permits one clean retry", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR");
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    let releaseDetailAttempts = 0;
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+      const pending = nativeFetch(input, init);
+      if (url.pathname !== "/control-api/releases/role-release") return pending;
+      releaseDetailAttempts++;
+      if (releaseDetailAttempts !== 1) return pending;
+      void pending.catch(() => undefined);
+      return new Promise<Response>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+      });
+    }) as typeof window.fetch;
+  });
+
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "최근 릴리스" }).selectOption("role-release");
+  const loadRelease = page.getByRole("button", { name: "불러오기", exact: true });
+  await loadRelease.click();
+  await expect.poll(state.releaseLoadRequests).toBe(1);
+  await expect(page.getByRole("button", { name: "조회 중…", exact: true })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+  await expect(loadRelease).toBeEnabled();
+  await expect(loadRelease).toBeFocused();
+
+  await loadRelease.click();
+  await expect.poll(state.releaseLoadRequests).toBe(2);
+  await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+  await expect(loadRelease).toBeEnabled();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { auditIntegrityFailure: true });
   await page.goto("/");
