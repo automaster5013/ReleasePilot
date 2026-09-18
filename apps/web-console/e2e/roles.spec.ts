@@ -1982,6 +1982,35 @@ test("audit integrity verification remains locked until the current request comp
   } finally { respond(); }
 });
 
+test("audit integrity verification allows only one manual request across browser tabs", async ({ page, context }) => {
+  let respond!: () => void;
+  const auditIntegrityGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { auditIntegrityGate });
+  const other = await context.newPage();
+  const otherState = await fixture(other, "OPERATOR");
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    await expect.poll(state.auditIntegrityRequests).toBe(1);
+    await expect.poll(otherState.auditIntegrityRequests).toBe(1);
+
+    await page.getByRole("button", { name: "Verified · 0 events", exact: true }).click();
+    await expect.poll(state.auditIntegrityRequests).toBe(2);
+    await other.getByRole("button", { name: "Verified · 0 events", exact: true }).click();
+
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 감사 체인을 검증하고 있습니다. 완료 후 다시 시도해 주세요." })).toBeVisible();
+    expect(otherState.auditIntegrityRequests()).toBe(1);
+    respond();
+    await expect(page.getByRole("button", { name: "Verified · 0 events", exact: true })).toBeEnabled();
+    expect(state.auditIntegrityRequests()).toBe(2);
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("@a11y OPERATOR revoke other sessions errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { activeSessions: true, failure: "SESSION_REVOKE_REJECTED" });
   page.on("dialog", (dialog) => dialog.accept());

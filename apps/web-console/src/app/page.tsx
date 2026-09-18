@@ -167,12 +167,18 @@ export default function Home() {
     if (trigger) setError("");
     setAuditIntegrityBusy(true);
     try {
-      const response = await fetch("/control-api/audit-events/verify", { credentials: "include" });
-      if (!response.ok) throw new Error();
-      setAuditIntegrity(await response.json() as AuditChainVerification);
-    } catch {
+      const verify = async () => {
+        const response = await fetch("/control-api/audit-events/verify", { credentials: "include" });
+        if (!response.ok) throw new Error();
+        setAuditIntegrity(await response.json() as AuditChainVerification);
+      };
+      if (trigger) {
+        const lockResult = await runWithBrowserLock("releasepilot:audit-integrity", verify);
+        if (!lockResult.acquired) throw new Error("다른 탭에서 감사 체인을 검증하고 있습니다. 완료 후 다시 시도해 주세요.");
+      } else await verify();
+    } catch (failure) {
       setAuditIntegrity(null);
-      setError("감사 체인을 검증할 수 없습니다.");
+      setError((failure as Error).message || "감사 체인을 검증할 수 없습니다.");
       if (trigger) restoreFocusAfterRender(trigger);
     } finally {
       auditIntegrityInFlight.current = false;
