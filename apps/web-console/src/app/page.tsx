@@ -929,18 +929,21 @@ export default function Home() {
     setOperationNotice("");
     setError("");
     try {
-      const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
-      const headers = mutationHeaders(await csrfToken(), { idempotencyKey, json: true });
-      if (!isCurrent()) return;
-      const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
-        method: "POST", credentials: "include",
-        headers,
-        body: JSON.stringify({ reason }),
+      const result = await runWithBrowserLock("releasepilot:release-operation", async () => {
+        const idempotencyKey = crypto.randomUUID() + crypto.randomUUID();
+        const headers = mutationHeaders(await csrfToken(), { idempotencyKey, json: true });
+        if (!isCurrent()) return;
+        const response = await fetchWithTimeout(`/control-api/releases/${targetId}/${action}`, {
+          method: "POST", credentials: "include",
+          headers,
+          body: JSON.stringify({ reason }),
+        });
+        if (!isCurrent()) return;
+        if (!response.ok) throw new Error(`${action} 요청이 거부되었습니다.`);
+        setOperationNotice(`${action} 요청이 접수되었습니다.`);
+        await refreshAudit(targetId, isCurrent);
       });
-      if (!isCurrent()) return;
-      if (!response.ok) throw new Error(`${action} 요청이 거부되었습니다.`);
-      setOperationNotice(`${action} 요청이 접수되었습니다.`);
-      await refreshAudit(targetId, isCurrent);
+      if (!result.acquired) throw new Error("다른 탭에서 릴리스 운영 조작을 처리하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       if (isCurrent()) {
         setError((failure as Error).message);

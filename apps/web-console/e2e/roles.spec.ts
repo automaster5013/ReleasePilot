@@ -352,6 +352,32 @@ test("operator release actions remain single-flight before busy state renders", 
   }
 });
 
+test("operator release actions allow only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const responseGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { responseGate });
+  const otherState = await fixture(other, "OPERATOR");
+  page.on("dialog", (dialog) => dialog.accept("Cross-tab promote"));
+  other.on("dialog", (dialog) => dialog.accept("Cross-tab abort"));
+  try {
+    await Promise.all([load(page), load(other)]);
+    await page.getByRole("button", { name: "Promote", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "Abort", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 릴리스 운영 조작을 처리하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/releases/role-release/promote", body: { reason: "Cross-tab promote" } }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByRole("status").filter({ hasText: "promote 요청이 접수되었습니다." })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("operator release action timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });
