@@ -91,3 +91,13 @@ variable "audit_retention_days" {
     error_message = "audit_retention_days must be at least one day."
   }
 }
+
+variable "runtime_secret_name" {
+  type        = string
+  default     = "releasepilot/production/runtime"
+  description = "AWS Secrets Manager name read by External Secrets Operator"
+  validation {
+    condition     = length(trimspace(var.runtime_secret_name)) > 0
+    error_message = "runtime_secret_name must not be empty."
+  }
+}

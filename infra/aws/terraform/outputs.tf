@@ -8,6 +8,8 @@ output "external_dns_role_arn" { value = var.create_route53_zone ? aws_iam_role.
 output "github_release_role_arn" { value = aws_iam_role.github_release.arn }
 output "audit_archive_bucket" { value = aws_s3_bucket.audit_archive.id }
 output "audit_archive_role_arn" { value = aws_iam_role.audit_archive.arn }
+output "runtime_secret_arn" { value = aws_secretsmanager_secret.releasepilot_runtime.arn }
+output "external_secrets_role_arn" { value = aws_iam_role.external_secrets.arn }
 output "estimated_cost_warning" { value = "EKS control plane, Auto Mode nodes, NAT Gateway and NLB incur charges. Destroy demo resources when not in use." }
 output "cost_profile" {
   value = {

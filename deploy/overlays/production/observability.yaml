@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: releasepilot-control-plane
+  labels: { release: kube-prometheus-stack }
+spec:
+  selector: { matchLabels: { app: control-plane } }
+  endpoints:
+    - { port: http, path: /actuator/prometheus, interval: 30s, scrapeTimeout: 10s }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: releasepilot-slo
+  labels: { release: kube-prometheus-stack }
+spec:
+  groups:
+    - name: releasepilot.availability
+      rules:
+        - alert: ReleasePilotControlPlaneDown
+          expr: up{namespace="releasepilot",service="control-plane"} == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: ReleasePilot control plane is unavailable
+            runbook_url: https://github.com/automaster5013/ReleasePilot/blob/main/docs/runbooks/production-operations.md#control-plane-down
+        - alert: ReleasePilotHighServerErrorRate
+          expr: sum(rate(http_server_requests_seconds_count{namespace="releasepilot",status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{namespace="releasepilot"}[5m])), 0.001) > 0.01
+          for: 10m
+          labels: { severity: critical }
+          annotations:
+            summary: ReleasePilot 5xx ratio exceeds 1 percent
+        - alert: ReleasePilotHighLatency
+          expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{namespace="releasepilot"}[5m]))) > 1
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: ReleasePilot p95 latency exceeds one second
+        - alert: ReleasePilotCertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds{namespace="releasepilot"} - time() < 1209600
+          for: 1h
+          labels: { severity: warning }
+          annotations:
+            summary: ReleasePilot TLS certificate expires within 14 days
+        - alert: ReleasePilotRolloutUnavailable
+          expr: kube_rollout_status_replicas_available{namespace="releasepilot"} < kube_rollout_spec_replicas{namespace="releasepilot"}
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: A ReleasePilot rollout lacks available replicas

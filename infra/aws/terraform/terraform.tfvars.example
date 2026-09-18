@@ -14,3 +14,7 @@ ecr_tagged_images_to_keep       = 10
 # Set after confirming the recipient; AWS sends a subscription confirmation.
 # budget_alert_email = "owner@example.com"
 monthly_budget_usd = 20
+
+# The Terraform stack creates only the encrypted secret container and IAM access.
+# Populate the JSON value separately; never commit secret values.
+runtime_secret_name = "releasepilot/production/runtime"

@@ -37,7 +37,7 @@ metadata: { name: releasepilot-control-plane }
 apiVersion: v1
 kind: Service
 metadata: { name: control-plane }
-spec: { selector: { app: control-plane }, ports: [{ port: 8080, targetPort: 8080 }] }
+spec: { selector: { app: control-plane }, ports: [{ name: http, port: 8080, targetPort: 8080 }] }
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout

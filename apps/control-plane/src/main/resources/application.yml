@@ -19,6 +19,7 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:
@@ -68,6 +69,7 @@ releasepilot:
     lease-timeout: ${ENVIRONMENT_REVALIDATION_LEASE_TIMEOUT:PT10M}
     batch-size: ${ENVIRONMENT_REVALIDATION_BATCH_SIZE:20}
   security:
+    local-login-enabled: ${LOCAL_LOGIN_ENABLED:true}
     rate-limit:
       enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
       cleanup-interval: ${AUTH_RATE_LIMIT_CLEANUP_INTERVAL:PT10M}

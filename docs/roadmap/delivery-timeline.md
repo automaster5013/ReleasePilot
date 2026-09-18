@@ -106,7 +106,7 @@ GitHub Checks 최종 통합에서는 다음 증거를 확인했다.
 
 ## 이후 운영 계획
 
-현재 개발 백로그는 완료됐지만, 실제 프로덕션 전환 시 다음 활동을 별도 일정으로 잡아야 한다.
+기존 개발 백로그 완료 후 상용 운영 준비 단계를 시작했다. 저장소에서 자동화 가능한 기반은 완료했으며, 조직 소유 계정과 운영 정책이 필요한 활성화 항목은 운영 승인 후 진행한다.
 
 | 우선순위 | 작업 | 완료 기준 |
 | --- | --- | --- |
@@ -116,6 +116,17 @@ GitHub Checks 최종 통합에서는 다음 증거를 확인했다.
 | P1 | 조직별 OIDC/SSO 공급자 설정 | 실제 IdP login/logout와 계정 lifecycle 인수 테스트 |
 | P1 | 부하·장애·재해 복구 훈련 | 목표 RTO/RPO와 대규모 동시 릴리스 기준 충족 |
 | P2 | 비용·용량 장기 관찰 | EKS, 로그, S3 보존 비용과 autoscaling 기준 확정 |
+
+### 2026-09-19 상용 운영 준비 단계
+
+| 영역 | 저장소 기반 작업 | 활성화 완료 조건 |
+| --- | --- | --- |
+| 인증 | 프로덕션 OIDC profile, 로컬·데모 로그인 차단, 보안 헤더와 15분 session | 조직 IdP client 등록, MFA 정책 및 실제 사용자 인수 테스트 |
+| 도메인·TLS | ExternalDNS annotation, cert-manager issuer, HTTPS redirect와 인증서 만료 경보 | 소유 도메인·운영 이메일 확정, DNS 위임과 인증서 Ready |
+| 관측성 | ServiceMonitor, SLO 경보, OTLP trace endpoint, 장애 runbook | Alertmanager 수신처와 on-call 정책 설정, 시험 경보 수신 |
+| 부하 시험 | k6 ramp test와 p95/p99/error threshold | 최종 도메인에서 실행하고 용량·HPA 증거 승인 |
+| 비밀 관리 | KMS 회전 key, Secrets Manager container, 최소 권한 Pod Identity, ExternalSecret | 실제 값을 별도 입력하고 동기화·교체 훈련 성공 |
+| 가용성 | HPA, PDB, 기본 차단 ingress/egress 정책 | RDS Multi-AZ/PITR, WAF, 복구 훈련 및 RTO/RPO 승인 |
 
 ## 관련 문서
 

@@ -1,0 +1,70 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny }
+spec: { podSelector: {}, policyTypes: [Ingress, Egress] }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-dns-egress }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: web-console-traffic }
+spec:
+  podSelector: { matchLabels: { app: web-console } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+      ports: [{ protocol: TCP, port: 3000 }]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: control-plane } } }]
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: control-plane-traffic }
+spec:
+  podSelector: { matchLabels: { app: control-plane } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: web-console } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: observability } }
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to: [{ podSelector: { matchLabels: { app: mysql } } }]
+      ports: [{ protocol: TCP, port: 3306 }]
+    - to: [{ podSelector: { matchLabels: { app: analysis-worker } } }]
+      ports: [{ protocol: TCP, port: 8090 }]
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16] }
+      ports: [{ protocol: TCP, port: 443 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: analysis-worker-traffic }
+spec:
+  podSelector: { matchLabels: { app: analysis-worker } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app: control-plane } } }]
+      ports: [{ protocol: TCP, port: 8090 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: mysql-traffic }
+spec:
+  podSelector: { matchLabels: { app: mysql } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app: control-plane } } }]
+      ports: [{ protocol: TCP, port: 3306 }]

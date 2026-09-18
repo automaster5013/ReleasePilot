@@ -40,6 +40,7 @@ public class SessionController {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final boolean demoEnabled;
+    private final boolean localLoginEnabled;
     private final String demoUsername;
     private final boolean oidcEnabled;
     private final String oidcRegistrationId;
@@ -49,6 +50,7 @@ public class SessionController {
 
     public SessionController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService,
                              @Value("${releasepilot.demo.enabled:false}") boolean demoEnabled,
+                             @Value("${releasepilot.security.local-login-enabled:true}") boolean localLoginEnabled,
                              @Value("${releasepilot.demo.username:releasepilot-demo}") String demoUsername,
                              @Value("${releasepilot.oidc.enabled:false}") boolean oidcEnabled,
                              @Value("${releasepilot.oidc.registration-id:releasepilot}") String oidcRegistrationId,
@@ -58,6 +60,7 @@ public class SessionController {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.demoEnabled = demoEnabled;
+        this.localLoginEnabled = localLoginEnabled;
         this.demoUsername = demoUsername;
         this.oidcEnabled = oidcEnabled && clientRegistrations.getIfAvailable() != null;
         this.oidcRegistrationId = oidcRegistrationId;
@@ -83,6 +86,7 @@ public class SessionController {
             HttpServletRequest request,
             CsrfToken csrfToken
     ) {
+        if (!localLoginEnabled) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
         rateLimiter.checkLogin(request, body.username());
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(body.username(), body.password())

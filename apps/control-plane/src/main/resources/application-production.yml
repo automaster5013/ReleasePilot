@@ -1,0 +1,41 @@
+spring:
+  session:
+    timeout: 15m
+  security:
+    oauth2:
+      client:
+        registration:
+          releasepilot:
+            provider: releasepilot
+            client-id: ${OIDC_CLIENT_ID}
+            client-secret: ${OIDC_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid,profile,email
+        provider:
+          releasepilot:
+            issuer-uri: ${OIDC_ISSUER_URI}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+        same-site: strict
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+
+releasepilot:
+  demo:
+    enabled: false
+  security:
+    local-login-enabled: false
+  oidc:
+    enabled: true
+    auto-provision: false
+    allowed-email-domains: ${OIDC_ALLOWED_EMAIL_DOMAINS}
+  bootstrap-operator:
+    enabled: false

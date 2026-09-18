@@ -142,6 +142,7 @@ CD는 변경된 애플리케이션 이미지만 게시하고 digest를 GitOps ma
 ## 문서 안내
 
 - [전체 작업 일정과 완료 기록](docs/roadmap/delivery-timeline.md)
+- [상용 운영 전환 및 장애 대응 런북](docs/runbooks/production-operations.md)
 - [MVP 실행 백로그](docs/roadmap/mvp-backlog.md)
 - [제품 계약](docs/requirements/release-contract.md)
 - [정책 계약](docs/requirements/policy-contract.md)
@@ -152,6 +153,6 @@ CD는 변경된 애플리케이션 이미지만 게시하고 digest를 GitOps ma
 
 ## 운영 범위와 다음 단계
 
-공개 데모는 EKS 내부 단일 MySQL과 읽기 전용 VIEWER 세션을 사용합니다. 실제 프로덕션 전환 시에는 RDS, 전용 secret manager, WAF, 인증된 관측성 endpoint, 조직별 SSO 공급자 설정과 장기 비용·재해 복구 정책을 별도로 확정해야 합니다.
+공개 데모는 EKS 내부 단일 MySQL과 읽기 전용 VIEWER 세션을 사용합니다. 별도의 production overlay에는 OIDC 전용 인증, TLS 강제, AWS Secrets Manager 연동, 기본 차단 네트워크 정책, HPA/PDB, Prometheus 경보와 k6 부하 시험 기준을 준비했습니다. 실제 전환 전에는 조직 소유 도메인·IdP·알림 수신처를 입력하고 RDS Multi-AZ, WAF, 복구 목표를 승인해야 합니다. 절차와 완료 기준은 [상용 운영 런북](docs/runbooks/production-operations.md)을 따릅니다.
 
 구현 순서, 배포 증거, CI/CD 실행과 운영 검증의 전체 흐름은 [작업 일정표](docs/roadmap/delivery-timeline.md)에 정리되어 있습니다.

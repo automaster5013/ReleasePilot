@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: releasepilot
+resources:
+  - ../../base
+  - ingress.yaml
+  - issuer.yaml
+  - external-secret.yaml
+  - network-policy.yaml
+  - observability.yaml
+  - availability.yaml
+  - storage-class.yaml
+  - deployment-verifier-rbac.yaml
+images:
+  - name: control-plane
+    newName: REPLACE_WITH_CONTROL_PLANE_IMAGE
+  - name: analysis-worker
+    newName: REPLACE_WITH_ANALYSIS_WORKER_IMAGE
+  - name: web-console
+    newName: REPLACE_WITH_WEB_CONSOLE_IMAGE
+patches:
+  - target: { kind: Rollout, name: control-plane }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/3
+        value: { name: DEMO_SESSION_ENABLED, value: "false" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: SPRING_PROFILES_ACTIVE, value: production }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: OIDC_ENABLED, value: "true" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: LOCAL_LOGIN_ENABLED, value: "false" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: OTEL_TRACING_ENABLED, value: "true" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector.observability:4318/v1/traces" }

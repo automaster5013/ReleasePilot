@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: releasepilot
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    external-dns.alpha.kubernetes.io/hostname: releasepilot.example.com
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [releasepilot.example.com]
+      secretName: releasepilot-production-tls
+  rules:
+    - host: releasepilot.example.com
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: control-plane, port: { number: 8080 } } } }
+          - { path: /actuator/health, pathType: Prefix, backend: { service: { name: control-plane, port: { number: 8080 } } } }
+          - { path: /oauth2, pathType: Prefix, backend: { service: { name: control-plane, port: { number: 8080 } } } }
+          - { path: /login/oauth2, pathType: Prefix, backend: { service: { name: control-plane, port: { number: 8080 } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: web-console, port: { number: 3000 } } } }
