@@ -12,6 +12,10 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByRole("heading", { name: "자주 묻는 질문", exact: true })).toBeVisible();
   await expect(page.getByText("승인 검토 중", { exact: true })).toBeVisible();
   await expect(page.getByText("APPROVAL REQUIRED", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "감사 증거 체인" })).toBeVisible();
+  await expect(page.getByText("APR-042", { exact: true })).toBeVisible();
+  await expect(page.getByText("OBS-010", { exact: true })).toBeVisible();
+  await expect(page.getByText("PRM-019", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
   await expect(page.getByText("배포 승인됨", { exact: true })).toBeVisible();
@@ -19,6 +23,7 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await page.getByRole("button", { name: "점진적 배포 시작", exact: true }).click();
   await expect(page.getByText("점진적 배포 진행 중", { exact: true })).toBeVisible();
   await expect(page.getByText("10% traffic", { exact: true })).toBeVisible({ timeout: 3_000 });
+  await expect(page.getByText("오류율 1.0% 관측 중", { exact: true })).toBeVisible();
 });
 
 test("control room exposes the public showcase and showcase metadata is canonical", async ({ page }) => {
@@ -123,6 +128,19 @@ test("showcase automatically rolls back when the error policy is breached", asyn
   await expect(page.getByText("QUARANTINED", { exact: true })).toBeVisible();
   await expect(page.getByText("RECOVERED", { exact: true })).toBeVisible();
   await expect(page.getByText("TRAFFIC RESTORED · CANARY ISOLATED", { exact: true })).toBeVisible();
+  await expect(page.getByText("RBK-017", { exact: true })).toBeVisible();
+  await expect(page.getByText("Stable 100% · Canary 격리", { exact: true })).toBeVisible();
+  await expect(page.getByText("✓ CHAIN SEALED · RECOVERED", { exact: true })).toBeVisible();
+});
+
+test("showcase seals the complete approval-to-promotion evidence chain", async ({ page }) => {
+  await page.goto("/showcase");
+  await page.getByRole("button", { name: "배포 승인", exact: true }).click();
+  await page.getByRole("button", { name: "점진적 배포 시작", exact: true }).click();
+  await expect(page.getByText("배포 완료", { exact: true })).toBeVisible({ timeout: 8_000 });
+  for (const id of ["APR-042", "OBS-010", "OBS-025", "OBS-050", "OBS-100", "PRM-019"]) await expect(page.getByText(id, { exact: true })).toBeVisible();
+  await expect(page.getByText("v1.9.0 승격 증거 봉인", { exact: true })).toBeVisible();
+  await expect(page.getByText("✓ CHAIN SEALED · PROMOTED", { exact: true })).toBeVisible();
 });
 
 test("@a11y showcase has no automated WCAG A or AA violations", async ({ page }) => {

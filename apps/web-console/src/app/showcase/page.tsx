@@ -5,6 +5,7 @@ import Link from "next/link";
 import styles from "./showcase.module.css";
 
 type Phase = "REVIEW" | "READY" | "RUNNING" | "ROLLING_BACK" | "ROLLED_BACK" | "COMPLETED";
+type EvidenceState = "pending" | "active" | "passed" | "blocked";
 
 const trafficSteps = [10, 25, 50, 100];
 const errorThreshold = 5;
@@ -55,13 +56,25 @@ export default function Showcase() {
   const recovered = phase === "ROLLED_BACK";
   const approved = phase !== "REVIEW";
   const canStart = phase === "READY" || phase === "ROLLED_BACK" || phase === "COMPLETED";
-  const eventLog = useMemo(() => {
-    if (phase === "REVIEW") return ["배포 요청 생성", "운영 승인 대기"];
-    if (phase === "READY") return ["승인 정책 확인", "운영 승인 기록 완료"];
-    if (phase === "ROLLING_BACK" || phase === "ROLLED_BACK") return ["메트릭 임계치 초과", "신규 트래픽 차단", "안정 버전 복구"];
-    if (phase === "COMPLETED") return ["모든 분석 단계 통과", "신규 버전 승격 완료"];
-    return [`신규 버전 트래픽 ${traffic}%`, `오류율 ${errorRate.toFixed(1)}% 관찰 중`];
-  }, [errorRate, phase, traffic]);
+  const evidenceChain = useMemo(() => {
+    const failed = phase === "ROLLING_BACK" || phase === "ROLLED_BACK";
+    const steps: { id: string; label: string; evidence: string; state: EvidenceState }[] = [
+      { id: "APR-042", label: "운영 승인", evidence: approved ? "readiness + policy 봉인" : "책임자 서명 대기", state: approved ? "passed" : "active" },
+      ...trafficSteps.map((step) => {
+        const passed = traffic > step || phase === "COMPLETED";
+        const active = phase === "RUNNING" && traffic === step;
+        const blocked = failed && traffic === step;
+        return {
+          id: `OBS-${String(step).padStart(3, "0")}`,
+          label: `Canary ${step}%`,
+          evidence: blocked ? `${errorRate.toFixed(1)}% > ${errorThreshold.toFixed(1)}% · 차단` : passed ? `${errorRate.toFixed(1)}% ≤ ${errorThreshold.toFixed(1)}% · 통과` : active ? `오류율 ${errorRate.toFixed(1)}% 관측 중` : "메트릭 판정 대기",
+          state: blocked ? "blocked" : passed ? "passed" : active ? "active" : "pending",
+        } as const;
+      }),
+      { id: failed ? "RBK-017" : "PRM-019", label: failed ? "자동 롤백" : "Stable 승격", evidence: phase === "ROLLED_BACK" ? "Stable 100% · Canary 격리" : phase === "ROLLING_BACK" ? "트래픽 복구 실행 중" : phase === "COMPLETED" ? "v1.9.0 승격 증거 봉인" : "최종 판정 대기", state: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "passed" : phase === "ROLLING_BACK" ? "active" : "pending" },
+    ];
+    return steps;
+  }, [approved, errorRate, phase, traffic]);
 
   function approve() { setPhase("READY"); }
   function start() { setTraffic(0); setPhase("RUNNING"); }
@@ -181,7 +194,11 @@ export default function Showcase() {
               <div><dt>Observed error</dt><dd data-unsafe={unsafe}>{errorRate.toFixed(1)}%</dd></div>
               <div><dt>Policy threshold</dt><dd>{errorThreshold.toFixed(1)}%</dd></div>
             </dl>
-            <div className={styles.timeline} aria-label="현재 처리 기록">{eventLog.map((event, index) => <p key={event}><i data-done={index < eventLog.length - 1} />{event}</p>)}</div>
+            <section className={styles.evidence} aria-labelledby="evidence-title">
+              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><span>CHAIN · 6 RECORDS</span></div>
+              <ol>{evidenceChain.map((item) => <li key={item.id} data-state={item.state}><i aria-hidden="true" /><div><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></div><b>{item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
+              <p className={styles.chainSeal}>{phase === "COMPLETED" ? "✓ CHAIN SEALED · PROMOTED" : recovered ? "✓ CHAIN SEALED · RECOVERED" : "SHA-256 · APPEND ONLY"}</p>
+            </section>
           </aside>
         </div>
 
