@@ -131,6 +131,24 @@ export default function Showcase() {
   const firstMismatch = integrity === "failed" ? sealedHashes.findIndex((hash, index) => hash !== verificationHashes[index]) : -1;
   const invalidLinks = firstMismatch < 0 ? 0 : evidenceChain.length - firstMismatch;
 
+  function exportIntegrityReport() {
+    const report = {
+      schema: "releasepilot.evidence-integrity/v1",
+      algorithm: "SHA-256",
+      genesis: "GENESIS",
+      result: integrity === "verified" ? "VERIFIED" : "TAMPER_DETECTED",
+      firstMismatchId: firstMismatch < 0 ? null : evidenceChain[firstMismatch].id,
+      invalidLinks,
+      records: evidenceChain.map((record, index) => ({ ...record, expectedHash: sealedHashes[index], actualHash: verificationHashes[index], valid: sealedHashes[index] === verificationHashes[index] })),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `releasepilot-evidence-${report.result.toLowerCase().replace("_", "-")}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className={styles.page}>
       <nav className={styles.nav} aria-label="쇼케이스 탐색">
@@ -246,7 +264,7 @@ export default function Showcase() {
               <div><dt>Policy threshold</dt><dd>{errorThreshold.toFixed(1)}%</dd></div>
             </dl>
             <section className={styles.evidence} aria-labelledby="evidence-title">
-              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><div><button type="button" onClick={toggleTamperTest} aria-pressed={tamperTarget === selectedEvidence}>{tamperTarget === selectedEvidence ? "변조 해제" : "선택 기록 변조 테스트"}</button><button type="button" onClick={verifyIntegrity} disabled={integrity === "verifying" || sealedHashes.length !== evidenceChain.length}>{integrity === "verified" ? "6/6 HASH VERIFIED" : integrity === "failed" ? `TAMPER DETECTED · ${evidenceChain[firstMismatch]?.id ?? "UNKNOWN"}` : integrity === "verifying" ? "VERIFYING…" : "체인 무결성 검증"}</button></div></div>
+              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><div><button type="button" onClick={toggleTamperTest} aria-pressed={tamperTarget === selectedEvidence}>{tamperTarget === selectedEvidence ? "변조 해제" : "선택 기록 변조 테스트"}</button><button type="button" onClick={verifyIntegrity} disabled={integrity === "verifying" || sealedHashes.length !== evidenceChain.length}>{integrity === "verified" ? "6/6 HASH VERIFIED" : integrity === "failed" ? `TAMPER DETECTED · ${evidenceChain[firstMismatch]?.id ?? "UNKNOWN"}` : integrity === "verifying" ? "VERIFYING…" : "체인 무결성 검증"}</button>{(integrity === "verified" || integrity === "failed") && <button type="button" onClick={exportIntegrityReport}>JSON 내보내기</button>}</div></div>
               <ol>{evidenceChain.map((item, index) => <li key={item.id} data-state={item.state} data-integrity={firstMismatch >= 0 && index >= firstMismatch ? "invalid" : undefined}><i aria-hidden="true" /><button type="button" onClick={() => setSelectedEvidence(index)} aria-current={selectedEvidence === index ? "step" : undefined}><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></button><b>{firstMismatch >= 0 && index >= firstMismatch ? "불일치" : item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
               <div className={styles.receipt} data-tampered={tamperTarget === selectedEvidence} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{tamperTarget === selectedEvidence ? "TEST TAMPER ACTIVE" : evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {selectedEvidence === 0 ? "GENESIS" : `${sealedHashes[selectedEvidence - 1]?.slice(0, 8) ?? "계산 중"}…`} → SHA {sealedHashes[selectedEvidence]?.slice(0, 8) ?? "계산 중"}…</small>{firstMismatch >= 0 && <small className={styles.hashDiff}>EXPECTED {sealedHashes[firstMismatch].slice(0, 8)}… ≠ ACTUAL {verificationHashes[firstMismatch].slice(0, 8)}… · {invalidLinks} LINKS INVALID</small>}</div>
               <p className={styles.chainSeal}>{phase === "COMPLETED" ? "✓ CHAIN SEALED · PROMOTED" : recovered ? "✓ CHAIN SEALED · RECOVERED" : "SHA-256 · APPEND ONLY"}</p>

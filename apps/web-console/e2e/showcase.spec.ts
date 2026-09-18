@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readFile } from "node:fs/promises";
 
 test("showcase explains and completes the approval-to-canary flow", async ({ page }) => {
   await page.goto("/showcase");
@@ -30,6 +31,16 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByRole("button", { name: "TAMPER DETECTED · OBS-025", exact: true })).toBeVisible();
   await expect(page.getByText(/EXPECTED [0-9a-f]{8}… ≠ ACTUAL [0-9a-f]{8}… · 4 LINKS INVALID/)).toBeVisible();
   await expect(page.locator('[data-integrity="invalid"]')).toHaveCount(4);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "JSON 내보내기", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("releasepilot-evidence-tamper-detected.json");
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const report = JSON.parse(await readFile(downloadPath!, "utf8"));
+  expect(report).toMatchObject({ schema: "releasepilot.evidence-integrity/v1", algorithm: "SHA-256", result: "TAMPER_DETECTED", firstMismatchId: "OBS-025", invalidLinks: 4 });
+  expect(report.records).toHaveLength(6);
+  expect(report.records.filter((record: { valid: boolean }) => !record.valid)).toHaveLength(4);
   await page.getByRole("button", { name: "변조 해제", exact: true }).click();
   await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
   await expect(page.getByRole("button", { name: "6/6 HASH VERIFIED", exact: true })).toBeVisible();
