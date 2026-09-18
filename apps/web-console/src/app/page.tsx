@@ -803,10 +803,13 @@ export default function Home() {
     const validation = validateClusterConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
-      const problem = await response.json().catch(() => null) as { detail?: string } | null;
-      if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 수정이 거부되었습니다.");
-      await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+      const lockResult = await runWithBrowserLock("releasepilot:connection-change", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/clusters/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), apiServer: apiServer.trim(), allowedNamespaces: parseNamespaces(namespaces), secretRef: secretRef.trim() }) });
+        const problem = await response.json().catch(() => null) as { detail?: string } | null;
+        if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 수정이 거부되었습니다.");
+        await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 변경하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
@@ -828,10 +831,13 @@ export default function Home() {
     const validation = validatePrometheusConnectionDraft(draft); if (validation) { connectionMutationInFlight.current = false; setConnectionNotice(validation); return; }
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
-      const problem = await response.json().catch(() => null) as { detail?: string } | null;
-      if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 수정이 거부되었습니다.");
-      await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+      const lockResult = await runWithBrowserLock("releasepilot:connection-change", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/prometheus/${item.id}`, { method: "PUT", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }), body: JSON.stringify({ name: name.trim(), baseUrl: baseUrl.trim(), secretRef: secretRef.trim() || null, queryTimeoutSeconds: Number(queryTimeoutSeconds) }) });
+        const problem = await response.json().catch(() => null) as { detail?: string } | null;
+        if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 수정이 거부되었습니다.");
+        await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 수정했습니다. 변경 사항을 사용하려면 다시 검증하세요.");
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 변경하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
@@ -849,10 +855,13 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionBusyId(item.id); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/${kind}/${item.id}/${enable ? "enable" : "disable"}`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
-      if (!response.ok) throw new Error(`연결 ${enable ? "재활성화" : "비활성화"} 요청이 거부되었습니다.`);
-      if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
-      setConnectionNotice(enable ? "연결을 재활성화했습니다. 사용 전에 연결 검증을 실행하세요." : "연결을 비활성화했습니다.");
+      const lockResult = await runWithBrowserLock("releasepilot:connection-change", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/${kind}/${item.id}/${enable ? "enable" : "disable"}`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+        if (!response.ok) throw new Error(`연결 ${enable ? "재활성화" : "비활성화"} 요청이 거부되었습니다.`);
+        if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
+        setConnectionNotice(enable ? "연결을 재활성화했습니다. 사용 전에 연결 검증을 실행하세요." : "연결을 비활성화했습니다.");
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 변경하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);

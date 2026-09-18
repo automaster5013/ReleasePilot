@@ -1411,6 +1411,32 @@ test("OPERATOR connection changes remain single-flight before busy state renders
   } finally { respond(); }
 });
 
+test("OPERATOR connection changes allow only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const connectionMutationGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, disabledPrometheus: true, connectionMutationGate });
+  const otherState = await fixture(other, "OPERATOR", { connections: true, disabledPrometheus: true });
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    const enable = page.locator("article").filter({ hasText: "Role metrics" }).getByRole("button", { name: "재활성화", exact: true });
+    await enable.click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.locator("article").filter({ hasText: "Role metrics" }).getByRole("button", { name: "재활성화", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 외부 연결을 변경하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/connections/prometheus/prometheus-role/enable", body: null }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByText("연결을 재활성화했습니다. 사용 전에 연결 검증을 실행하세요.", { exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("connection status timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });
