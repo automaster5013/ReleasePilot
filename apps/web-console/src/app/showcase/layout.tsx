@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: "Progressive Delivery 시뮬레이터 | ReleasePilot",
   description: "승인 검토, Canary 트래픽 제어, 메트릭 기반 자동 롤백을 직접 체험하는 ReleasePilot Progressive Delivery 시뮬레이터",
   alternates: { canonical: showcaseUrl },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
   openGraph: {
     type: "website",
     locale: "ko_KR",
@@ -22,6 +27,26 @@ export const metadata: Metadata = {
   },
 };
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "ReleasePilot",
+  applicationCategory: "DeveloperApplication",
+  applicationSubCategory: "Progressive Delivery Control Plane",
+  operatingSystem: "Web",
+  url: showcaseUrl,
+  description: "배포 승인, Canary 트래픽 제어, 메트릭 기반 자동 롤백과 감사 기록을 통합하는 Progressive Delivery 플랫폼",
+  featureList: ["배포 승인 검토", "점진적 Canary 트래픽 제어", "메트릭 기반 자동 롤백", "감사 가능한 릴리스 기록"],
+};
+
 export default function ShowcaseLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return children;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
+      />
+      {children}
+    </>
+  );
 }

@@ -18,18 +18,31 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
 
 test("control room exposes the public showcase and showcase metadata is canonical", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   const showcaseLink = page.getByRole("link", { name: "제품 둘러보기", exact: true });
   await expect(showcaseLink).toHaveAttribute("href", "/showcase");
   await showcaseLink.click();
   await expect(page).toHaveURL(/\/showcase$/);
   await expect(page).toHaveTitle("Progressive Delivery 시뮬레이터 | ReleasePilot");
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "https://releasepilot.kr/showcase");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /index/);
+  await expect(page.locator('meta[name="robots"]')).not.toHaveAttribute("content", /noindex/);
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "ReleasePilot Progressive Delivery 시뮬레이터");
+
+  const structuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent() ?? "{}");
+  expect(structuredData).toMatchObject({
+    "@type": "SoftwareApplication",
+    name: "ReleasePilot",
+    applicationSubCategory: "Progressive Delivery Control Plane",
+    url: "https://releasepilot.kr/showcase",
+  });
+  expect(structuredData.featureList).toContain("메트릭 기반 자동 롤백");
 });
 
 test("public discovery endpoints advertise the showcase", async ({ request }) => {
   const robots = await request.get("/robots.txt");
   expect(robots.ok()).toBe(true);
+  expect(await robots.text()).toContain("Disallow: /control-api/");
   expect(await robots.text()).toContain("Sitemap: https://releasepilot.kr/sitemap.xml");
 
   const sitemap = await request.get("/sitemap.xml");

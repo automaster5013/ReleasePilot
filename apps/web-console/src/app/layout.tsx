@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ReleasePilot — Safe delivery control plane",
   description: "승인, Canary 운영 지표 검증, 자동 롤백과 감사 기록을 연결하는 DevOps 운영 플랫폼",
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
