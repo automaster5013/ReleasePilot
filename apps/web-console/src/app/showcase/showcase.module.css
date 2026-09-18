@@ -26,6 +26,7 @@
 .stablePacket{fill:#9bbcff;filter:url(#flow-glow)}
 .canaryPacket{fill:#74f4bd;filter:url(#flow-glow)}
 .rollbackPacket{fill:#ff948d;filter:url(#flow-glow)}
+.approvalLink path{fill:none;stroke:#7f6d55;stroke-width:1.5;stroke-dasharray:4 4}.approvalLink circle{fill:#9b7d58}.approvalLink[data-approved=true] path{stroke:#61e3ad;stroke-dasharray:none;filter:url(#flow-glow)}.approvalLink[data-approved=true] circle{fill:#69f0b7}.approvalGate rect{fill:#17150f;stroke:#806a4d;stroke-width:1}.approvalGate text{font-family:Arial,sans-serif;font-weight:700}.approvalKicker{fill:#af9a7b;font-size:8px;letter-spacing:.13em}.approvalState{fill:#f1c47f;font-size:9px}.approvalEvidence{fill:#8f8677;font-size:7px;letter-spacing:.05em}.approvalIcon rect{fill:#2a2115;stroke:#cc9d58;stroke-width:1}.approvalIcon path{fill:none;stroke:#e9bb72;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.approvalGate[data-approved=true] rect{fill:#0d2019;stroke:#5ce2ac}.approvalGate[data-approved=true] .approvalKicker{fill:#8bb7a5}.approvalGate[data-approved=true] .approvalState{fill:#72edba}.approvalGate[data-approved=true] .approvalEvidence{fill:#82b9a3}.approvalGate[data-approved=true] .approvalIcon rect{fill:#153228;stroke:#61e3ad}.approvalGate[data-approved=true] .approvalIcon path{stroke:#73efba}
 .coreAura{fill:#55e7ab;opacity:.08;filter:url(#core-glow)}
 .coreOrbit{fill:url(#core-fill);stroke:#7fa6ff;stroke-width:1.5;stroke-dasharray:4 3}
 .coreMark{fill:#10231d;stroke:#60e4af;stroke-width:1.5}

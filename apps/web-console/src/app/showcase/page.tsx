@@ -53,6 +53,7 @@ export default function Showcase() {
   const unsafe = errorRate > errorThreshold;
   const rollingBack = phase === "ROLLING_BACK";
   const recovered = phase === "ROLLED_BACK";
+  const approved = phase !== "REVIEW";
   const canStart = phase === "READY" || phase === "ROLLED_BACK" || phase === "COMPLETED";
   const eventLog = useMemo(() => {
     if (phase === "REVIEW") return ["배포 요청 생성", "운영 승인 대기"];
@@ -136,13 +137,22 @@ export default function Showcase() {
                 </circle>
               ))}
 
+              <g className={styles.approvalLink} data-approved={approved} aria-hidden="true"><path d="M120 142V180"/><circle cx="120" cy="180" r="3"/></g>
+              <g className={styles.approvalGate} data-approved={approved} transform="translate(34 78)">
+                <rect width="172" height="64" rx="14"/>
+                <g className={styles.approvalIcon} transform="translate(18 17)"><rect x="0" y="9" width="22" height="18" rx="5"/><path d={approved ? "M6 17l4 4 7-8" : "M6 9V6a5 5 0 0110 0v3"}/></g>
+                <text className={styles.approvalKicker} x="52" y="20">APPROVAL GATE</text>
+                <text className={styles.approvalState} x="52" y="39">{approved ? "APPROVED · EVIDENCE SEALED" : "APPROVAL REQUIRED"}</text>
+                <text className={styles.approvalEvidence} x="52" y="54">READINESS {approved ? "✓" : "○"}  ·  POLICY {approved ? "✓" : "○"}</text>
+              </g>
+
               <g className={styles.core} transform="translate(120 250)">
                 <circle className={styles.coreAura} r="72"/>
                 <circle className={styles.coreOrbit} r="58"/>
                 <path className={styles.coreMark} d="M0-34 30-17 30 17 0 34-30 17-30-17Z"/>
                 <text className={styles.coreKicker} y="-7">RELEASEPILOT</text>
                 <text className={styles.coreName} y="12">POLICY CORE</text>
-                <text className={styles.coreStatus} y="30">{rollingBack ? "CUTOVER" : recovered ? "RECOVERED" : phase === "COMPLETED" ? "PROMOTED" : phase === "REVIEW" ? "POLICY READY" : "ROUTING LIVE"}</text>
+                <text className={styles.coreStatus} y="30">{rollingBack ? "CUTOVER" : recovered ? "RECOVERED" : phase === "COMPLETED" ? "PROMOTED" : phase === "REVIEW" ? "LOCKED" : "ROUTING LIVE"}</text>
               </g>
 
               <g className={`${styles.releaseNode} ${styles.stableNode}`} data-release="stable" transform="translate(520 65)">

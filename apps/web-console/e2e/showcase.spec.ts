@@ -11,9 +11,11 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByText("지금 더 많은 트래픽을 보내도 안전한가?", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "자주 묻는 질문", exact: true })).toBeVisible();
   await expect(page.getByText("승인 검토 중", { exact: true })).toBeVisible();
+  await expect(page.getByText("APPROVAL REQUIRED", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
   await expect(page.getByText("배포 승인됨", { exact: true })).toBeVisible();
+  await expect(page.getByText("APPROVED · EVIDENCE SEALED", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "점진적 배포 시작", exact: true }).click();
   await expect(page.getByText("점진적 배포 진행 중", { exact: true })).toBeVisible();
   await expect(page.getByText("10% traffic", { exact: true })).toBeVisible({ timeout: 3_000 });
