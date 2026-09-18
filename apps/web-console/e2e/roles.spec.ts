@@ -1877,6 +1877,41 @@ test("release refresh allows only one request across browser tabs", async ({ pag
   }
 });
 
+test("release refresh timeout unlocks the control and permits one clean retry", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR");
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    let releaseListAttempts = 0;
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+      const pending = nativeFetch(input, init);
+      if (url.pathname !== "/control-api/releases" || init?.method) return pending;
+      releaseListAttempts++;
+      if (releaseListAttempts !== 2) return pending;
+      void pending.catch(() => undefined);
+      return new Promise<Response>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+      });
+    }) as typeof window.fetch;
+  });
+
+  await page.goto("/");
+  await expect.poll(state.releaseListRequests).toBe(1);
+  const refresh = page.getByRole("button", { name: "최근 릴리스 새로고침", exact: true });
+  await refresh.click();
+  await expect.poll(state.releaseListRequests).toBe(2);
+  await expect(refresh).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+  await expect(refresh).toBeEnabled();
+  await expect(refresh).toBeFocused();
+
+  await refresh.click();
+  await expect.poll(state.releaseListRequests).toBe(3);
+  await expect(refresh).toBeEnabled();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 test("@a11y OPERATOR release load errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { releaseLoadFailure: true });
   await page.goto("/");

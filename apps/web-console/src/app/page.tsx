@@ -202,7 +202,7 @@ export default function Home() {
     setReleaseListBusy(true);
     try {
       const refresh = async () => {
-        const response = await fetch("/control-api/releases?limit=20", { credentials: "include" });
+        const response = await fetchWithTimeout("/control-api/releases?limit=20", { credentials: "include" });
         if (!response.ok) throw new Error("최근 릴리스를 불러올 수 없습니다.");
         const page = await response.json() as { items: ReleaseSummary[] };
         setRecentReleases(page.items);
