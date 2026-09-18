@@ -1849,6 +1849,32 @@ test("release refresh remains locked until the current list request completes", 
   } finally { respond(); }
 });
 
+test("release refresh allows only one request across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const releaseRefreshGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { releaseRefreshGate });
+  const otherState = await fixture(other, "OPERATOR");
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    await expect.poll(state.releaseListRequests).toBe(1);
+    await page.getByRole("button", { name: "최근 릴리스 새로고침", exact: true }).click();
+    await expect.poll(state.releaseListRequests).toBe(2);
+    await other.getByRole("button", { name: "최근 릴리스 새로고침", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 최근 릴리스 목록을 새로고침하고 있습니다." })).toBeVisible();
+    expect(otherState.releaseListRequests()).toBe(1);
+    respond();
+    await expect(page.getByRole("button", { name: "최근 릴리스 새로고침", exact: true })).toBeEnabled();
+    expect(state.releaseListRequests()).toBe(2);
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("@a11y OPERATOR release load errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { releaseLoadFailure: true });
   await page.goto("/");

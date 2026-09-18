@@ -195,13 +195,19 @@ export default function Home() {
     if (trigger) setError("");
     setReleaseListBusy(true);
     try {
-      const response = await fetch("/control-api/releases?limit=20", { credentials: "include" });
-      if (!response.ok) throw new Error();
-      const page = await response.json() as { items: ReleaseSummary[] };
-      setRecentReleases(page.items);
-      setReleaseId((current) => current || page.items[0]?.id || "");
-    } catch {
-      setError("최근 릴리스를 불러올 수 없습니다.");
+      const refresh = async () => {
+        const response = await fetch("/control-api/releases?limit=20", { credentials: "include" });
+        if (!response.ok) throw new Error("최근 릴리스를 불러올 수 없습니다.");
+        const page = await response.json() as { items: ReleaseSummary[] };
+        setRecentReleases(page.items);
+        setReleaseId((current) => current || page.items[0]?.id || "");
+      };
+      if (trigger) {
+        const lockResult = await runWithBrowserLock("releasepilot:release-refresh", refresh);
+        if (!lockResult.acquired) throw new Error("다른 탭에서 최근 릴리스 목록을 새로고침하고 있습니다. 완료 후 다시 시도해 주세요.");
+      } else await refresh();
+    } catch (failure) {
+      setError((failure as Error).message || "최근 릴리스를 불러올 수 없습니다.");
       if (trigger) restoreFocusAfterRender(trigger);
     } finally {
       releaseListInFlight.current = false;
