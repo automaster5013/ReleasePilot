@@ -908,8 +908,11 @@ export default function Home() {
     setConnectionBusyId("refresh");
     setConnectionNotice("");
     try {
-      await Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]);
-      setConnectionNotice("외부 연결 목록을 새로고침했습니다.");
+      const lockResult = await runWithBrowserLock("releasepilot:connection-refresh", async () => {
+        await Promise.all([refreshClusterConnections(), refreshPrometheusConnections()]);
+        setConnectionNotice("외부 연결 목록을 새로고침했습니다.");
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결 목록을 새로고침하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);

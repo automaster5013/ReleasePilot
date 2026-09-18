@@ -1668,6 +1668,34 @@ test("connection refresh remains locked until both list requests complete", asyn
   } finally { respond(); }
 });
 
+test("connection refresh allows only one request pair across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const connectionRefreshGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionRefreshGate });
+  const otherState = await fixture(other, "OPERATOR", { connections: true });
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    await expect.poll(state.clusterListRequests).toBe(1);
+    await expect.poll(state.prometheusListRequests).toBe(1);
+    await page.getByRole("button", { name: "새로고침", exact: true }).click();
+    await expect.poll(state.clusterListRequests).toBe(2);
+    await expect.poll(state.prometheusListRequests).toBe(2);
+    await other.getByRole("button", { name: "새로고침", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 외부 연결 목록을 새로고침하고 있습니다." })).toBeVisible();
+    expect(otherState.clusterListRequests()).toBe(1);
+    expect(otherState.prometheusListRequests()).toBe(1);
+    respond();
+    await expect(page.getByText("외부 연결 목록을 새로고침했습니다.", { exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("OPERATOR connection validation remains single-flight before busy state renders", async ({ page }) => {
   let respond!: () => void;
   const connectionValidationGate = new Promise<void>((resolve) => { respond = resolve; });
