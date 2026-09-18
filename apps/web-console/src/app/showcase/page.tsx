@@ -127,6 +127,27 @@ export default function Showcase() {
         <p className={styles.eyebrow}>WHY RELEASEPILOT</p>
         <h2 id="difference-title">일정 관리가 끝나는 곳에서<br />ReleasePilot의 일이 시작됩니다.</h2>
         <p>Jira나 GitHub가 “언제 무엇을 배포할지” 조율한다면, ReleasePilot은 “지금 이 버전을 운영 트래픽에 더 노출해도 안전한지”를 증거로 판단하고 실행합니다.</p>
+
+        <div className={styles.comparison} role="table" aria-label="릴리스 일정 관리 도구와 ReleasePilot 비교">
+          <div className={styles.comparisonHead} role="row"><span role="columnheader">비교 기준</span><strong role="columnheader">일정·프로젝트 관리</strong><strong role="columnheader">ReleasePilot</strong></div>
+          {[
+            ["핵심 질문", "언제, 누가, 무엇을 배포하는가?", "지금 더 많은 트래픽을 보내도 안전한가?"],
+            ["판단 입력", "이슈, 일정, 담당자, 진행 상태", "승인 증거, readiness, 실시간 운영 메트릭"],
+            ["실행 동작", "업무 조율과 상태 추적", "Canary 트래픽 확대·중지·승격"],
+            ["이상 감지", "담당자에게 상황 공유", "정책 임계치로 자동 판정"],
+            ["장애 대응", "복구 작업을 별도로 조율", "트래픽 차단과 안정 버전 자동 롤백"],
+            ["남는 증거", "업무 변경 이력", "승인·메트릭·트래픽·복구 감사 체인"],
+          ].map(([label, coordination, releasePilot]) => <div className={styles.comparisonRow} role="row" key={label}><span role="rowheader">{label}</span><span role="cell">{coordination}</span><strong role="cell">{releasePilot}</strong></div>)}
+        </div>
+
+        <div className={styles.faq} aria-labelledby="faq-title">
+          <div><p className={styles.eyebrow}>QUICK ANSWERS</p><h3 id="faq-title">자주 묻는 질문</h3></div>
+          <div>
+            <details><summary>ReleasePilot은 릴리스 일정 관리 도구인가요?</summary><p>아닙니다. ReleasePilot은 승인 증거와 운영 메트릭을 바탕으로 Canary 트래픽을 제어하고 이상 시 자동 롤백하는 Progressive Delivery Control Plane입니다.</p></details>
+            <details><summary>기존 CI/CD와 함께 사용할 수 있나요?</summary><p>네. 기존 파이프라인이 만든 배포 후보를 받아 승인, 점진적 트래픽 전환, 메트릭 판정, 롤백과 감사 기록을 운영합니다.</p></details>
+            <details><summary>오류율이 임계치를 넘으면 어떻게 되나요?</summary><p>신규 버전으로 향하는 트래픽을 차단하고 안정 버전으로 복구하며, 판단 근거와 조치 이력을 남깁니다.</p></details>
+          </div>
+        </div>
       </section>
     </main>
   );

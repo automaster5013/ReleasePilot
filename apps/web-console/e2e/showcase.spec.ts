@@ -7,6 +7,9 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByText("승인 검토", { exact: true })).toBeVisible();
   await expect(page.getByText("트래픽 제어", { exact: true })).toBeVisible();
   await expect(page.getByText("자동 롤백", { exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "릴리스 일정 관리 도구와 ReleasePilot 비교" })).toBeVisible();
+  await expect(page.getByText("지금 더 많은 트래픽을 보내도 안전한가?", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "자주 묻는 질문", exact: true })).toBeVisible();
   await expect(page.getByText("승인 검토 중", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
@@ -34,7 +37,7 @@ test("control room exposes the public showcase and showcase metadata is canonica
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
   await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", /^https:\/\/releasepilot\.kr\/showcase\/opengraph-image(?:\?.+)?$/);
 
-  const structuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent() ?? "{}");
+  const structuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent() ?? "{}");
   expect(structuredData).toMatchObject({
     "@type": "SoftwareApplication",
     name: "ReleasePilot",
@@ -42,6 +45,10 @@ test("control room exposes the public showcase and showcase metadata is canonica
     url: "https://releasepilot.kr/showcase",
   });
   expect(structuredData.featureList).toContain("메트릭 기반 자동 롤백");
+  const faqStructuredData = JSON.parse(await page.locator('script[type="application/ld+json"]').nth(1).textContent() ?? "{}");
+  expect(faqStructuredData["@type"]).toBe("FAQPage");
+  expect(faqStructuredData.mainEntity).toHaveLength(3);
+  expect(faqStructuredData.mainEntity[0].name).toBe("ReleasePilot은 릴리스 일정 관리 도구인가요?");
 });
 
 test("public discovery endpoints advertise the showcase", async ({ request }) => {
