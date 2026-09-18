@@ -670,13 +670,16 @@ export default function Home() {
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/prometheus/${connectionId}/validate`, {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      const lockResult = await runWithBrowserLock("releasepilot:connection-validation", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/prometheus/${connectionId}/validate`, {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+        });
+        const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
+        if (!response.ok) throw new Error("Prometheus 연결 검증 요청이 거부되었습니다.");
+        await refreshPrometheusConnections();
+        setConnectionNotice(result?.status === "ACTIVE" ? "Prometheus 연결 검증을 통과했습니다." : `Prometheus 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
       });
-      const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
-      if (!response.ok) throw new Error("Prometheus 연결 검증 요청이 거부되었습니다.");
-      await refreshPrometheusConnections();
-      setConnectionNotice(result?.status === "ACTIVE" ? "Prometheus 연결 검증을 통과했습니다." : `Prometheus 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 검증하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
@@ -695,13 +698,16 @@ export default function Home() {
     setConnectionBusyId(connectionId);
     setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/clusters/${connectionId}/validate`, {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+      const lockResult = await runWithBrowserLock("releasepilot:connection-validation", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/clusters/${connectionId}/validate`, {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()),
+        });
+        const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
+        if (!response.ok) throw new Error("Kubernetes 연결 검증 요청이 거부되었습니다.");
+        await refreshClusterConnections();
+        setConnectionNotice(result?.status === "ACTIVE" ? "Kubernetes 연결 검증을 통과했습니다." : `Kubernetes 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
       });
-      const result = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
-      if (!response.ok) throw new Error("Kubernetes 연결 검증 요청이 거부되었습니다.");
-      await refreshClusterConnections();
-      setConnectionNotice(result?.status === "ACTIVE" ? "Kubernetes 연결 검증을 통과했습니다." : `Kubernetes 연결 검증 실패 · ${result?.failureCode ?? "UNKNOWN"}`);
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 검증하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
@@ -877,12 +883,15 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionBusyId(`all-${kind}`); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout(`/control-api/connections/${kind}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
-      if (!response.ok) throw new Error(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} 일괄 검증 요청이 거부되었습니다.`);
-      const results = await response.json() as { status: string }[];
-      if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
-      const failed = results.filter((result) => result.status !== "ACTIVE").length;
-      setConnectionNotice(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} ${results.length}개 검증 완료 · 성공 ${results.length - failed} · 실패 ${failed} · 비활성 연결 제외`);
+      const lockResult = await runWithBrowserLock("releasepilot:connection-validation", async () => {
+        const response = await fetchWithTimeout(`/control-api/connections/${kind}/validate`, { method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken()) });
+        if (!response.ok) throw new Error(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} 일괄 검증 요청이 거부되었습니다.`);
+        const results = await response.json() as { status: string }[];
+        if (kind === "clusters") await refreshClusterConnections(); else await refreshPrometheusConnections();
+        const failed = results.filter((result) => result.status !== "ACTIVE").length;
+        setConnectionNotice(`${kind === "clusters" ? "Kubernetes" : "Prometheus"} ${results.length}개 검증 완료 · 성공 ${results.length - failed} · 실패 ${failed} · 비활성 연결 제외`);
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 검증하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);

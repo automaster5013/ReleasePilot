@@ -1692,6 +1692,32 @@ test("OPERATOR connection validation remains single-flight before busy state ren
   } finally { respond(); }
 });
 
+test("OPERATOR connection validation allows only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const connectionValidationGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionValidationGate });
+  const otherState = await fixture(other, "OPERATOR", { connections: true });
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    await cluster.getByRole("button", { name: "연결 검증", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await other.getByRole("button", { name: "Prometheus 전체 검증", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 외부 연결을 검증하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/connections/clusters/cluster-role/validate", body: null }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByText("Kubernetes 연결 검증을 통과했습니다.", { exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("connection validation timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });
