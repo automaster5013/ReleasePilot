@@ -28,6 +28,8 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByText("TEST TAMPER ACTIVE", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
   await expect(page.getByRole("button", { name: "TAMPER DETECTED · OBS-025", exact: true })).toBeVisible();
+  await expect(page.getByText(/EXPECTED [0-9a-f]{8}… ≠ ACTUAL [0-9a-f]{8}… · 4 LINKS INVALID/)).toBeVisible();
+  await expect(page.locator('[data-integrity="invalid"]')).toHaveCount(4);
   await page.getByRole("button", { name: "변조 해제", exact: true }).click();
   await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
   await expect(page.getByRole("button", { name: "6/6 HASH VERIFIED", exact: true })).toBeVisible();
