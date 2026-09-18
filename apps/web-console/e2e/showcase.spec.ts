@@ -24,6 +24,13 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
   await expect(page.getByRole("button", { name: "6/6 HASH VERIFIED", exact: true })).toBeVisible();
   await expect(page.getByText(/PREV [0-9a-f]{8}… → SHA [0-9a-f]{8}…/)).toBeVisible();
+  await page.getByRole("button", { name: "선택 기록 변조 테스트", exact: true }).click();
+  await expect(page.getByText("TEST TAMPER ACTIVE", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
+  await expect(page.getByRole("button", { name: "TAMPER DETECTED · OBS-025", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "변조 해제", exact: true }).click();
+  await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
+  await expect(page.getByRole("button", { name: "6/6 HASH VERIFIED", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
   await expect(page.getByText("배포 승인됨", { exact: true })).toBeVisible();

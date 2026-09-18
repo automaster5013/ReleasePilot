@@ -42,6 +42,7 @@ export default function Showcase() {
   const [selectedEvidence, setSelectedEvidence] = useState(0);
   const [sealedHashes, setSealedHashes] = useState<string[]>([]);
   const [integrity, setIntegrity] = useState<IntegrityState>("ready");
+  const [tamperTarget, setTamperTarget] = useState<number | null>(null);
 
   useEffect(() => {
     if (phase !== "RUNNING") return;
@@ -102,19 +103,26 @@ export default function Showcase() {
       if (!current) return;
       setSealedHashes(hashes);
       setIntegrity("ready");
+      setTamperTarget(null);
     });
     return () => { current = false; };
   }, [evidenceChain]);
 
   async function verifyIntegrity() {
     setIntegrity("verifying");
-    const recalculated = await hashEvidenceChain(evidenceChain);
+    const verificationChain = evidenceChain.map((record, index) => index === tamperTarget ? { ...record, evidence: `${record.evidence} · TAMPERED` } : record);
+    const recalculated = await hashEvidenceChain(verificationChain);
     setIntegrity(recalculated.every((hash, index) => hash === sealedHashes[index]) ? "verified" : "failed");
+  }
+
+  function toggleTamperTest() {
+    setTamperTarget((current) => current === selectedEvidence ? null : selectedEvidence);
+    setIntegrity("ready");
   }
 
   function approve() { setPhase("READY"); }
   function start() { setTraffic(0); setPhase("RUNNING"); }
-  function reset() { setPhase("REVIEW"); setTraffic(0); setErrorRate(1); setSelectedEvidence(0); }
+  function reset() { setPhase("REVIEW"); setTraffic(0); setErrorRate(1); setSelectedEvidence(0); setTamperTarget(null); setIntegrity("ready"); }
 
   return (
     <main className={styles.page}>
@@ -231,9 +239,9 @@ export default function Showcase() {
               <div><dt>Policy threshold</dt><dd>{errorThreshold.toFixed(1)}%</dd></div>
             </dl>
             <section className={styles.evidence} aria-labelledby="evidence-title">
-              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><button type="button" onClick={verifyIntegrity} disabled={integrity === "verifying" || sealedHashes.length !== evidenceChain.length}>{integrity === "verified" ? "6/6 HASH VERIFIED" : integrity === "failed" ? "INTEGRITY FAILED" : integrity === "verifying" ? "VERIFYING…" : "체인 무결성 검증"}</button></div>
+              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><div><button type="button" onClick={toggleTamperTest} aria-pressed={tamperTarget === selectedEvidence}>{tamperTarget === selectedEvidence ? "변조 해제" : "선택 기록 변조 테스트"}</button><button type="button" onClick={verifyIntegrity} disabled={integrity === "verifying" || sealedHashes.length !== evidenceChain.length}>{integrity === "verified" ? "6/6 HASH VERIFIED" : integrity === "failed" ? `TAMPER DETECTED · ${evidenceChain[tamperTarget ?? 0].id}` : integrity === "verifying" ? "VERIFYING…" : "체인 무결성 검증"}</button></div></div>
               <ol>{evidenceChain.map((item, index) => <li key={item.id} data-state={item.state}><i aria-hidden="true" /><button type="button" onClick={() => setSelectedEvidence(index)} aria-current={selectedEvidence === index ? "step" : undefined}><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></button><b>{item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
-              <div className={styles.receipt} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {selectedEvidence === 0 ? "GENESIS" : `${sealedHashes[selectedEvidence - 1]?.slice(0, 8) ?? "계산 중"}…`} → SHA {sealedHashes[selectedEvidence]?.slice(0, 8) ?? "계산 중"}…</small></div>
+              <div className={styles.receipt} data-tampered={tamperTarget === selectedEvidence} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{tamperTarget === selectedEvidence ? "TEST TAMPER ACTIVE" : evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {selectedEvidence === 0 ? "GENESIS" : `${sealedHashes[selectedEvidence - 1]?.slice(0, 8) ?? "계산 중"}…`} → SHA {sealedHashes[selectedEvidence]?.slice(0, 8) ?? "계산 중"}…</small></div>
               <p className={styles.chainSeal}>{phase === "COMPLETED" ? "✓ CHAIN SEALED · PROMOTED" : recovered ? "✓ CHAIN SEALED · RECOVERED" : "SHA-256 · APPEND ONLY"}</p>
             </section>
           </aside>
