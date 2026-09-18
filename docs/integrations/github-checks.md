@@ -25,15 +25,28 @@ ReleasePilot은 서비스의 `repositoryUrl`이 `https://github.com/{owner}/{rep
 
 ## 활성화
 
-GitHub App installation token 또는 Checks 쓰기 권한이 있는 fine-grained token을 Kubernetes
-Secret 등에서 환경 변수 `GITHUB_CHECKS_TOKEN`으로 주입한다. GitHub App을 사용할 경우 token이
-만료되기 전에 외부 secret controller가 값을 갱신해야 한다.
+Check Run 쓰기는 GitHub App 전용 권한이다. AWS demo overlay는 `releasepilot-github-checks` Secret의
+`private-key.pem` 키를 `/connector-credentials/github-checks-private-key.pem`에 읽기 전용으로
+투영한다. Control Plane은 App JWT로 1시간짜리 installation token을 발급하고 만료 5분 전에
+자동 갱신한다. 장기 installation token이나 개인 access token은 저장하지 않는다.
+
+운영 토큰은 Git에 저장하지 않는다. 배포 전에 대상 namespace에 Secret을 생성한다.
+
+```bash
+kubectl -n releasepilot create secret generic releasepilot-github-checks \
+  --from-file=private-key.pem=/secure/path/releasepilot-checks.private-key.pem
+```
+
+AWS demo overlay가 적용하는 런타임 설정은 다음과 같다.
 
 ```properties
 GITHUB_CHECKS_ENABLED=true
-GITHUB_CHECKS_SECRET_REF=env:GITHUB_CHECKS_TOKEN
-GITHUB_CHECKS_TOKEN=...
+GITHUB_CHECKS_APP_ID=4993433
+GITHUB_CHECKS_INSTALLATION_ID=162831833
+GITHUB_CHECKS_PRIVATE_KEY_PATH=/connector-credentials/github-checks-private-key.pem
 ```
 
-기본값은 `GITHUB_CHECKS_ENABLED=false`다. 활성화 전에 대상 GitHub App 또는 token에 해당
-repository의 `Checks: write` 권한을 부여한다.
+기본 애플리케이션 값은 `GITHUB_CHECKS_ENABLED=false`다. AWS demo overlay는 전용 Secret이 있어야
+Pod가 시작되는 fail-closed 구성으로 이를 활성화한다. GitHub App은 대상 저장소에만 설치하고
+`Checks: write` 외에는 GitHub가 강제하는 `Metadata: read`만 허용한다. private key 교체 시 Secret의
+동일 키를 갱신하면 다음 token 발급부터 새 키를 사용한다.

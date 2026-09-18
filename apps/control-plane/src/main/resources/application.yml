@@ -105,6 +105,9 @@ releasepilot:
   github-checks:
     enabled: ${GITHUB_CHECKS_ENABLED:false}
     secret-ref: ${GITHUB_CHECKS_SECRET_REF:env:GITHUB_CHECKS_TOKEN}
+    app-id: ${GITHUB_CHECKS_APP_ID:0}
+    installation-id: ${GITHUB_CHECKS_INSTALLATION_ID:0}
+    private-key-path: ${GITHUB_CHECKS_PRIVATE_KEY_PATH:}
     poll-interval: ${GITHUB_CHECKS_POLL_INTERVAL:PT5S}
     lease-timeout: ${GITHUB_CHECKS_LEASE_TIMEOUT:PT2M}
     batch-size: ${GITHUB_CHECKS_BATCH_SIZE:20}
