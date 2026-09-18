@@ -931,10 +931,13 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionAuditBusy(true); setConnectionNotice("");
     try {
-      const response = await fetch(`/control-api/audit-events?aggregateType=${aggregateType}&aggregateId=${connectionId}`, { credentials: "include" });
-      if (!response.ok) throw new Error("연결 감사 이력을 불러올 수 없습니다.");
-      const page = await response.json() as { items: AuditEventView[] };
-      setConnectionAuditId(connectionId); setConnectionAuditEvents(page.items);
+      const lockResult = await runWithBrowserLock("releasepilot:connection-audit", async () => {
+        const response = await fetch(`/control-api/audit-events?aggregateType=${aggregateType}&aggregateId=${connectionId}`, { credentials: "include" });
+        if (!response.ok) throw new Error("연결 감사 이력을 불러올 수 없습니다.");
+        const page = await response.json() as { items: AuditEventView[] };
+        setConnectionAuditId(connectionId); setConnectionAuditEvents(page.items);
+      });
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결 감사 이력을 조회하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);

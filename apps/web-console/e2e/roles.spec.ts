@@ -1627,6 +1627,32 @@ test("OPERATOR connection audit remains single-flight before busy state renders"
   } finally { respond(); }
 });
 
+test("OPERATOR connection audit allows only one request across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const connectionAuditGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connections: true, connectionAuditGate });
+  const otherState = await fixture(other, "OPERATOR", { connections: true });
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    const cluster = page.locator("article").filter({ hasText: "Role cluster" });
+    await cluster.getByRole("button", { name: "감사 이력", exact: true }).click();
+    await expect.poll(state.connectionAuditRequests).toBe(1);
+    await other.locator("article").filter({ hasText: "Role metrics" }).getByRole("button", { name: "감사 이력", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 외부 연결 감사 이력을 조회하고 있습니다." })).toBeVisible();
+    expect(otherState.connectionAuditRequests()).toBe(0);
+    respond();
+    await expect(cluster.getByRole("button", { name: "이력 닫기", exact: true })).toBeEnabled();
+    expect(state.connectionAuditRequests()).toBe(1);
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("@a11y OPERATOR connection refresh errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { connections: true, connectionRefreshFailure: true });
   await page.goto("/");
