@@ -1308,6 +1308,42 @@ test("OPERATOR connection registration remains single-flight before busy state r
   } finally { respond(); }
 });
 
+test("OPERATOR connection registration allows only one mutation across browser tabs", async ({ page, context }) => {
+  const other = await context.newPage();
+  let respond!: () => void;
+  const connectionCreateGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { connectionCreateGate });
+  const otherState = await fixture(other, "OPERATOR");
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    await page.getByText("NEW CONNECTION", { exact: false }).click();
+    await other.getByText("NEW CONNECTION", { exact: false }).click();
+    const clusterForm = page.locator("form").filter({ has: page.getByText("Kubernetes cluster", { exact: true }) });
+    await clusterForm.getByLabel("Name", { exact: true }).fill("Production cluster");
+    await clusterForm.getByLabel("API server", { exact: true }).fill("https://cluster.example");
+    await clusterForm.getByLabel("Allowed namespaces", { exact: true }).fill("releasepilot");
+    await clusterForm.getByLabel("Secret reference", { exact: true }).fill("env:KUBERNETES_TOKEN");
+    const prometheusForm = other.locator("form").filter({ has: other.getByText("Prometheus", { exact: true }) });
+    await prometheusForm.getByLabel("Name", { exact: true }).fill("Production metrics");
+    await prometheusForm.getByLabel("Base URL", { exact: true }).fill("https://metrics.example");
+
+    await clusterForm.getByRole("button", { name: "Cluster 등록", exact: true }).click();
+    await expect.poll(() => state.mutations.length).toBe(1);
+    await prometheusForm.getByRole("button", { name: "Prometheus 등록", exact: true }).click();
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 외부 연결을 등록하고 있습니다." })).toBeVisible();
+    expect(state.mutations).toEqual([{ path: "/connections/clusters", body: { name: "Production cluster", apiServer: "https://cluster.example", allowedNamespaces: ["releasepilot"], secretRef: "env:KUBERNETES_TOKEN" } }]);
+    expect(otherState.mutations).toEqual([]);
+    respond();
+    await expect(page.getByText("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.", { exact: true })).toBeVisible();
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
+});
+
 test("connection registration timeout unlocks controls and permits one clean retry", async ({ page }) => {
   let respond!: () => void;
   const responseGate = new Promise<void>((resolve) => { respond = resolve; });

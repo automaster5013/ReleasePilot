@@ -724,13 +724,16 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout("/control-api/connections/clusters", {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
-        body: JSON.stringify({ name: clusterDraft.name.trim(), apiServer: clusterDraft.apiServer.trim(), allowedNamespaces: parseNamespaces(clusterDraft.namespaces), secretRef: clusterDraft.secretRef.trim() }),
+      const lockResult = await runWithBrowserLock("releasepilot:connection-create", async () => {
+        const response = await fetchWithTimeout("/control-api/connections/clusters", {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
+          body: JSON.stringify({ name: clusterDraft.name.trim(), apiServer: clusterDraft.apiServer.trim(), allowedNamespaces: parseNamespaces(clusterDraft.namespaces), secretRef: clusterDraft.secretRef.trim() }),
+        });
+        const problem = await response.json().catch(() => null) as { detail?: string } | null;
+        if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 등록이 거부되었습니다.");
+        setClusterDraft(emptyClusterDraft); await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
       });
-      const problem = await response.json().catch(() => null) as { detail?: string } | null;
-      if (!response.ok) throw new Error(problem?.detail ?? "Kubernetes 연결 등록이 거부되었습니다.");
-      setClusterDraft(emptyClusterDraft); await refreshClusterConnections(); setConnectionNotice("Kubernetes 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 등록하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
@@ -769,13 +772,16 @@ export default function Home() {
     setConnectionActionError("");
     setConnectionCreateBusy(true); setConnectionNotice("");
     try {
-      const response = await fetchWithTimeout("/control-api/connections/prometheus", {
-        method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
-        body: JSON.stringify({ name: prometheusDraft.name.trim(), baseUrl: prometheusDraft.baseUrl.trim(), secretRef: prometheusDraft.secretRef.trim() || null, queryTimeoutSeconds: Number(prometheusDraft.queryTimeoutSeconds) }),
+      const lockResult = await runWithBrowserLock("releasepilot:connection-create", async () => {
+        const response = await fetchWithTimeout("/control-api/connections/prometheus", {
+          method: "POST", credentials: "include", headers: mutationHeaders(await csrfToken(), { json: true }),
+          body: JSON.stringify({ name: prometheusDraft.name.trim(), baseUrl: prometheusDraft.baseUrl.trim(), secretRef: prometheusDraft.secretRef.trim() || null, queryTimeoutSeconds: Number(prometheusDraft.queryTimeoutSeconds) }),
+        });
+        const problem = await response.json().catch(() => null) as { detail?: string } | null;
+        if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 등록이 거부되었습니다.");
+        setPrometheusDraft(emptyPrometheusDraft); await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
       });
-      const problem = await response.json().catch(() => null) as { detail?: string } | null;
-      if (!response.ok) throw new Error(problem?.detail ?? "Prometheus 연결 등록이 거부되었습니다.");
-      setPrometheusDraft(emptyPrometheusDraft); await refreshPrometheusConnections(); setConnectionNotice("Prometheus 연결을 등록했습니다. 사용 전에 연결 검증을 실행하세요.");
+      if (!lockResult.acquired) throw new Error("다른 탭에서 외부 연결을 등록하고 있습니다. 완료 후 다시 시도해 주세요.");
     } catch (failure) {
       const message = (failure as Error).message;
       setConnectionActionError(message);
