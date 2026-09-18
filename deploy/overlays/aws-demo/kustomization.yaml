@@ -11,7 +11,7 @@ images:
     digest: sha256:bbd55a59d50e9fd7db72ba3628e2efe0bbdfdcad4b877daf5a7db2afd61758d0
   - name: web-console
     newName: automaster5013/releasepilot-web-console
-    digest: sha256:407bb6287f9bfde8a31b21dd198b48c7c2aeb9040d690892dc617ed7136bc010
+    digest: sha256:5f3c88c8916a55536e379b986207132b083a6f7976fecd09f959199fbeee2eea
 patches:
   - target: { kind: Rollout, name: control-plane }
     path: connector-credentials.yaml
