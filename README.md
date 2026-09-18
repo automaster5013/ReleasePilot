@@ -14,21 +14,21 @@ ReleasePilot은 Kubernetes 애플리케이션의 **배포 승인, Progressive De
 
 ## 현재 상태
 
-2026-09-19 기준 MVP와 후속 안정화 백로그를 모두 완료했습니다.
+2026-09-19 기준 MVP, 후속 안정화 백로그와 OWASP 코드 수준 최종 보안점검·보완을 모두 완료했습니다.
 
 | 영역 | 현재 상태 |
 | --- | --- |
 | 제품 백로그 | 192/192 완료 |
 | 운영 환경 | AWS 서울 리전 EKS Auto Mode, HTTPS 공개 운영 |
 | 배포 방식 | Docker Hub digest → GitOps → Argo CD → Argo Rollouts Canary |
-| Control Plane | Java 21 / Spring Boot, 205개 테스트 통과 |
+| Control Plane | Java 21 / Spring Boot, 209개 테스트 통과 |
 | Web Console | Next.js / TypeScript, Chromium·Firefox·WebKit 회귀 검사 |
-| 분석 Worker | Python, Prometheus 기반 정책 판정 |
-| 보안 | 세션·CSRF·RBAC·secret redaction·gitleaks·provenance·admission 검증 |
+| 분석 Worker | Python, Prometheus 기반 정책 판정, 서비스 간 공유 토큰 인증 |
+| 보안 | OWASP 코드 점검 완료, 프로젝트 접근 제어·SSRF allowlist·Worker 인증·PromQL 삽입 방어 |
 | 감사 | SHA-256 체인, 변조 탐지, S3 Object Lock WORM 보관 |
 | GitHub Checks | GitHub App installation token 자동 발급·갱신, 운영 Check Run 검증 완료 |
 
-현재 운영 Control Plane 이미지는 GitOps에 digest로 고정되며, 최근 GitHub Checks 통합 배포는 `sha256:dad3db6359319a0688e7176dc52a122709d176ca305a798c457ee40e2aac26f9`입니다.
+최신 보안 보완 소스 commit은 `4379839`, GitOps commit은 `2ee1c1a`입니다. 공개 데모의 Control Plane 이미지는 `sha256:96ce29a3a0bfaeac5febb64cda4067ca0798f8e0a55f5f2fdadd1358be6c307d`, Analysis Worker 이미지는 `sha256:a98af3acdc1f380a75a98c49f77621901b7de3771bb4e5d2de0df1a11badb9b6`으로 고정되어 있습니다.
 
 ## 핵심 기능
 
@@ -39,6 +39,7 @@ ReleasePilot은 Kubernetes 애플리케이션의 **배포 승인, Progressive De
 - 다중 클러스터: Environment가 배포 대상을 고정하고 namespace별 Argo Rollouts 권한을 검증
 - 감사 가능한 운영: correlation ID, append-only SHA-256 체인, 무결성 검증, JSON 보고서, 외부 WORM 보관
 - GitHub Checks 연동: 승인·배포 결과를 Check Run으로 게시하고 GitHub App token을 자동 순환
+- 서비스 신뢰 경계: 프로젝트별 분석 결과 접근 제어, 외부 대상 정확한 호스트 allowlist, Control Plane↔Worker 공유 토큰 인증
 - 운영 안전성: 멱등성, 동시성 잠금, timeout 복구, 지연 응답 격리, 접근성 있는 오류·포커스 복원
 - 공개 쇼케이스: 승인 게이트, 단계별 트래픽 전환, 자동 롤백, 증거 체인과 변조 탐지를 브라우저에서 재현
 
@@ -156,6 +157,6 @@ CD는 변경된 애플리케이션 이미지만 게시하고 digest를 GitOps ma
 
 ## 운영 범위와 다음 단계
 
-공개 데모는 EKS 내부 단일 MySQL과 읽기 전용 VIEWER 세션을 사용합니다. 별도의 production overlay에는 OIDC 전용 인증, TLS 강제, AWS Secrets Manager 연동, 기본 차단 네트워크 정책, HPA/PDB, Prometheus 경보와 k6 부하 시험 기준을 준비했습니다. 실제 전환 전에는 조직 소유 도메인·IdP·알림 수신처를 입력하고 RDS Multi-AZ, WAF, 복구 목표를 승인해야 합니다. 절차와 완료 기준은 [상용 운영 런북](docs/runbooks/production-operations.md)을 따릅니다.
+공개 데모는 EKS 내부 단일 MySQL과 읽기 전용 VIEWER 세션을 사용합니다. 별도의 production overlay에는 OIDC 전용 인증, TLS 강제, AWS Secrets Manager 연동, 기본 차단 네트워크 정책, HPA/PDB, Prometheus 경보와 k6 부하 시험 기준을 준비했습니다. OWASP 코드 점검에서 확인한 4개 항목은 보완과 회귀 검증, 기존 공개 데모 배포까지 완료했습니다. 실제 상용 전환은 현재 잠정 보류 상태이며, 재개 시 조직 소유 도메인·IdP·알림 수신처 입력과 RDS Multi-AZ, WAF, 복구 목표 승인이 필요합니다. 절차와 완료 기준은 [상용 운영 런북](docs/runbooks/production-operations.md)을 따릅니다.
 
 구현 순서, 배포 증거, CI/CD 실행과 운영 검증의 전체 흐름은 [작업 일정표](docs/roadmap/delivery-timeline.md)에 정리되어 있습니다.

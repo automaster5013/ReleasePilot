@@ -1,16 +1,17 @@
 # ReleasePilot 작업 일정표
 
-이 문서는 ReleasePilot의 초기 MVP 구축부터 운영 안정화, 공개 쇼케이스, GitHub Checks 실연동까지 실제 진행한 작업을 일정 순서로 요약한다. 세부 192개 항목과 각 테스트·배포 증거는 [MVP 실행 백로그](mvp-backlog.md)에 있다.
+이 문서는 ReleasePilot의 초기 MVP 구축부터 운영 안정화, 공개 쇼케이스, GitHub Checks 실연동과 OWASP 코드 수준 최종 보안점검까지 실제 진행한 작업을 일정 순서로 요약한다. 세부 192개 항목과 각 테스트·배포 증거는 [MVP 실행 백로그](mvp-backlog.md)에 있다.
 
 ## 완료 요약
 
 - 작업 기간: **2026-09-14 ~ 2026-09-19**
-- 완료 범위: **M0~M7 및 후속 우선순위 192/192**
-- 최종 문서 기준 commit: `183fb74`
+- 완료 범위: **M0~M7, 후속 우선순위 192/192 및 OWASP 코드 보완 4/4**
+- 최종 보안 보완 commit: `4379839`
 - GitHub Checks 기능 commit: `a8a7ab4`, 오탐 수정 `18b90ee`
-- 최종 GitOps commit: `6d7719a`
-- 최종 Control Plane digest: `sha256:dad3db6359319a0688e7176dc52a122709d176ca305a798c457ee40e2aac26f9`
-- 최종 검증: CI #369, CD #124, 문서 CI #370·#371 성공
+- 최종 GitOps commit: `2ee1c1a`
+- 최종 Control Plane digest: `sha256:96ce29a3a0bfaeac5febb64cda4067ca0798f8e0a55f5f2fdadd1358be6c307d`
+- 최종 Analysis Worker digest: `sha256:a98af3acdc1f380a75a98c49f77621901b7de3771bb4e5d2de0df1a11badb9b6`
+- 최종 검증: CI #374, Docker Hub CD #126 성공, 공개 readiness HTTP 200
 
 ## 일자별 진행표
 
@@ -21,7 +22,7 @@
 | 2026-09-16 | 동시성·접근성·운영 경계 | 릴리스·연결·세션·감사 작업의 동시성 잠금과 지연 응답 격리, CSRF·멱등성, 오류 focus 복원, 상태 메시지, 키보드·고대비·모바일 reflow를 보강했다. | Chromium/Firefox/WebKit, WCAG A·AA 자동 검사, 공개 ingress·보안 헤더 검증 |
 | 2026-09-17 | 실패 복구와 사용자 흐름 완성 | 조회·mutation 실패, timeout, 다중 탭 중복 실행, 새로고침·대상 전환 중 race condition을 체계적으로 재현하고 복구 동작을 추가했다. 운영 콘솔의 요청→승인→Rollout→감사 흐름을 역할별로 완성했다. | CI/CD 연속 성공, 브라우저 회귀 확대, Pod 재시작 0·Rollout 2/2 Healthy |
 | 2026-09-18 | 공개 쇼케이스와 감사 증거 시각화 | 공개 `/showcase`, Canary 트래픽 시뮬레이터, 승인 게이트, 자동 롤백, Policy Core, 검색 metadata·JSON-LD·소셜 이미지, 한 화면 반응형 UI를 구현했다. 감사 증거 영수증과 실제 SHA-256 검증·변조 탐지도 추가했다. | CI #353~#363 계열, GitOps digest 배포, 1440×900·320/390px·reduced-motion 검증 |
-| 2026-09-19 | 무결성 보고서와 GitHub Checks 완결 | 변조 영향 범위 진단과 JSON 보고서 내보내기를 완료했다. 저장소 전용 GitHub App을 설치하고 RS256 App JWT→installation token 자동 발급·캐시를 구현해 EKS Secret으로 배포했다. | 전체 Control Plane 205개 테스트, CI #369, CD #124, Check Run `105735510576`, CI #370·#371 |
+| 2026-09-19 | 무결성·GitHub Checks·최종 보안점검 완결 | 변조 영향 범위 진단과 JSON 보고서, GitHub App installation token 자동 발급을 완료했다. 이어 OWASP 코드 점검으로 객체 단위 접근 제어, SSRF·자격증명 전달, Worker 무인증, PromQL 삽입 위험을 확인하고 4건 모두 보완·회귀 검증·배포했다. | Control Plane 209개, Worker 10개, Web 38개 테스트; CI #374, CD #126, readiness 200 |
 
 ## 마일스톤 일정
 
@@ -38,8 +39,9 @@
 | 후속 안정화 1~177 | 지속 개선 | 2026-09-15~18 | 보안, 동시성, timeout, 접근성, 다중 탭·지연 응답 격리 |
 | 공개 쇼케이스·증거 178~192 | 지속 개선 | 2026-09-18~19 | Progressive Delivery 시각화, 감사 체인·변조 탐지·JSON 보고서 |
 | GitHub Checks 운영 연결 | 배포 설정 | 2026-09-19 | GitHub App 최소 권한, 자동 token 갱신, 실 Check Run 검증 |
+| OWASP 코드 수준 최종 점검 | 출시 전 보안 검토 | 2026-09-19 | 프로젝트 BOLA 차단, 외부 호스트 allowlist, Worker 공유 토큰, PromQL 입력 제한, 회귀·CD 검증 |
 
-초기 예상은 순차적인 10주 개발 계획이었지만, vertical slice 단위 구현과 자동화된 CI/CD 검증을 병렬화해 6일간의 집중 작업으로 완료했다. 이 기간은 기능 개발 기록을 뜻하며, 실제 조직 도입에 필요한 보안 심사·부하 시험·재해 복구 훈련 기간은 포함하지 않는다.
+초기 예상은 순차적인 10주 개발 계획이었지만, vertical slice 단위 구현과 자동화된 CI/CD 검증을 병렬화해 6일간의 집중 작업으로 완료했다. 이 기간에는 내부 OWASP 코드 점검과 보완이 포함되며, 실제 조직 도입에 필요한 외부 침투시험·부하 시험·재해 복구 훈련 기간은 포함하지 않는다.
 
 ## 단계별 결과
 
@@ -75,6 +77,14 @@
 - Control Plane이 RS256 JWT를 서명해 1시간 installation token을 발급하고 만료 5분 전에 갱신한다.
 - 운영 worker가 Check Run `105735510576`을 생성·갱신해 `GitHub App connection verified` 성공 상태를 게시했다.
 
+### 6. OWASP 코드 수준 최종 보안점검
+
+- 릴리스 분석 결과 조회에 서비스·프로젝트 역참조와 `ProjectAccess.canView` 검사를 적용해 객체 단위 권한 우회를 차단했다.
+- Kubernetes·Prometheus 연결은 정확한 호스트 allowlist와 허용 스킴을 통과한 경우에만 자격증명을 전송한다.
+- Control Plane과 Analysis Worker 사이에 공유 토큰 인증과 상수 시간 비교를 적용하고, Worker의 Prometheus 대상도 별도 allowlist로 제한했다.
+- workload label을 안전한 문자와 길이로 제한해 PromQL 문자열 삽입을 차단했다.
+- 로컬 Worker 포트를 loopback에만 공개하고 운영 필수 비밀·호스트 설정을 [OWASP 보완 문서](../security/owasp-code-review-remediation.md)에 기록했다.
+
 ## 배포와 검증 흐름
 
 ```text
@@ -89,15 +99,16 @@
   → Rollout 2/2 Healthy + 공개 HTTPS smoke test
 ```
 
-GitHub Checks 최종 통합에서는 다음 증거를 확인했다.
+최종 보안 보완 배포에서는 다음 증거를 확인했다.
 
 | 검증 | 결과 |
 | --- | --- |
-| Control Plane 전체 테스트 | 205개 성공 |
+| Control Plane 전체 테스트 | 209개 성공 |
+| Analysis Worker 테스트·lint | 10개 성공, Ruff 통과 |
+| Web Console 테스트 | 38개 성공 |
 | Secret scan | gitleaks 통과 |
-| 소스 CI | #369 성공 |
-| 이미지·GitOps CD | #124 성공 |
-| 최종 문서 CI | #370, #371 성공 |
+| 소스 CI | #374 성공 |
+| 이미지·GitOps CD | #126 성공 |
 | EKS Rollout | 2/2 Ready, Healthy |
 | Argo CD | Synced, Healthy |
 | 공개 readiness | HTTP 200 |
@@ -106,7 +117,7 @@ GitHub Checks 최종 통합에서는 다음 증거를 확인했다.
 
 ## 이후 운영 계획
 
-기존 개발 백로그 완료 후 상용 운영 준비 단계를 시작했다. 저장소에서 자동화 가능한 기반은 완료했으며, 조직 소유 계정과 운영 정책이 필요한 활성화 항목은 운영 승인 후 진행한다.
+기존 개발 백로그와 내부 OWASP 코드 보완을 완료했다. 저장소에서 자동화 가능한 기반은 완료했으며, 상용 운영 활성화는 최종 판단에 따라 잠정 보류했다. 조직 소유 계정과 운영 정책이 필요한 항목은 재개 승인 후 진행한다.
 
 | 우선순위 | 작업 | 완료 기준 |
 | --- | --- | --- |
@@ -135,3 +146,4 @@ GitHub Checks 최종 통합에서는 다음 증거를 확인했다.
 - [시스템 아키텍처](../architecture/system-architecture.md)
 - [공개 데모 Runbook](../runbooks/public-demo.md)
 - [GitHub Checks 연동](../integrations/github-checks.md)
+- [OWASP 코드 점검 보완 사항](../security/owasp-code-review-remediation.md)
