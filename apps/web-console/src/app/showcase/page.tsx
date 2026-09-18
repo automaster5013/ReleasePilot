@@ -6,12 +6,25 @@ import styles from "./showcase.module.css";
 
 type Phase = "REVIEW" | "READY" | "RUNNING" | "ROLLING_BACK" | "ROLLED_BACK" | "COMPLETED";
 type EvidenceState = "pending" | "active" | "passed" | "blocked";
-type EvidenceRecord = { id: string; label: string; evidence: string; state: EvidenceState; actor: string; source: string; previousHash: string; recordedAt: string };
+type EvidenceRecord = { id: string; label: string; evidence: string; state: EvidenceState; actor: string; source: string; recordedAt: string };
+type IntegrityState = "ready" | "verifying" | "verified" | "failed";
 
 const trafficSteps = [10, 25, 50, 100];
 const errorThreshold = 5;
 const stablePath = "M 176 239 C 286 197, 393 125, 520 120";
 const canaryPath = "M 176 261 C 286 303, 393 375, 520 380";
+
+async function hashEvidenceChain(records: EvidenceRecord[]) {
+  let previous = "GENESIS";
+  const hashes: string[] = [];
+  for (const record of records) {
+    const canonical = JSON.stringify([record.id, record.label, record.evidence, record.state, record.actor, record.source, record.recordedAt]);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${previous}:${canonical}`));
+    previous = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    hashes.push(previous);
+  }
+  return hashes;
+}
 
 const phaseCopy: Record<Phase, { label: string; detail: string }> = {
   REVIEW: { label: "승인 검토 중", detail: "운영 승인 전에는 신규 버전에 트래픽을 보내지 않습니다." },
@@ -27,6 +40,8 @@ export default function Showcase() {
   const [traffic, setTraffic] = useState(0);
   const [errorRate, setErrorRate] = useState(1);
   const [selectedEvidence, setSelectedEvidence] = useState(0);
+  const [sealedHashes, setSealedHashes] = useState<string[]>([]);
+  const [integrity, setIntegrity] = useState<IntegrityState>("ready");
 
   useEffect(() => {
     if (phase !== "RUNNING") return;
@@ -61,7 +76,7 @@ export default function Showcase() {
   const evidenceChain = useMemo(() => {
     const failed = phase === "ROLLING_BACK" || phase === "ROLLED_BACK";
     const steps: EvidenceRecord[] = [
-      { id: "APR-042", label: "운영 승인", evidence: approved ? "readiness + policy 봉인" : "책임자 서명 대기", state: approved ? "passed" : "active", actor: "on-call approver", source: "Policy v3 + readiness", previousHash: "GENESIS", recordedAt: approved ? "T+00:04" : "대기 중" },
+      { id: "APR-042", label: "운영 승인", evidence: approved ? "readiness + policy 봉인" : "책임자 서명 대기", state: approved ? "passed" : "active", actor: "on-call approver", source: "Policy v3 + readiness", recordedAt: approved ? "T+00:04" : "대기 중" },
       ...trafficSteps.map((step) => {
         const passed = traffic > step || phase === "COMPLETED";
         const active = phase === "RUNNING" && traffic === step;
@@ -73,14 +88,29 @@ export default function Showcase() {
           state: blocked ? "blocked" : passed ? "passed" : active ? "active" : "pending",
           actor: "analysis-worker",
           source: `Prometheus · ${step}% window`,
-          previousHash: step === 10 ? "a91c…8e2f" : `${String(step * 37).padStart(4, "0")}…${String(step * 91).slice(-4)}`,
           recordedAt: passed || active || blocked ? `T+${String(8 + trafficSteps.indexOf(step) * 2).padStart(2, "0")}:00` : "대기 중",
         } as const;
       }),
-      { id: failed ? "RBK-017" : "PRM-019", label: failed ? "자동 롤백" : "Stable 승격", evidence: phase === "ROLLED_BACK" ? "Stable 100% · Canary 격리" : phase === "ROLLING_BACK" ? "트래픽 복구 실행 중" : phase === "COMPLETED" ? "v1.9.0 승격 증거 봉인" : "최종 판정 대기", state: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "passed" : phase === "ROLLING_BACK" ? "active" : "pending", actor: "release-controller", source: failed ? "Policy breach action" : "All gates passed", previousHash: "f742…19bd", recordedAt: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "T+16:00" : "대기 중" },
+      { id: failed ? "RBK-017" : "PRM-019", label: failed ? "자동 롤백" : "Stable 승격", evidence: phase === "ROLLED_BACK" ? "Stable 100% · Canary 격리" : phase === "ROLLING_BACK" ? "트래픽 복구 실행 중" : phase === "COMPLETED" ? "v1.9.0 승격 증거 봉인" : "최종 판정 대기", state: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "passed" : phase === "ROLLING_BACK" ? "active" : "pending", actor: "release-controller", source: failed ? "Policy breach action" : "All gates passed", recordedAt: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "T+16:00" : "대기 중" },
     ];
     return steps;
   }, [approved, errorRate, phase, traffic]);
+
+  useEffect(() => {
+    let current = true;
+    hashEvidenceChain(evidenceChain).then((hashes) => {
+      if (!current) return;
+      setSealedHashes(hashes);
+      setIntegrity("ready");
+    });
+    return () => { current = false; };
+  }, [evidenceChain]);
+
+  async function verifyIntegrity() {
+    setIntegrity("verifying");
+    const recalculated = await hashEvidenceChain(evidenceChain);
+    setIntegrity(recalculated.every((hash, index) => hash === sealedHashes[index]) ? "verified" : "failed");
+  }
 
   function approve() { setPhase("READY"); }
   function start() { setTraffic(0); setPhase("RUNNING"); }
@@ -201,9 +231,9 @@ export default function Showcase() {
               <div><dt>Policy threshold</dt><dd>{errorThreshold.toFixed(1)}%</dd></div>
             </dl>
             <section className={styles.evidence} aria-labelledby="evidence-title">
-              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><span>CHAIN · 6 RECORDS</span></div>
+              <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><button type="button" onClick={verifyIntegrity} disabled={integrity === "verifying" || sealedHashes.length !== evidenceChain.length}>{integrity === "verified" ? "6/6 HASH VERIFIED" : integrity === "failed" ? "INTEGRITY FAILED" : integrity === "verifying" ? "VERIFYING…" : "체인 무결성 검증"}</button></div>
               <ol>{evidenceChain.map((item, index) => <li key={item.id} data-state={item.state}><i aria-hidden="true" /><button type="button" onClick={() => setSelectedEvidence(index)} aria-current={selectedEvidence === index ? "step" : undefined}><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></button><b>{item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
-              <div className={styles.receipt} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {evidenceChain[selectedEvidence].previousHash} → SHA-256 append</small></div>
+              <div className={styles.receipt} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {selectedEvidence === 0 ? "GENESIS" : `${sealedHashes[selectedEvidence - 1]?.slice(0, 8) ?? "계산 중"}…`} → SHA {sealedHashes[selectedEvidence]?.slice(0, 8) ?? "계산 중"}…</small></div>
               <p className={styles.chainSeal}>{phase === "COMPLETED" ? "✓ CHAIN SEALED · PROMOTED" : recovered ? "✓ CHAIN SEALED · RECOVERED" : "SHA-256 · APPEND ONLY"}</p>
             </section>
           </aside>

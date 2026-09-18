@@ -21,7 +21,9 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await page.getByRole("button", { name: /OBS-025 Canary 25%/ }).click();
   await expect(page.getByText("검증 영수증 · OBS-025", { exact: true })).toBeVisible();
   await expect(page.getByText(/analysis-worker · Prometheus · 25% window/)).toBeVisible();
-  await expect(page.getByText(/PREV .* → SHA-256 append/)).toBeVisible();
+  await page.getByRole("button", { name: "체인 무결성 검증", exact: true }).click();
+  await expect(page.getByRole("button", { name: "6/6 HASH VERIFIED", exact: true })).toBeVisible();
+  await expect(page.getByText(/PREV [0-9a-f]{8}… → SHA [0-9a-f]{8}…/)).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
   await expect(page.getByText("배포 승인됨", { exact: true })).toBeVisible();
