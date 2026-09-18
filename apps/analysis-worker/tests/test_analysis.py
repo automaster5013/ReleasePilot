@@ -98,6 +98,14 @@ def test_prometheus_failure_never_promotes():
     assert {item.reason_code for item in result.evidence} == {"QUERY_TIMEOUT"}
 
 
+def test_prometheus_client_rejects_non_allowlisted_target(monkeypatch):
+    from releasepilot_analysis_worker.prometheus import PrometheusClient
+
+    monkeypatch.setenv("PROMETHEUS_ALLOWED_HOSTS", "prometheus.internal")
+    with pytest.raises(PrometheusError, match="TARGET_NOT_ALLOWED"):
+        asyncio.run(PrometheusClient().query("http://127.0.0.1:9090", "vector(1)", 0, "token"))
+
+
 def test_critical_route_failure_blocks_release_even_when_global_metrics_pass():
     values = {
         ("HTTP_5XX_RATE", "canary"): 0.004, ("HTTP_5XX_RATE", "stable"): 0.002,

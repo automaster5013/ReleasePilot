@@ -17,14 +17,17 @@ public class HttpClusterValidationGateway implements ClusterValidationGateway {
     private final SecretResolver secrets;
     private final HttpClient http;
     private final ObjectMapper json;
+    private final OutboundTargetPolicy targets;
 
-    public HttpClusterValidationGateway(SecretResolver secrets,HttpClient http,ObjectMapper json){
-        this.secrets=secrets;this.http=http;this.json=json;
+    public HttpClusterValidationGateway(SecretResolver secrets,HttpClient http,ObjectMapper json,OutboundTargetPolicy targets){
+        this.secrets=secrets;this.http=http;this.json=json;this.targets=targets;
     }
 
     @Override public Result validate(ClusterConnection connection){
         var secret=secrets.resolve(connection.getSecretRef());
         if(secret.isEmpty())return invalid("SECRET_UNAVAILABLE",List.of());
+        try{targets.requireAllowed(connection.getApiServer(),java.util.Set.of("https"));}
+        catch(OutboundTargetPolicy.TargetNotAllowedException exception){return invalid("TARGET_NOT_ALLOWED",List.of());}
         try{
             String root=strip(connection.getApiServer());
             var versionResponse=send(HttpRequest.newBuilder(URI.create(root+"/version")).timeout(Duration.ofSeconds(10))

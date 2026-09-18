@@ -124,6 +124,8 @@ Control Plane은 `/actuator/prometheus`를 제공하고 trace를 OTLP HTTP로 Co
 
 Kubernetes·Prometheus token은 데이터베이스에 원문으로 저장하지 않습니다. 로컬에서는 `env:환경변수명` 형식의 `secretRef`를 사용하고, 운영에서는 projected volume과 전용 resolver로 자격 증명을 주입합니다.
 
+외부 연결은 정확한 호스트 허용목록을 통과해야 하며 Analysis Worker 호출에는 서비스 간 공유 토큰이 필요합니다. 필수 환경 변수와 교체 절차는 [OWASP 코드 점검 보완 사항](docs/security/owasp-code-review-remediation.md)을 참고하세요.
+
 GitHub Checks는 개인 access token 대신 저장소 전용 GitHub App을 사용합니다. Control Plane이 private key로 RS256 JWT를 서명해 단기 installation token을 발급하며, 만료 5분 전에 자동 갱신합니다. 설정과 키 교체 절차는 [GitHub Checks 연동 문서](docs/integrations/github-checks.md)에 있습니다.
 
 ## 테스트와 배포
@@ -150,6 +152,7 @@ CD는 변경된 애플리케이션 이미지만 게시하고 digest를 GitOps ma
 - [공개 데모 운영 Runbook](docs/runbooks/public-demo.md)
 - [3~5분 시연 스크립트](docs/runbooks/demo-script.md)
 - [GitHub Checks 연동](docs/integrations/github-checks.md)
+- [OWASP 코드 점검 보완 사항](docs/security/owasp-code-review-remediation.md)
 
 ## 운영 범위와 다음 단계
 

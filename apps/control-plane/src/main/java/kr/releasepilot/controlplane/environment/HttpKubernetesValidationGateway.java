@@ -3,10 +3,11 @@ import kr.releasepilot.controlplane.connection.*; import org.springframework.ste
 import java.net.URI; import java.net.http.*; import java.time.Duration; import java.util.*;
 @Component
 public class HttpKubernetesValidationGateway implements KubernetesValidationGateway {
- private final ClusterConnectionRepository connections; private final SecretResolver secrets; private final HttpClient http; private final ObjectMapper json;
- public HttpKubernetesValidationGateway(ClusterConnectionRepository connections,SecretResolver secrets,HttpClient http,ObjectMapper json){this.connections=connections;this.secrets=secrets;this.http=http;this.json=json;}
+ private final ClusterConnectionRepository connections; private final SecretResolver secrets; private final HttpClient http; private final ObjectMapper json; private final OutboundTargetPolicy targets;
+ public HttpKubernetesValidationGateway(ClusterConnectionRepository connections,SecretResolver secrets,HttpClient http,ObjectMapper json,OutboundTargetPolicy targets){this.connections=connections;this.secrets=secrets;this.http=http;this.json=json;this.targets=targets;}
  public Snapshot inspect(Environment env){
   var connection=connections.findById(env.getClusterId()).orElse(null); if(connection==null)return unavailable();
+  try{targets.requireAllowed(connection.getApiServer(),java.util.Set.of("https"));}catch(OutboundTargetPolicy.TargetNotAllowedException ignored){return unavailable();}
   var secret=secrets.resolve(connection.getSecretRef()).orElse(null); if(secret==null)return unavailable();
   try{
    String root=strip(connection.getApiServer()); String ns=env.getNamespace(); String name=env.getRolloutName();

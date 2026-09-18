@@ -10,10 +10,11 @@ import java.time.Duration;
 
 @Component
 public class HttpPrometheusConnectionValidationGateway implements PrometheusConnectionValidationGateway {
-    private final SecretResolver secrets;private final HttpClient http;private final ObjectMapper json;
-    public HttpPrometheusConnectionValidationGateway(SecretResolver secrets,HttpClient http,ObjectMapper json){this.secrets=secrets;this.http=http;this.json=json;}
+    private final SecretResolver secrets;private final HttpClient http;private final ObjectMapper json;private final OutboundTargetPolicy targets;
+    public HttpPrometheusConnectionValidationGateway(SecretResolver secrets,HttpClient http,ObjectMapper json,OutboundTargetPolicy targets){this.secrets=secrets;this.http=http;this.json=json;this.targets=targets;}
     @Override public Result validate(PrometheusConnection connection){
         String token=null;if(connection.getSecretRef()!=null){var secret=secrets.resolve(connection.getSecretRef());if(secret.isEmpty())return invalid("SECRET_UNAVAILABLE");token=secret.get().bearerToken();}
+        try{targets.requireAllowed(connection.getBaseUrl(),java.util.Set.of("http","https"));}catch(OutboundTargetPolicy.TargetNotAllowedException exception){return invalid("TARGET_NOT_ALLOWED");}
         try{String root=strip(connection.getBaseUrl());var ready=send(root+"/-/ready",token,connection.getQueryTimeoutSeconds());if(ready.statusCode()!=200)return invalid("PROMETHEUS_NOT_READY");var query=send(root+"/api/v1/query?query="+URLEncoder.encode("vector(1)",StandardCharsets.UTF_8),token,connection.getQueryTimeoutSeconds());if(query.statusCode()!=200)return invalid("PROMETHEUS_QUERY_FAILED");try{var body=json.readTree(query.body());if(!"success".equals(body.path("status").asText())||body.path("data").path("result").isEmpty())return invalid("PROMETHEUS_QUERY_FAILED");}catch(Exception invalidResponse){return invalid("PROMETHEUS_QUERY_FAILED");}return new Result(ConnectionStatus.ACTIVE,"");}
         catch(InterruptedException exception){Thread.currentThread().interrupt();return invalid("PROMETHEUS_UNREACHABLE");}catch(Exception exception){return invalid("PROMETHEUS_UNREACHABLE");}
     }

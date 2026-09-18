@@ -1,4 +1,6 @@
 import math
+import os
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -14,6 +16,17 @@ class PrometheusClient:
         self._timeout = timeout_seconds
 
     async def query(self, base_url: str, query: str, timestamp: float, token: str | None) -> float:
+        parsed = urlsplit(base_url)
+        allowed_hosts = {
+            host.strip().encode("idna").decode("ascii").lower()
+            for host in os.getenv("PROMETHEUS_ALLOWED_HOSTS", "").split(",")
+            if host.strip()
+        }
+        host = (parsed.hostname or "").encode("idna").decode("ascii").lower()
+        if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+            raise PrometheusError("TARGET_NOT_ALLOWED")
+        if not host or host not in allowed_hosts:
+            raise PrometheusError("TARGET_NOT_ALLOWED")
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:

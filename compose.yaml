@@ -30,6 +30,8 @@ services:
       SESSION_COOKIE_SECURE: 'false'
       DEMO_SESSION_ENABLED: ${DEMO_SESSION_ENABLED:-false}
       ANALYSIS_WORKER_URL: http://analysis-worker:8090
+      ANALYSIS_WORKER_SHARED_TOKEN: ${ANALYSIS_WORKER_SHARED_TOKEN:-releasepilot-worker-local}
+      CONNECTION_VALIDATION_ALLOWED_HOSTS: ${CONNECTION_VALIDATION_ALLOWED_HOSTS:-prometheus}
     ports:
       - '${CONTROL_PLANE_PORT:-8080}:8080'
     depends_on:
@@ -47,7 +49,10 @@ services:
     build:
       context: ./apps/analysis-worker
     ports:
-      - '${ANALYSIS_WORKER_PORT:-8090}:8090'
+      - '127.0.0.1:${ANALYSIS_WORKER_PORT:-8090}:8090'
+    environment:
+      ANALYSIS_WORKER_SHARED_TOKEN: ${ANALYSIS_WORKER_SHARED_TOKEN:-releasepilot-worker-local}
+      PROMETHEUS_ALLOWED_HOSTS: ${CONNECTION_VALIDATION_ALLOWED_HOSTS:-prometheus}
     healthcheck:
       test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
       interval: 10s

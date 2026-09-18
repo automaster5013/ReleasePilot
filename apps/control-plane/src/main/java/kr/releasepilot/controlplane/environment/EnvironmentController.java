@@ -26,7 +26,7 @@ public class EnvironmentController {
   @NotBlank @Pattern(regexp="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$") String namespace,
   @NotBlank @Size(max=253) String rolloutName,@NotBlank @Size(max=253) @Pattern(regexp="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$") String containerName,RolloutStrategy strategy,@NotBlank @Size(max=253) String stableServiceName,
   @NotBlank @Size(max=253) String canaryServiceName,@NotNull UUID prometheusConnectionId,
-  @NotEmpty Map<@Pattern(regexp="^(service_namespace|service_name)$") String,@NotBlank @Size(max=100) String> workloadLabelSelector,
+  @NotEmpty Map<@Pattern(regexp="^(service_namespace|service_name)$") String,@NotBlank @Size(max=63) @Pattern(regexp="^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$") String> workloadLabelSelector,
   @NotNull UUID defaultPolicyVersionId){}
  public record EnvironmentResponse(UUID id,UUID serviceId,String name,UUID clusterId,String namespace,String rolloutName,String containerName,String strategy,String status,Instant createdAt){static EnvironmentResponse from(Environment e){return new EnvironmentResponse(e.getId(),e.getServiceId(),e.getName(),e.getClusterId(),e.getNamespace(),e.getRolloutName(),e.getContainerName(),e.getRolloutStrategy().name(),e.getStatus().name(),e.getCreatedAt());}}
  public record EnvironmentPage(List<EnvironmentResponse> items,String nextCursor){}

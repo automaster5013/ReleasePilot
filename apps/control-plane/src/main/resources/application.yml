@@ -60,6 +60,7 @@ management:
 releasepilot:
   connection-validation:
     max-age: ${CONNECTION_VALIDATION_MAX_AGE:PT6H}
+    allowed-hosts: ${CONNECTION_VALIDATION_ALLOWED_HOSTS:}
   environment-revalidation:
     enabled: ${ENVIRONMENT_REVALIDATION_ENABLED:true}
     poll-interval: ${ENVIRONMENT_REVALIDATION_POLL_INTERVAL:PT5M}
@@ -93,6 +94,7 @@ releasepilot:
   analysis:
     enabled: ${ANALYSIS_ENABLED:true}
     worker-url: ${ANALYSIS_WORKER_URL:http://localhost:8090}
+    worker-shared-token: ${ANALYSIS_WORKER_SHARED_TOKEN:}
     poll-interval: ${ANALYSIS_POLL_INTERVAL:PT5S}
     lease-timeout: ${ANALYSIS_LEASE_TIMEOUT:PT2M}
     batch-size: ${ANALYSIS_BATCH_SIZE:20}

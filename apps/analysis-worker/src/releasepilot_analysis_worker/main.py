@@ -1,6 +1,8 @@
+import hmac
+import os
 import time
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from .evaluator import AnalysisEvaluator, default_registry
@@ -47,6 +49,16 @@ def metrics() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
+def require_worker_token(token: str | None) -> None:
+    expected = os.getenv("ANALYSIS_WORKER_SHARED_TOKEN", "")
+    if not expected or token is None or not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=401, detail="invalid service credential")
+
+
 @app.post("/v1/analyses", response_model=AnalysisResponse, tags=["analysis"])
-async def analyze(request: AnalysisRequest) -> AnalysisResponse:
+async def analyze(
+    request: AnalysisRequest,
+    x_releasepilot_worker_token: str | None = Header(default=None),
+) -> AnalysisResponse:
+    require_worker_token(x_releasepilot_worker_token)
     return await AnalysisEvaluator(default_registry(), PrometheusClient()).evaluate(request)

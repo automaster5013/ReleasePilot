@@ -38,6 +38,12 @@ class EnvironmentApiTests {
   mvc.perform(get("/api/v1/services/{id}/environments",app.getId()).with(authentication(viewer())))
    .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("SERVICE_NOT_FOUND"));
  }
+ @Test void rejectsPromqlLabelInjectionBeforePersistence() throws Exception {
+  mvc.perform(post("/api/v1/services/{id}/environments",UUID.randomUUID()).with(authentication(operator())).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("""
+   {"name":"production","clusterId":"%s","namespace":"releasepilot-demo","rolloutName":"checkout","containerName":"checkout","stableServiceName":"checkout-stable","canaryServiceName":"checkout-canary","prometheusConnectionId":"%s","workloadLabelSelector":{"service_namespace":"shop\\\"} or vector(1)","service_name":"checkout"},"defaultPolicyVersionId":"%s"}
+   """.formatted(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID())))
+   .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+ }
  private UsernamePasswordAuthenticationToken operator(){var p=new UserAccountPrincipal(UUID.randomUUID(),"operator","unused","Operator",true,List.of(new SimpleGrantedAuthority("ROLE_OPERATOR")));return UsernamePasswordAuthenticationToken.authenticated(p,p.getPassword(),p.getAuthorities());}
  private UsernamePasswordAuthenticationToken viewer(){var p=new UserAccountPrincipal(UUID.randomUUID(),"viewer","unused","Viewer",true,List.of(new SimpleGrantedAuthority("ROLE_VIEWER")));return UsernamePasswordAuthenticationToken.authenticated(p,p.getPassword(),p.getAuthorities());}
 }

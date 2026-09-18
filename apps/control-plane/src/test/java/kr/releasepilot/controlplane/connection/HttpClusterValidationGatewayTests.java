@@ -11,12 +11,13 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class HttpClusterValidationGatewayTests {
     @Test void validatesEveryNamespaceAndRequiredRolloutVerb()throws Exception{
         var server=server(false);server.start();
         try{
-            var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.of(new SecretResolver.SecretMaterial("secret")),HttpClient.newHttpClient(),new ObjectMapper());
+            var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.of(new SecretResolver.SecretMaterial("secret")),HttpClient.newHttpClient(),new ObjectMapper(),mock(OutboundTargetPolicy.class));
             var cluster=ClusterConnection.create("multi","http://127.0.0.1:"+server.getAddress().getPort(),List.of("east","west"),"env:TOKEN",Instant.now());
             var result=gateway.validate(cluster);
             assertThat(result.status()).isEqualTo(ConnectionStatus.ACTIVE);
@@ -29,7 +30,7 @@ class HttpClusterValidationGatewayTests {
     @Test void deniesActivationWhenOneClusterNamespaceLacksPatch()throws Exception{
         var server=server(true);server.start();
         try{
-            var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.of(new SecretResolver.SecretMaterial("secret")),HttpClient.newHttpClient(),new ObjectMapper());
+            var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.of(new SecretResolver.SecretMaterial("secret")),HttpClient.newHttpClient(),new ObjectMapper(),mock(OutboundTargetPolicy.class));
             var cluster=ClusterConnection.create("multi","http://127.0.0.1:"+server.getAddress().getPort(),List.of("east","west"),"env:TOKEN",Instant.now());
             var result=gateway.validate(cluster);
             assertThat(result.status()).isEqualTo(ConnectionStatus.INVALID);
@@ -40,7 +41,7 @@ class HttpClusterValidationGatewayTests {
     }
 
     @Test void missingSecretFailsClosedWithoutNetworkAccess(){
-        var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.empty(),HttpClient.newHttpClient(),new ObjectMapper());
+        var gateway=new HttpClusterValidationGateway(ref->java.util.Optional.empty(),HttpClient.newHttpClient(),new ObjectMapper(),mock(OutboundTargetPolicy.class));
         var cluster=ClusterConnection.create("offline","https://never-contact.invalid",List.of("default"),"env:MISSING",Instant.now());
         var result=gateway.validate(cluster);
         assertThat(result.status()).isEqualTo(ConnectionStatus.INVALID);

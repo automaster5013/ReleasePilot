@@ -3,10 +3,11 @@ import kr.releasepilot.controlplane.connection.*; import org.springframework.ste
 import java.net.*; import java.net.http.*; import java.nio.charset.StandardCharsets; import java.time.Duration;
 @Component
 public class HttpPrometheusValidationGateway implements PrometheusValidationGateway {
- private final PrometheusConnectionRepository connections; private final SecretResolver secrets; private final HttpClient http; private final ObjectMapper json;
- public HttpPrometheusValidationGateway(PrometheusConnectionRepository connections,SecretResolver secrets,HttpClient http,ObjectMapper json){this.connections=connections;this.secrets=secrets;this.http=http;this.json=json;}
+ private final PrometheusConnectionRepository connections; private final SecretResolver secrets; private final HttpClient http; private final ObjectMapper json; private final OutboundTargetPolicy targets;
+ public HttpPrometheusValidationGateway(PrometheusConnectionRepository connections,SecretResolver secrets,HttpClient http,ObjectMapper json,OutboundTargetPolicy targets){this.connections=connections;this.secrets=secrets;this.http=http;this.json=json;this.targets=targets;}
  public Snapshot inspect(Environment env){
   var connection=connections.findById(env.getPrometheusConnectionId()).orElse(null);if(connection==null)return unavailable();
+  try{targets.requireAllowed(connection.getBaseUrl(),java.util.Set.of("http","https"));}catch(OutboundTargetPolicy.TargetNotAllowedException ignored){return unavailable();}
   String token=connection.getSecretRef()==null?null:secrets.resolve(connection.getSecretRef()).map(SecretResolver.SecretMaterial::bearerToken).orElse(null);
   if(connection.getSecretRef()!=null&&token==null)return unavailable();
   try{String root=strip(connection.getBaseUrl());boolean ready=send(root+"/-/ready",token).statusCode()==200;
