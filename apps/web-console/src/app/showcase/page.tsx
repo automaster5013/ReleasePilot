@@ -6,6 +6,7 @@ import styles from "./showcase.module.css";
 
 type Phase = "REVIEW" | "READY" | "RUNNING" | "ROLLING_BACK" | "ROLLED_BACK" | "COMPLETED";
 type EvidenceState = "pending" | "active" | "passed" | "blocked";
+type EvidenceRecord = { id: string; label: string; evidence: string; state: EvidenceState; actor: string; source: string; previousHash: string; recordedAt: string };
 
 const trafficSteps = [10, 25, 50, 100];
 const errorThreshold = 5;
@@ -25,6 +26,7 @@ export default function Showcase() {
   const [phase, setPhase] = useState<Phase>("REVIEW");
   const [traffic, setTraffic] = useState(0);
   const [errorRate, setErrorRate] = useState(1);
+  const [selectedEvidence, setSelectedEvidence] = useState(0);
 
   useEffect(() => {
     if (phase !== "RUNNING") return;
@@ -58,8 +60,8 @@ export default function Showcase() {
   const canStart = phase === "READY" || phase === "ROLLED_BACK" || phase === "COMPLETED";
   const evidenceChain = useMemo(() => {
     const failed = phase === "ROLLING_BACK" || phase === "ROLLED_BACK";
-    const steps: { id: string; label: string; evidence: string; state: EvidenceState }[] = [
-      { id: "APR-042", label: "운영 승인", evidence: approved ? "readiness + policy 봉인" : "책임자 서명 대기", state: approved ? "passed" : "active" },
+    const steps: EvidenceRecord[] = [
+      { id: "APR-042", label: "운영 승인", evidence: approved ? "readiness + policy 봉인" : "책임자 서명 대기", state: approved ? "passed" : "active", actor: "on-call approver", source: "Policy v3 + readiness", previousHash: "GENESIS", recordedAt: approved ? "T+00:04" : "대기 중" },
       ...trafficSteps.map((step) => {
         const passed = traffic > step || phase === "COMPLETED";
         const active = phase === "RUNNING" && traffic === step;
@@ -69,16 +71,20 @@ export default function Showcase() {
           label: `Canary ${step}%`,
           evidence: blocked ? `${errorRate.toFixed(1)}% > ${errorThreshold.toFixed(1)}% · 차단` : passed ? `${errorRate.toFixed(1)}% ≤ ${errorThreshold.toFixed(1)}% · 통과` : active ? `오류율 ${errorRate.toFixed(1)}% 관측 중` : "메트릭 판정 대기",
           state: blocked ? "blocked" : passed ? "passed" : active ? "active" : "pending",
+          actor: "analysis-worker",
+          source: `Prometheus · ${step}% window`,
+          previousHash: step === 10 ? "a91c…8e2f" : `${String(step * 37).padStart(4, "0")}…${String(step * 91).slice(-4)}`,
+          recordedAt: passed || active || blocked ? `T+${String(8 + trafficSteps.indexOf(step) * 2).padStart(2, "0")}:00` : "대기 중",
         } as const;
       }),
-      { id: failed ? "RBK-017" : "PRM-019", label: failed ? "자동 롤백" : "Stable 승격", evidence: phase === "ROLLED_BACK" ? "Stable 100% · Canary 격리" : phase === "ROLLING_BACK" ? "트래픽 복구 실행 중" : phase === "COMPLETED" ? "v1.9.0 승격 증거 봉인" : "최종 판정 대기", state: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "passed" : phase === "ROLLING_BACK" ? "active" : "pending" },
+      { id: failed ? "RBK-017" : "PRM-019", label: failed ? "자동 롤백" : "Stable 승격", evidence: phase === "ROLLED_BACK" ? "Stable 100% · Canary 격리" : phase === "ROLLING_BACK" ? "트래픽 복구 실행 중" : phase === "COMPLETED" ? "v1.9.0 승격 증거 봉인" : "최종 판정 대기", state: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "passed" : phase === "ROLLING_BACK" ? "active" : "pending", actor: "release-controller", source: failed ? "Policy breach action" : "All gates passed", previousHash: "f742…19bd", recordedAt: phase === "ROLLED_BACK" || phase === "COMPLETED" ? "T+16:00" : "대기 중" },
     ];
     return steps;
   }, [approved, errorRate, phase, traffic]);
 
   function approve() { setPhase("READY"); }
   function start() { setTraffic(0); setPhase("RUNNING"); }
-  function reset() { setPhase("REVIEW"); setTraffic(0); setErrorRate(1); }
+  function reset() { setPhase("REVIEW"); setTraffic(0); setErrorRate(1); setSelectedEvidence(0); }
 
   return (
     <main className={styles.page}>
@@ -196,7 +202,8 @@ export default function Showcase() {
             </dl>
             <section className={styles.evidence} aria-labelledby="evidence-title">
               <div className={styles.evidenceHeader}><h3 id="evidence-title">감사 증거 체인</h3><span>CHAIN · 6 RECORDS</span></div>
-              <ol>{evidenceChain.map((item) => <li key={item.id} data-state={item.state}><i aria-hidden="true" /><div><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></div><b>{item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
+              <ol>{evidenceChain.map((item, index) => <li key={item.id} data-state={item.state}><i aria-hidden="true" /><button type="button" onClick={() => setSelectedEvidence(index)} aria-current={selectedEvidence === index ? "step" : undefined}><span>{item.id}</span><strong>{item.label}</strong><small>{item.evidence}</small></button><b>{item.state === "passed" ? "검증" : item.state === "blocked" ? "차단" : item.state === "active" ? "기록 중" : "대기"}</b></li>)}</ol>
+              <div className={styles.receipt} aria-live="polite"><div><span>검증 영수증 · {evidenceChain[selectedEvidence].id}</span><b>{evidenceChain[selectedEvidence].recordedAt}</b></div><p><strong>{evidenceChain[selectedEvidence].actor}</strong> · {evidenceChain[selectedEvidence].source}</p><small>PREV {evidenceChain[selectedEvidence].previousHash} → SHA-256 append</small></div>
               <p className={styles.chainSeal}>{phase === "COMPLETED" ? "✓ CHAIN SEALED · PROMOTED" : recovered ? "✓ CHAIN SEALED · RECOVERED" : "SHA-256 · APPEND ONLY"}</p>
             </section>
           </aside>

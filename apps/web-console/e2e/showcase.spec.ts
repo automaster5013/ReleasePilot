@@ -16,6 +16,12 @@ test("showcase explains and completes the approval-to-canary flow", async ({ pag
   await expect(page.getByText("APR-042", { exact: true })).toBeVisible();
   await expect(page.getByText("OBS-010", { exact: true })).toBeVisible();
   await expect(page.getByText("PRM-019", { exact: true })).toBeVisible();
+  await expect(page.getByText("검증 영수증 · APR-042", { exact: true })).toBeVisible();
+  await expect(page.getByText(/on-call approver · Policy v3/)).toBeVisible();
+  await page.getByRole("button", { name: /OBS-025 Canary 25%/ }).click();
+  await expect(page.getByText("검증 영수증 · OBS-025", { exact: true })).toBeVisible();
+  await expect(page.getByText(/analysis-worker · Prometheus · 25% window/)).toBeVisible();
+  await expect(page.getByText(/PREV .* → SHA-256 append/)).toBeVisible();
 
   await page.getByRole("button", { name: "배포 승인", exact: true }).click();
   await expect(page.getByText("배포 승인됨", { exact: true })).toBeVisible();
