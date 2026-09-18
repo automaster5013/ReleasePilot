@@ -75,6 +75,25 @@ test("desktop showcase communicates the whole product without page scrolling", a
   expect(await page.locator("[class*='faq']").evaluate((element) => element.getBoundingClientRect().bottom <= window.innerHeight)).toBe(true);
 });
 
+test("delivery routes terminate at the center edge of their release nodes", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/showcase");
+
+  for (const target of ["stable", "canary"]) {
+    const alignment = await page.evaluate((release) => {
+      const route = document.querySelector<SVGPathElement>(`[data-route="${release}"]`)!;
+      const node = document.querySelector<SVGGElement>(`[data-release="${release}"]`)!;
+      const point = route.getPointAtLength(route.getTotalLength());
+      const matrix = route.getScreenCTM()!;
+      const endpoint = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+      const bounds = node.getBoundingClientRect();
+      return { x: Math.abs(endpoint.x - bounds.left), y: Math.abs(endpoint.y - (bounds.top + bounds.height / 2)) };
+    }, target);
+    expect(alignment.x).toBeLessThan(1);
+    expect(alignment.y).toBeLessThan(1);
+  }
+});
+
 test("public discovery endpoints advertise the showcase", async ({ request }) => {
   const robots = await request.get("/robots.txt");
   expect(robots.ok()).toBe(true);

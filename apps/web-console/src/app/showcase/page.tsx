@@ -8,6 +8,8 @@ type Phase = "REVIEW" | "READY" | "RUNNING" | "ROLLING_BACK" | "ROLLED_BACK" | "
 
 const trafficSteps = [10, 25, 50, 100];
 const errorThreshold = 5;
+const stablePath = "M 176 239 C 286 197, 393 125, 520 120";
+const canaryPath = "M 176 261 C 286 303, 393 375, 520 380";
 
 const phaseCopy: Record<Phase, { label: string; detail: string }> = {
   REVIEW: { label: "승인 검토 중", detail: "운영 승인 전에는 신규 버전에 트래픽을 보내지 않습니다." },
@@ -89,14 +91,68 @@ export default function Showcase() {
         <div className={styles.workspace}>
           <section className={styles.stage} aria-label="트래픽 라우팅 시각화">
             {unsafe && (phase === "RUNNING" || phase === "ROLLING_BACK") && <div className={styles.alert} role="alert">오류율 {errorRate.toFixed(1)}% · 정책 임계치 {errorThreshold}% 초과</div>}
-            <div className={styles.router}><span>LOAD</span><strong>BALANCER</strong></div>
-            <div className={`${styles.route} ${styles.oldRoute}`}><i style={{ width: `${oldTraffic}%` }} /></div>
-            <div className={`${styles.route} ${styles.newRoute}`}><i style={{ width: `${traffic}%` }} /></div>
-            <div className={`${styles.version} ${styles.oldVersion}`}><span>STABLE</span><strong>v1.8.4</strong><b>{oldTraffic}% traffic</b></div>
-            <div className={`${styles.version} ${styles.newVersion}`} data-active={traffic > 0}><span>CANARY</span><strong>v1.9.0</strong><b>{traffic}% traffic</b></div>
-            <div className={styles.packets} aria-hidden="true">
-              {Array.from({ length: 18 }, (_, index) => <i key={index} style={{ "--index": index } as React.CSSProperties} data-canary={index < Math.round(traffic / 6)} />)}
-            </div>
+            <svg className={styles.deliveryMap} viewBox="0 0 720 500" role="img" aria-labelledby="delivery-map-title delivery-map-description">
+              <title id="delivery-map-title">ReleasePilot 실시간 Canary 트래픽 제어</title>
+              <desc id="delivery-map-description">Policy Core가 안정 버전과 Canary 버전의 트래픽을 제어하며, 10, 25, 50, 100퍼센트 검증 단계를 통과하거나 오류율 초과 시 자동 롤백합니다.</desc>
+              <defs>
+                <linearGradient id="stable-flow" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#78a8ff" stopOpacity=".28"/><stop offset="1" stopColor="#8eb7ff"/></linearGradient>
+                <linearGradient id="canary-flow" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#42d99b" stopOpacity=".35"/><stop offset="1" stopColor="#69f0b7"/></linearGradient>
+                <radialGradient id="core-fill"><stop stopColor="#17372e"/><stop offset="1" stopColor="#0b1714"/></radialGradient>
+                <filter id="flow-glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <filter id="core-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="12"/></filter>
+              </defs>
+
+              <g className={styles.mapGrid} aria-hidden="true">
+                {Array.from({ length: 12 }, (_, index) => <line key={`v-${index}`} x1={index * 60} y1="0" x2={index * 60} y2="500" />)}
+                {Array.from({ length: 9 }, (_, index) => <line key={`h-${index}`} x1="0" y1={index * 60 + 10} x2="720" y2={index * 60 + 10} />)}
+              </g>
+
+              <path className={styles.routeBed} d={stablePath}/>
+              <path className={styles.routeBed} d={canaryPath}/>
+              <path className={`${styles.flowLine} ${styles.stableFlow}`} data-route="stable" d={stablePath} pathLength="100" style={{ "--flow-level": oldTraffic } as React.CSSProperties}/>
+              <path className={`${styles.flowLine} ${styles.canaryFlow}`} data-route="canary" d={canaryPath} pathLength="100" style={{ "--flow-level": traffic } as React.CSSProperties}/>
+
+              <g className={styles.gates} aria-hidden="true">
+                {[
+                  [268, 298, 10], [337, 334, 25], [406, 365, 50], [492, 379, 100],
+                ].map(([x, y, step]) => <g key={step} transform={`translate(${x} ${y})`} data-passed={traffic >= step}><circle r="8"/><circle r="3"/><text y="-15">{step}%</text></g>)}
+              </g>
+
+              {(phase === "RUNNING" || phase === "COMPLETED") && Array.from({ length: 5 }, (_, index) => (
+                <circle className={styles.canaryPacket} r="4" key={`canary-${index}`} aria-hidden="true">
+                  <animateMotion dur="2.8s" begin={`${index * -.56}s`} repeatCount="indefinite" path={canaryPath}/>
+                </circle>
+              ))}
+              {Array.from({ length: 4 }, (_, index) => (
+                <circle className={styles.stablePacket} r="3.5" key={`stable-${index}`} aria-hidden="true">
+                  <animateMotion dur="3.2s" begin={`${index * -.8}s`} repeatCount="indefinite" path={stablePath}/>
+                </circle>
+              ))}
+
+              <g className={styles.core} transform="translate(120 250)">
+                <circle className={styles.coreAura} r="72"/>
+                <circle className={styles.coreOrbit} r="58"/>
+                <path className={styles.coreMark} d="M0-34 30-17 30 17 0 34-30 17-30-17Z"/>
+                <text className={styles.coreKicker} y="-7">RELEASEPILOT</text>
+                <text className={styles.coreName} y="12">POLICY CORE</text>
+                <text className={styles.coreStatus} y="30">{phase === "ROLLING_BACK" ? "ROLLBACK" : "ROUTING LIVE"}</text>
+              </g>
+
+              <g className={`${styles.releaseNode} ${styles.stableNode}`} data-release="stable" transform="translate(520 65)">
+                <rect width="168" height="110" rx="17"/>
+                <circle cx="22" cy="24" r="4"/><text className={styles.nodeKicker} x="34" y="28">STABLE</text>
+                <text className={styles.nodeVersion} x="20" y="61">v1.8.4</text>
+                <text className={styles.nodeTraffic} x="20" y="88">{oldTraffic}% traffic</text>
+                <text className={styles.nodeHealth} x="148" y="28" textAnchor="end">HEALTHY</text>
+              </g>
+              <g className={`${styles.releaseNode} ${styles.canaryNode}`} data-release="canary" transform="translate(520 325)" data-active={traffic > 0}>
+                <rect width="168" height="110" rx="17"/>
+                <circle cx="22" cy="24" r="4"/><text className={styles.nodeKicker} x="34" y="28">CANARY</text>
+                <text className={styles.nodeVersion} x="20" y="61">v1.9.0</text>
+                <text className={styles.nodeTraffic} x="20" y="88">{traffic}% traffic</text>
+                <text className={styles.nodeHealth} x="148" y="28" textAnchor="end">{unsafe ? "AT RISK" : "ANALYZING"}</text>
+              </g>
+            </svg>
           </section>
 
           <aside className={styles.panel} aria-live="polite">

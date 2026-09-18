@@ -6,3 +6,42 @@
 @media(max-width:850px){.comparison{overflow-x:auto}.comparisonHead,.comparisonRow{min-width:720px}.faq{grid-template-columns:1fr;gap:28px}}
 @media(min-width:1100px) and (min-height:700px){.page{height:100dvh;min-height:0;display:grid;grid-template-columns:minmax(400px,.72fr) minmax(650px,1.28fr);grid-template-rows:58px 48% 52%;overflow:hidden}.nav{grid-column:1/-1;grid-row:1;width:100%;height:58px;max-width:none;padding:0 32px}.hero{grid-column:1;grid-row:2;align-self:stretch;max-width:none;margin:0;padding:24px 28px 10px;overflow:hidden}.hero h1{max-width:650px;margin-top:12px;font-size:clamp(32px,3.35vw,52px);line-height:1.01}.lead{max-width:610px;margin-top:13px;font-size:14px;line-height:1.48}.capabilities{margin-top:16px;border-radius:14px}.capabilities article{min-height:0;padding:12px}.capabilities strong{margin-top:8px;font-size:15px}.capabilities p{margin-top:5px;font-size:11px;line-height:1.35}.simulator{grid-column:2;grid-row:2/4;align-self:stretch;display:flex;flex-direction:column;min-height:0;max-width:none;margin:14px 18px 14px 8px;padding:16px;border-radius:22px}.simHeader{flex:0 0 auto;padding:2px 2px 12px}.simHeader h2{margin-top:6px;font-size:28px}.liveBadge{padding:7px 10px}.workspace{flex:1 1 auto;min-height:0}.stage{min-height:0}.panel{padding:18px}.phase{padding-bottom:12px}.phase strong{font-size:20px}.phase p{margin-top:6px;font-size:12px}.metrics div{padding:10px 0}.timeline{margin-top:10px}.timeline p{padding-block:5px}.controls{flex:0 0 auto;grid-template-columns:.8fr 1.2fr;gap:10px;margin-top:10px}.actions{gap:7px}.actions button{min-height:48px}.errorControl{gap:10px;padding:7px 10px}.errorControl small{font-size:10px}.explainer{grid-column:1;grid-row:3;align-self:stretch;max-width:none;margin:0;padding:8px 28px 18px;overflow:hidden}.explainer>.eyebrow{display:none}.explainer h2{max-width:620px;margin-top:0;font-size:24px;line-height:1.05}.explainer>p{max-width:620px;margin-top:7px;font-size:12px;line-height:1.4}.comparison{margin-top:9px;border-radius:12px}.comparisonHead>*{padding:6px 8px;font-size:9px}.comparisonRow>*{padding:5px 8px;font-size:10px;line-height:1.25}.comparisonRow>span:first-child{font-size:9px}.faq{grid-template-columns:.45fr 1.55fr;gap:16px;margin-top:9px;padding-top:8px}.faq .eyebrow{font-size:9px}.faq h3{margin-top:5px;font-size:17px}.faq summary{padding:5px 24px 5px 0;font-size:10px}.faq summary:after{font-size:14px}.faq details p{padding:0 20px 5px 0;font-size:9px;line-height:1.35}}
 @media(min-width:1100px) and (min-height:700px){.page{grid-template-rows:58px minmax(0,48fr) minmax(0,52fr)}.hero,.simulator,.explainer{box-sizing:border-box}.hero h1{font-size:clamp(30px,2.5vw,36px)}}
+
+/* ReleasePilot delivery map: every route and target shares one SVG coordinate system. */
+.stage{overflow:hidden;background:radial-gradient(circle at 36% 53%,#123a2e 0,#0a1814 40%,#06100d 76%)}
+.stage:after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(115deg,#ffffff05,transparent 30%,transparent 70%,#53e8ad08);box-shadow:inset 0 0 80px #0007}
+.deliveryMap{position:absolute;z-index:1;inset:0;width:100%;height:100%;font-family:Arial,sans-serif}
+.mapGrid{stroke:#9ac8b5;stroke-width:.55;opacity:.055}
+.routeBed{fill:none;stroke:#789087;stroke-width:7;stroke-linecap:round;opacity:.16}
+.flowLine{fill:none;stroke-width:7;stroke-linecap:round;stroke-dasharray:var(--flow-level) 100;transition:stroke-dasharray .7s ease;filter:url(#flow-glow)}
+.stableFlow{stroke:url(#stable-flow)}
+.canaryFlow{stroke:url(#canary-flow)}
+.gates g circle:first-child{fill:#091713;stroke:#5b756b;stroke-width:1}
+.gates g circle:nth-child(2){fill:#647d73}
+.gates g text{fill:#718b81;font-size:9px;font-weight:700;text-anchor:middle;letter-spacing:.06em}
+.gates g[data-passed=true] circle:first-child{stroke:#69f0b7}
+.gates g[data-passed=true] circle:nth-child(2){fill:#69f0b7;filter:url(#flow-glow)}
+.gates g[data-passed=true] text{fill:#87e9c1}
+.stablePacket{fill:#9bbcff;filter:url(#flow-glow)}
+.canaryPacket{fill:#74f4bd;filter:url(#flow-glow)}
+.coreAura{fill:#55e7ab;opacity:.08;filter:url(#core-glow)}
+.coreOrbit{fill:url(#core-fill);stroke:#7fa6ff;stroke-width:1.5;stroke-dasharray:4 3}
+.coreMark{fill:#10231d;stroke:#60e4af;stroke-width:1.5}
+.core text{text-anchor:middle}
+.coreKicker{fill:#8ba299;font-size:7px;font-weight:700;letter-spacing:.16em}
+.coreName{fill:#edf8f3;font-size:11px;font-weight:800}
+.coreStatus{fill:#63e7a5;font-size:7px;font-weight:700;letter-spacing:.12em}
+.releaseNode rect{fill:#0d1a17;stroke:#50625c;stroke-width:1}
+.releaseNode circle{fill:#82a9fa}
+.releaseNode text{font-weight:700}
+.releaseNode .nodeKicker{fill:#a6bbb2;font-size:9px;letter-spacing:.15em}
+.releaseNode .nodeVersion{fill:#f1faf6;font-size:22px}
+.releaseNode .nodeTraffic{fill:#87adff;font-size:12px}
+.releaseNode .nodeHealth{fill:#72887f;font-size:7px;letter-spacing:.08em}
+.stableNode rect{stroke:#7098ec}
+.canaryNode circle{fill:#52645d}
+.canaryNode .nodeTraffic{fill:#63e7a5}
+.canaryNode[data-active=true] rect{stroke:#60e4ad;filter:url(#flow-glow)}
+.canaryNode[data-active=true] circle{fill:#63e7a5}
+.canaryNode[data-active=true] .nodeHealth{fill:#63e7a5}
+@media(prefers-reduced-motion:reduce){.stablePacket,.canaryPacket{display:none}}
