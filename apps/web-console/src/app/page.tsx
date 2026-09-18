@@ -168,7 +168,7 @@ export default function Home() {
     setAuditIntegrityBusy(true);
     try {
       const verify = async () => {
-        const response = await fetch("/control-api/audit-events/verify", { credentials: "include" });
+        const response = await fetchWithTimeout("/control-api/audit-events/verify", { credentials: "include" });
         if (!response.ok) throw new Error();
         setAuditIntegrity(await response.json() as AuditChainVerification);
       };

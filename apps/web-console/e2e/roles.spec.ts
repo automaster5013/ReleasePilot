@@ -2011,6 +2011,42 @@ test("audit integrity verification allows only one manual request across browser
   }
 });
 
+test("audit integrity verification timeout unlocks the control and permits one clean retry", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR");
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    let verificationAttempts = 0;
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+      const pending = nativeFetch(input, init);
+      if (url.pathname !== "/control-api/audit-events/verify") return pending;
+      verificationAttempts++;
+      if (verificationAttempts !== 2) return pending;
+      void pending.catch(() => undefined);
+      return new Promise<Response>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+      });
+    }) as typeof window.fetch;
+  });
+
+  await page.goto("/");
+  await expect.poll(state.auditIntegrityRequests).toBe(1);
+  const verify = page.getByRole("button", { name: "Verified · 0 events", exact: true });
+  await verify.click();
+  await expect.poll(state.auditIntegrityRequests).toBe(2);
+  await expect(page.getByRole("button", { name: "Verifying…", exact: true })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+  const retry = page.getByRole("button", { name: "Verification unavailable", exact: true });
+  await expect(retry).toBeEnabled();
+  await expect(retry).toBeFocused();
+
+  await retry.click();
+  await expect.poll(state.auditIntegrityRequests).toBe(3);
+  await expect(page.getByRole("button", { name: "Verified · 0 events", exact: true })).toBeEnabled();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 test("@a11y OPERATOR revoke other sessions errors preserve trigger focus", async ({ page }) => {
   const state = await fixture(page, "OPERATOR", { activeSessions: true, failure: "SESSION_REVOKE_REJECTED" });
   page.on("dialog", (dialog) => dialog.accept());
