@@ -361,7 +361,8 @@ test("operator release actions allow only one mutation across browser tabs", asy
   page.on("dialog", (dialog) => dialog.accept("Cross-tab promote"));
   other.on("dialog", (dialog) => dialog.accept("Cross-tab abort"));
   try {
-    await Promise.all([load(page), load(other)]);
+    await load(page);
+    await load(other);
     await page.getByRole("button", { name: "Promote", exact: true }).click();
     await expect.poll(() => state.mutations.length).toBe(1);
     await other.getByRole("button", { name: "Abort", exact: true }).click();
@@ -466,7 +467,8 @@ test("approval decisions allow only one mutation across browser tabs", async ({ 
   page.on("dialog", (dialog) => dialog.accept("Cross-tab approve"));
   other.on("dialog", (dialog) => dialog.accept("Cross-tab reject"));
   try {
-    await Promise.all([load(page), load(other)]);
+    await load(page);
+    await load(other);
     await page.getByRole("button", { name: "Approve", exact: true }).click();
     await expect.poll(() => state.mutations.length).toBe(1);
     await other.getByRole("button", { name: "Reject", exact: true }).click();
@@ -1911,6 +1913,35 @@ test("release load remains locked until the current detail request completes", a
     expect(state.mutations).toEqual([]);
     expect(state.unexpected).toEqual([]);
   } finally { respond(); }
+});
+
+test("release load allows only one detail request across browser tabs", async ({ page, context }) => {
+  let respond!: () => void;
+  const releaseLoadGate = new Promise<void>((resolve) => { respond = resolve; });
+  const state = await fixture(page, "OPERATOR", { releaseLoadGate });
+  const other = await context.newPage();
+  const otherState = await fixture(other, "OPERATOR");
+  try {
+    await page.goto("/");
+    await other.goto("/");
+    await page.getByRole("combobox", { name: "최근 릴리스" }).selectOption("role-release");
+    await other.getByRole("combobox", { name: "최근 릴리스" }).selectOption("role-release");
+
+    await page.getByRole("button", { name: "불러오기", exact: true }).click();
+    await expect.poll(state.releaseLoadRequests).toBe(1);
+    await other.getByRole("button", { name: "불러오기", exact: true }).click();
+
+    await expect(other.getByRole("alert").filter({ hasText: "다른 탭에서 릴리스 상세를 조회하고 있습니다. 완료 후 다시 시도해 주세요." })).toBeVisible();
+    expect(otherState.releaseLoadRequests()).toBe(0);
+    respond();
+    await expect(page.getByRole("heading", { name: "release · v-role", exact: true })).toBeVisible();
+    expect(state.releaseLoadRequests()).toBe(1);
+    expect(state.unexpected).toEqual([]);
+    expect(otherState.unexpected).toEqual([]);
+  } finally {
+    respond();
+    await other.close();
+  }
 });
 
 test("@a11y OPERATOR audit integrity errors preserve trigger focus", async ({ page }) => {

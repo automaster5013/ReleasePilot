@@ -538,7 +538,10 @@ export default function Home() {
     releaseLoadInFlight.current = true;
     const trigger = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
     setReleaseLoadBusy(true);
-    try { await load(releaseId.trim()); } catch (failure) {
+    try {
+      const lockResult = await runWithBrowserLock("releasepilot:release-load", () => load(releaseId.trim()));
+      if (!lockResult.acquired) throw new Error("다른 탭에서 릴리스 상세를 조회하고 있습니다. 완료 후 다시 시도해 주세요.");
+    } catch (failure) {
       setError((failure as Error).message);
       restoreFocusAfterRender(trigger);
     } finally {
