@@ -947,7 +947,7 @@ export default function Home() {
     setConnectionAuditBusy(true); setConnectionNotice("");
     try {
       const lockResult = await runWithBrowserLock("releasepilot:connection-audit", async () => {
-        const response = await fetch(`/control-api/audit-events?aggregateType=${aggregateType}&aggregateId=${connectionId}`, { credentials: "include" });
+        const response = await fetchWithTimeout(`/control-api/audit-events?aggregateType=${aggregateType}&aggregateId=${connectionId}`, { credentials: "include" });
         if (!response.ok) throw new Error("연결 감사 이력을 불러올 수 없습니다.");
         const page = await response.json() as { items: AuditEventView[] };
         setConnectionAuditId(connectionId); setConnectionAuditEvents(page.items);
