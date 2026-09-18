@@ -65,8 +65,8 @@ export default function Showcase() {
   return (
     <main className={styles.page}>
       <nav className={styles.nav} aria-label="쇼케이스 탐색">
-        <Link href="/" className={styles.brand}><span>RP</span>ReleasePilot</Link>
-        <Link href="/" className={styles.consoleLink}>Control room 열기 <span aria-hidden="true">↗</span></Link>
+        <Link href="/showcase" className={styles.brand}><span>RP</span>ReleasePilot</Link>
+        <Link href="/console" className={styles.consoleLink}>Control room 열기 <span aria-hidden="true">↗</span></Link>
       </nav>
 
       <section className={styles.hero} aria-labelledby="showcase-title">
@@ -143,7 +143,7 @@ export default function Showcase() {
         <div className={styles.faq} aria-labelledby="faq-title">
           <div><p className={styles.eyebrow}>QUICK ANSWERS</p><h3 id="faq-title">자주 묻는 질문</h3></div>
           <div>
-            <details><summary>ReleasePilot은 릴리스 일정 관리 도구인가요?</summary><p>아닙니다. ReleasePilot은 승인 증거와 운영 메트릭을 바탕으로 Canary 트래픽을 제어하고 이상 시 자동 롤백하는 Progressive Delivery Control Plane입니다.</p></details>
+            <details open><summary>ReleasePilot은 릴리스 일정 관리 도구인가요?</summary><p>아닙니다. ReleasePilot은 승인 증거와 운영 메트릭을 바탕으로 Canary 트래픽을 제어하고 이상 시 자동 롤백하는 Progressive Delivery Control Plane입니다.</p></details>
             <details><summary>기존 CI/CD와 함께 사용할 수 있나요?</summary><p>네. 기존 파이프라인이 만든 배포 후보를 받아 승인, 점진적 트래픽 전환, 메트릭 판정, 롤백과 감사 기록을 운영합니다.</p></details>
             <details><summary>오류율이 임계치를 넘으면 어떻게 되나요?</summary><p>신규 버전으로 향하는 트래픽을 차단하고 안정 버전으로 복구하며, 판단 근거와 조치 이력을 남깁니다.</p></details>
           </div>

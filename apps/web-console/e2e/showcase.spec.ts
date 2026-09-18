@@ -51,6 +51,30 @@ test("control room exposes the public showcase and showcase metadata is canonica
   expect(faqStructuredData.mainEntity[0].name).toBe("ReleasePilot은 릴리스 일정 관리 도구인가요?");
 });
 
+test("public domain root leads with the showcase while the control room remains available", async ({ request, page }) => {
+  const root = await request.get("/", { headers: { "X-Forwarded-Host": "releasepilot.kr" }, maxRedirects: 0 });
+  expect(root.status()).toBe(307);
+  expect(root.headers().location).toBe("https://releasepilot.kr/showcase");
+
+  await page.goto("/console");
+  await expect(page.getByRole("heading", { name: /Progressive delivery/ })).toBeVisible();
+  await page.goto("/showcase");
+  await expect(page.getByRole("link", { name: /Control room 열기/ })).toHaveAttribute("href", "/console");
+});
+
+test("desktop showcase communicates the whole product without page scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/showcase");
+  await expect(page.getByRole("heading", { name: /안전한 결정을 운영하는 플랫폼/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Canary deployment simulator" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "릴리스 일정 관리 도구와 ReleasePilot 비교" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "자주 묻는 질문" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= document.documentElement.clientHeight)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  expect(await page.locator("[class*='controls']").evaluate((element) => element.getBoundingClientRect().bottom <= window.innerHeight)).toBe(true);
+  expect(await page.locator("[class*='faq']").evaluate((element) => element.getBoundingClientRect().bottom <= window.innerHeight)).toBe(true);
+});
+
 test("public discovery endpoints advertise the showcase", async ({ request }) => {
   const robots = await request.get("/robots.txt");
   expect(robots.ok()).toBe(true);
