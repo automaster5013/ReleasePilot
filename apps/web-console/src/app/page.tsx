@@ -248,13 +248,13 @@ export default function Home() {
   }, [sessionUser]);
 
   const refreshPrometheusConnections = useCallback(async () => {
-    const response = await fetch("/control-api/connections/prometheus", { credentials: "include" });
+    const response = await fetchWithTimeout("/control-api/connections/prometheus", { credentials: "include" });
     if (!response.ok) throw new Error("Prometheus 연결 목록을 불러올 수 없습니다.");
     setPrometheusConnections(await response.json() as PrometheusConnection[]);
   }, []);
 
   const refreshClusterConnections = useCallback(async () => {
-    const response = await fetch("/control-api/connections/clusters", { credentials: "include" });
+    const response = await fetchWithTimeout("/control-api/connections/clusters", { credentials: "include" });
     if (!response.ok) throw new Error("Kubernetes 연결 목록을 불러올 수 없습니다.");
     setClusterConnections(await response.json() as ClusterConnection[]);
   }, []);

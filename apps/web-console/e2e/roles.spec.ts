@@ -1724,6 +1724,45 @@ test("connection refresh allows only one request pair across browser tabs", asyn
   }
 });
 
+test("connection refresh timeout unlocks the control and permits one clean retry", async ({ page }) => {
+  const state = await fixture(page, "OPERATOR", { connections: true });
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    let clusterListAttempts = 0;
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+      const pending = nativeFetch(input, init);
+      if (url.pathname !== "/control-api/connections/clusters" || init?.method) return pending;
+      clusterListAttempts++;
+      if (clusterListAttempts !== 2) return pending;
+      void pending.catch(() => undefined);
+      return new Promise<Response>((_resolve, reject) => {
+        setTimeout(() => reject(new Error("요청 시간이 초과되었습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.")), 1_000);
+      });
+    }) as typeof window.fetch;
+  });
+
+  await page.goto("/");
+  await expect.poll(state.clusterListRequests).toBe(1);
+  await expect.poll(state.prometheusListRequests).toBe(1);
+  const refresh = page.getByRole("button", { name: "새로고침", exact: true });
+  await refresh.click();
+  await expect.poll(state.clusterListRequests).toBe(2);
+  await expect.poll(state.prometheusListRequests).toBe(2);
+  await expect(page.getByRole("button", { name: "새로고침 중…", exact: true })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "요청 시간이 초과되었습니다." })).toBeVisible();
+  await expect(refresh).toBeEnabled();
+  await expect(refresh).toBeFocused();
+
+  await refresh.click();
+  await expect.poll(state.clusterListRequests).toBe(3);
+  await expect.poll(state.prometheusListRequests).toBe(3);
+  await expect(page.getByText("외부 연결 목록을 새로고침했습니다.", { exact: true })).toBeVisible();
+  await expect(refresh).toBeEnabled();
+  expect(state.mutations).toEqual([]);
+  expect(state.unexpected).toEqual([]);
+});
+
 test("OPERATOR connection validation remains single-flight before busy state renders", async ({ page }) => {
   let respond!: () => void;
   const connectionValidationGate = new Promise<void>((resolve) => { respond = resolve; });
