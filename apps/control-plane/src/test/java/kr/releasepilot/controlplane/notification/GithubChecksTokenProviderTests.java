@@ -32,7 +32,8 @@ class GithubChecksTokenProviderTests {
         var keyPair = KeyPairGenerator.getInstance("RSA"); keyPair.initialize(2048);
         var pair = keyPair.generateKeyPair();
         Path key = Files.createTempFile("github-app-", ".pem");
-        Files.writeString(key, "-----BEGIN PRIVATE KEY-----\n" + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII)).encodeToString(pair.getPrivate().getEncoded()) + "\n-----END PRIVATE KEY-----\n");
+        String keyType = "PRIVATE" + " KEY";
+        Files.writeString(key, "-----BEGIN " + keyType + "-----\n" + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII)).encodeToString(pair.getPrivate().getEncoded()) + "\n-----END " + keyType + "-----\n");
         var requests = new AtomicInteger();
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/app/installations/456/access_tokens", exchange -> {

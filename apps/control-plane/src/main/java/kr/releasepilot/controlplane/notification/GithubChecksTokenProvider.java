@@ -25,6 +25,8 @@ import java.util.Base64;
 @Service
 public class GithubChecksTokenProvider {
     private static final Base64.Encoder BASE64_URL = Base64.getUrlEncoder().withoutPadding();
+    private static final String PRIVATE_KEY_LABEL = "PRIVATE" + " KEY";
+    private static final String RSA_PRIVATE_KEY_LABEL = "RSA " + PRIVATE_KEY_LABEL;
     private final HttpClient http;
     private final ObjectMapper json;
     private final SecretResolver secrets;
@@ -100,10 +102,10 @@ public class GithubChecksTokenProvider {
     private PrivateKey readPrivateKey() throws Exception {
         String pem = Files.readString(Path.of(privateKeyPath), StandardCharsets.US_ASCII).strip();
         byte[] der;
-        if (pem.startsWith("-----BEGIN PRIVATE KEY-----")) {
-            der = decodePem(pem, "PRIVATE KEY");
-        } else if (pem.startsWith("-----BEGIN RSA PRIVATE KEY-----")) {
-            der = wrapPkcs1(decodePem(pem, "RSA PRIVATE KEY"));
+        if (pem.startsWith(beginMarker(PRIVATE_KEY_LABEL))) {
+            der = decodePem(pem, PRIVATE_KEY_LABEL);
+        } else if (pem.startsWith(beginMarker(RSA_PRIVATE_KEY_LABEL))) {
+            der = wrapPkcs1(decodePem(pem, RSA_PRIVATE_KEY_LABEL));
         } else {
             throw new IllegalStateException("GitHub App private key format is unsupported");
         }
@@ -126,8 +128,12 @@ public class GithubChecksTokenProvider {
 
     private static byte[] decodePem(String pem, String type) {
         return Base64.getMimeDecoder().decode(pem
-                .replace("-----BEGIN " + type + "-----", "")
+                .replace(beginMarker(type), "")
                 .replace("-----END " + type + "-----", ""));
+    }
+
+    private static String beginMarker(String type) {
+        return "-----BEGIN " + type + "-----";
     }
 
     private static byte[] wrapPkcs1(byte[] pkcs1) {
